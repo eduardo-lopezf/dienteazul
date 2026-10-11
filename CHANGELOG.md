@@ -49,6 +49,19 @@ frontend as a Nuxt layer under its own Python package.
   instead of the copy cached at boot, and reports `pending_enabled` for an
   App whose status in the file differs from what is running. What is
   mounted is still decided at boot.
+- **A clinic can be moved to another account tier on its own.**
+  `PUT /ops/clinics/{id}/tier` changes the tier, adds the Apps the new
+  one makes mandatory and leaves the rest; the new tier's limits hold
+  from the next request.
+- **An account tier can be given limits, and they are held.**
+  `tier_limits` (migration `0020`) says how many users a clinic of a tier
+  may add besides its holder and how much disk its files may take; the
+  control plane writes it with `PUT /ops/limits`. `POST /auth/users` and
+  every upload into the clinic's folder answer `403` past the limit
+  (`app/core/auth/limits.py`). A tier with no row has no limit, so an
+  installation without a control plane is unchanged. Settings → Apps →
+  Espacio de trabajo shows the clinic what it is allowed and what it uses
+  (`GET /auth/clinic/limits`, `admin.clinic.read`).
 - **A clinic's Apps can be changed one at a time by the operator.**
   `PUT /ops/clinics/{id}/apps` sets what a clinic has and what it is
   offered, and nothing else, under the rules of creation; it takes effect

@@ -105,9 +105,15 @@ export function useApi() {
           await navigateTo('/change-password')
           throw error
         }
+        // What the account's tier allows was reached: say that, wherever
+        // the user or the file was being added from.
+        const limitReached = {
+          'User limit reached': 'settings.workspace.limits.userLimitReached',
+          'Storage limit reached': 'settings.workspace.limits.storageLimitReached'
+        }[fetchError.data?.message ?? '']
         toast.add({
           title: t('common.error'),
-          description: t('common.forbidden', 'Acceso denegado'),
+          description: limitReached ? t(limitReached) : t('common.forbidden', 'Acceso denegado'),
           color: 'error'
         })
         throw error

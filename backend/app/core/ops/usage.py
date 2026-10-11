@@ -40,6 +40,8 @@ class ClinicUsage:
     id: UUID
     name: str
     created_at: datetime
+    #: What its limits go by.
+    account_tier: str
     #: Apps chosen for it at creation; ``None`` means all of them.
     apps: list[str] | None
     users: int
@@ -229,6 +231,7 @@ async def measure(db: AsyncSession, storage_root: Path, *, refresh: bool) -> Dep
                 id=clinic.id,
                 name=clinic.name,
                 created_at=clinic.created_at,
+                account_tier=clinic.account_tier,
                 apps=clinic.apps,
                 users=users.get(clinic.id, 0),
                 database_bytes=shares.get(clinic.id, (0, 0))[0],

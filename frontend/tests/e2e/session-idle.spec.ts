@@ -1,5 +1,5 @@
 import type { Browser, Page } from '@playwright/test'
-import { expect, test } from './_fixtures'
+import { awaitHydration, expect, test } from './_fixtures'
 
 const LAST_ACTIVITY_COOKIE = 'session:last-activity'
 const HOUR_MS = 60 * 60 * 1000
@@ -9,12 +9,29 @@ async function freshContext(browser: Browser) {
 }
 
 async function logInThroughForm(page: Page): Promise<void> {
-  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 120_000 })
+  // Only when we are not already there. Half the tests below arrive at the
+  // login screen by being sent to it — `/login?redirect=%2Fpatients` — and
+  // navigating again dropped the `redirect`, so the session resumed at `/`
+  // and every "returns there after login" assertion failed on the app
+  // doing exactly what it was asked.
+  if (!new URL(page.url()).pathname.startsWith('/login')) {
+    await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 120_000 })
+  }
+  // Before Vue is in charge the button is enabled and inert, so clicking it
+  // here filled the form and submitted nothing — which is what every test
+  // below mistook for "the session did not survive".
+  await awaitHydration(page)
   const submit = page.getByRole('button', { name: 'Entrar' })
   await expect(submit).toBeEnabled({ timeout: 60_000 })
   await page.getByPlaceholder('Correo electrónico').fill('admin@demo.clinic')
   await page.getByPlaceholder('Contraseña').fill('demo1234')
   await submit.click()
+  // Returning on the click handed the next line a session that did not
+  // exist yet: the cookies arrive with the response, so a request made in
+  // between is anonymous and comes back 302. Where it lands is the test's
+  // business — `/` or the deep link it was sent from — so wait for the
+  // login screen to be gone, not for a particular page.
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 })
 }
 
 // Cold dev-server compiles of /patients and /login.

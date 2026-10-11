@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID
 
 import jwt
@@ -99,6 +100,7 @@ async def test_usage_lists_each_clinic_with_its_share(
     [clinic] = usage["clinics"]
     assert clinic["id"] == str(test_clinic.id)
     assert clinic["users"] == 1
+    assert clinic["account_tier"] == test_clinic.account_tier
     assert clinic["database_rows"] >= 1
     assert 0 < clinic["database_bytes"] <= usage["database_bytes"]
     assert usage["shared_database_bytes"] + clinic["database_bytes"] == usage["database_bytes"]
@@ -897,3 +899,108 @@ async def test_a_clinics_apps_are_changed_on_their_own_and_at_once(
         f"/api/v1/ops/clinics/{clinic_id}/apps", json={"apps": HOLDER["apps"]}, headers=_token()
     )
     assert refused.status_code == 422
+
+
+async def test_a_clinic_moves_to_another_tier_and_keeps_its_apps(
+    client: AsyncClient, ops_enabled: None
+) -> None:
+    payload = HOLDER | {"account_tier": "basic", "apps": [*HOLDER["apps"], "recalls"]}
+    created = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
+    clinic_id = created.json()["data"]["clinic_id"]
+    url = f"/api/v1/ops/clinics/{clinic_id}/tier"
+
+    # To a clinic: what that tier makes mandatory comes with it.
+    response = await client.put(url, json={"account_tier": "clinic"}, headers=_token())
+    assert response.status_code == 200, response.text
+    clinic = response.json()["data"]
+    assert clinic["account_tier"] == "clinic"
+    assert {"recalls", "professionals"} <= set(clinic["apps"])
+    assert clinic["name"] == "Aurelia Zamarripa"
+
+    # And back: nothing it has is taken away.
+    response = await client.put(url, json={"account_tier": "medium"}, headers=_token())
+    clinic = response.json()["data"]
+    assert (clinic["account_tier"], clinic["name"]) == ("medium", "Aurelia Zamarripa")
+    assert "recalls" in clinic["apps"]
+
+    refused = await client.put(url, json={"account_tier": "nonsense"}, headers=_token())
+    assert refused.status_code == 422
+
+
+# --- What a tier is allowed -------------------------------------------------
+
+
+async def _set_limits(client: AsyncClient, tier: str, **limits: int | None) -> None:
+    response = await client.put("/api/v1/ops/limits", json={tier: limits}, headers=_token())
+    assert response.status_code == 200, response.text
+
+
+def _new_user(n: int) -> dict[str, str]:
+    return {
+        "email": f"extra{n}@example.com",
+        "password": "TestPass1234",
+        "first_name": "Extra",
+        "last_name": str(n),
+        "role": "receptionist",
+    }
+
+
+async def test_limits_are_replaced_whole(client: AsyncClient, ops_enabled: None) -> None:
+    await _set_limits(client, "basic", extra_users=0, storage_mb=20)
+    await _set_limits(client, "medium", extra_users=2, storage_mb=None)
+
+    response = await client.get("/api/v1/ops/limits", headers=_token())
+    assert response.json()["data"] == {"medium": {"extra_users": 2, "storage_mb": None}}
+
+
+async def test_a_clinic_adds_no_more_users_than_its_tier_allows(
+    client: AsyncClient, ops_enabled: None, test_clinic: Clinic, auth_headers: dict[str, str]
+) -> None:
+    await _set_limits(client, test_clinic.account_tier, extra_users=1)
+
+    first = await client.post("/api/v1/auth/users", json=_new_user(1), headers=auth_headers)
+    assert first.status_code == 201, first.text
+    second = await client.post("/api/v1/auth/users", json=_new_user(2), headers=auth_headers)
+    assert (second.status_code, second.json()["message"]) == (403, "User limit reached")
+
+    limits = await client.get("/api/v1/auth/clinic/limits", headers=auth_headers)
+    assert limits.json()["data"]["users"] == 2
+    assert limits.json()["data"]["users_limit"] == 2
+
+    # The limit is the operator's to move, and moving it is enough.
+    await _set_limits(client, test_clinic.account_tier, extra_users=None)
+    third = await client.post("/api/v1/auth/users", json=_new_user(2), headers=auth_headers)
+    assert third.status_code == 201, third.text
+
+
+async def test_an_upload_that_does_not_fit_is_refused(
+    client: AsyncClient,
+    ops_enabled: None,
+    test_clinic: Clinic,
+    auth_headers: dict[str, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "STORAGE_LOCAL_PATH", str(tmp_path))
+    folder = tmp_path / str(test_clinic.id)
+    folder.mkdir()
+    (folder / "held.bin").write_bytes(b"0" * (1024 * 1024 - 10))
+    await _set_limits(client, test_clinic.account_tier, storage_mb=1)
+
+    upload = {
+        "files": {"file": ("x.pdf", b"%PDF-1.4 " + b"0" * 100, "application/pdf")},
+        "data": {"document_type": "other", "title": "x"},
+        "headers": auth_headers,
+    }
+    url = f"/api/v1/media/patients/{test_clinic.id}/documents"
+    refused = await client.post(url, **upload)
+    assert (refused.status_code, refused.json()["message"]) == (403, "Storage limit reached")
+
+    limits = await client.get("/api/v1/auth/clinic/limits", headers=auth_headers)
+    assert limits.json()["data"]["storage_bytes"] == 1024 * 1024 - 10
+    assert limits.json()["data"]["storage_limit_bytes"] == 1024 * 1024
+
+    # With room for it, the request gets past the limit (to a patient
+    # that does not exist).
+    await _set_limits(client, test_clinic.account_tier, storage_mb=2)
+    assert (await client.post(url, **upload)).status_code == 404

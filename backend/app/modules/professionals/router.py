@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.limits import require_storage_room
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
@@ -162,6 +163,7 @@ async def upload_professional_photo(
     file: Annotated[UploadFile, File()],
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("professionals.write"))],
+    __: Annotated[None, Depends(require_storage_room)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ProfessionalResponse]:
     professional = await ProfessionalService.get(db, ctx.clinic_id, professional_id)

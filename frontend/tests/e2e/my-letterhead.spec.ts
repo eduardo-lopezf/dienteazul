@@ -14,7 +14,12 @@ test.describe('my letterhead', () => {
   test.describe.configure({ timeout: 180_000 })
 
   test('a dentist saves their own letterhead and cannot touch the clinic\'s', async ({ loggedIn: page }) => {
-    const auth = { authorization: `Bearer ${await tokenFor(page)}` }
+    // The dentist's own token, named explicitly: `tokenFor` signs in as the
+    // role it is given and defaults to **admin**, so the bare call asked for
+    // an admin and this test then linked the dentist's directory profile to
+    // the admin's account. The page, in the dentist's session, was right to
+    // say they are not a professional.
+    const auth = { authorization: `Bearer ${await tokenFor(page, 'dentist')}` }
     const letterheads = `${API_BASE}/api/v1/auth/clinic/settings/letterheads`
 
     const active = await (await page.request.get(`${API_BASE}/api/v1/modules/-/active`, { headers: auth })).json()

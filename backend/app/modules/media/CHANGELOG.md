@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- feat(media): las subidas de documentos y fotografías dependen de `require_storage_room` (core): se rechazan con `403 Storage limit reached` cuando no caben en el espacio en disco que permite el nivel de la clínica.
 - fix(media): cargas, vistas previas y descargas usan `useApi` con sesión HttpOnly, CSRF y recuperación de refresh.
 - feat(media): el contrato `PatientDocuments` ofrece `usage_by_kind`:
   cuánto pesan los archivos de los pacientes por clase clínica

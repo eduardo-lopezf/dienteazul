@@ -18,6 +18,7 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.auth.limits import require_storage_room
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.patients.service import PatientService
@@ -82,6 +83,7 @@ async def upload_document(
     description: Annotated[str | None, Form(max_length=2000)] = None,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)] = None,
     _: Annotated[None, Depends(require_permission("media.documents.write"))] = None,
+    __: Annotated[None, Depends(require_storage_room)] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ) -> ApiResponse[DocumentResponse]:
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
@@ -172,6 +174,7 @@ async def upload_photo(
     description: Annotated[str | None, Form(max_length=2000)] = None,
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)] = None,
     _: Annotated[None, Depends(require_permission("media.documents.write"))] = None,
+    __: Annotated[None, Depends(require_storage_room)] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ) -> ApiResponse[DocumentResponse]:
     """Upload a clinical photo / X-ray with taxonomy metadata.

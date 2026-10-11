@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- feat(professionals): la subida del retrato depende de `require_storage_room` (core): se rechaza con `403 Storage limit reached` cuando no cabe en el espacio en disco que permite el nivel de la clínica.
 - fix(professionals): cargas y vistas previas de fotos usan `useApi` y la sesión HttpOnly del mismo origen.
 - refactor(professionals): `useProfessionals` vive ahora en esta capa
   (`frontend/composables/`) y no en la app base (ADR 0044).

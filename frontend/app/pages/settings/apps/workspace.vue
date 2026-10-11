@@ -290,6 +290,8 @@ watch(canRead, (ok) => {
       </div>
     </div>
 
+    <AccountLimits v-if="canRead" />
+
     <div
       v-if="!canRead"
       class="rounded-md border border-default p-6 text-sm text-muted"

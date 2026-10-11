@@ -679,6 +679,8 @@ async def create_user(
             detail="Email already registered",
         )
 
+    await ensure_user_room(db, clinic_id)
+
     # Create user
     user = User(
         email=data.email,
@@ -1025,6 +1027,8 @@ from app.core.letterhead import (  # noqa: E402
 )
 from app.core.tenancy.usage import by_clinical_kind, cached_file_usage  # noqa: E402
 
+from .limits import clinic_limits, ensure_user_room  # noqa: E402
+
 
 class _BudgetSettingsPatch(BaseModel):
     """Subset of clinic.settings keys owned by the budget module."""
@@ -1266,6 +1270,29 @@ async def get_storage_usage(
             measured_at=measured.measured_at,
         )
     )
+
+
+class _ClinicLimitsResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    users: int
+    #: The holder and the users the clinic may add; ``None`` is no limit.
+    users_limit: int | None
+    storage_bytes: int
+    storage_limit_bytes: int | None
+
+
+@router.get("/clinic/limits", response_model=ApiResponse[_ClinicLimitsResponse])
+async def get_clinic_limits(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tenant: Annotated[TenantContext, Depends(get_tenant)],
+) -> ApiResponse[_ClinicLimitsResponse]:
+    """What the clinic's account tier allows it, beside what it uses: its
+    users and the disk its files take."""
+    limits = await clinic_limits(db, tenant, ctx.clinic_id)
+    return ApiResponse(data=_ClinicLimitsResponse.model_validate(limits))
 
 
 @router.get("/clinic/settings/brand", response_model=ApiResponse[_BrandResponse])

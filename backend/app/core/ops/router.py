@@ -23,12 +23,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core.auth.models import Clinic, ClinicMembership, User
+from app.core.auth.models import Clinic, ClinicMembership, TierLimit, User
 from app.core.auth.schemas import _validate_iana_timezone
 from app.core.auth.service import hash_password, validate_password_strength
 from app.core.contracts import ReferenceSpecialties, provider
@@ -90,6 +90,7 @@ class ClinicUsageResponse(BaseModel):
     id: UUID
     name: str
     created_at: datetime
+    account_tier: str
     apps: list[str] | None
     users: int
     #: ``deactivated`` | ``active`` | ``offline`` | ``inactive``; read now,
@@ -735,6 +736,45 @@ async def update_clinic(
     return ApiResponse(data=await _detail(db, clinic, specialties))
 
 
+class ClinicTierUpdate(BaseModel):
+    account_tier: AccountTier
+
+
+@router.put("/clinics/{clinic_id}/tier", response_model=ApiResponse[ClinicDetailResponse])
+async def set_clinic_tier(
+    data: ClinicTierUpdate,
+    clinic: Annotated[Clinic, Depends(_clinic)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tenant: Annotated[TenantContext, Depends(get_tenant)],
+) -> ApiResponse[ClinicDetailResponse]:
+    """Move a clinic to another account tier, and nothing else.
+
+    It keeps its Apps and gains the ones the new tier makes mandatory,
+    with what they require. Under an individual tier the record takes its
+    holder's name; moved to a clinic tier it keeps the name it has until
+    somebody gives it its own. The new tier's limits hold from the next
+    request on; a clinic already over them keeps what it has.
+    """
+    try:
+        validate_tier_custody(data.account_tier, tenant.privacy.custody_mode)
+    except TierCustodyError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    clinic.account_tier = data.account_tier.value
+    if clinic.apps is not None:
+        catalog = {app.name: app for app in load_app_catalog()}
+        apps = set(clinic.apps) | set(mandatory_apps(data.account_tier.value))
+        while needed := {n for name in apps for n in required_apps(catalog[name])} - apps:
+            apps |= needed
+        clinic.apps = [name for name in catalog if name in apps]
+        clinic.available_apps = [n for n in clinic.available_apps or [] if n not in apps]
+    if data.account_tier in _INDIVIDUAL_TIERS:
+        holder = await _holder(db, clinic.id)
+        if holder:
+            clinic.name = f"{holder.first_name} {holder.last_name}"
+    await db.flush()
+    return ApiResponse(data=await _detail(db, clinic))
+
+
 @router.delete("/clinics/{clinic_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_clinic(
     clinic: Annotated[Clinic, Depends(_clinic)],
@@ -757,6 +797,40 @@ async def delete_clinic(
         raise HTTPException(
             status.HTTP_409_CONFLICT, f"Could not delete every record of the clinic: {exc.orig}"
         ) from None
+
+
+class TierLimits(BaseModel):
+    """What a clinic of a tier is allowed; ``None`` is no limit."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    #: Users it may add besides its holder.
+    extra_users: int | None = Field(default=None, ge=0)
+    #: Disk space for its files, in megabytes.
+    storage_mb: int | None = Field(default=None, gt=0)
+
+
+@router.get("/limits", response_model=ApiResponse[dict[AccountTier, TierLimits]])
+async def get_limits(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[dict[AccountTier, TierLimits]]:
+    """What each account tier is allowed. A tier left out has no limit."""
+    rows = await db.scalars(select(TierLimit))
+    return ApiResponse(data={AccountTier(row.tier): TierLimits.model_validate(row) for row in rows})
+
+
+@router.put("/limits", response_model=ApiResponse[dict[AccountTier, TierLimits]])
+async def set_limits(
+    data: dict[AccountTier, TierLimits],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[dict[AccountTier, TierLimits]]:
+    """Replace what every account tier is allowed; a tier left out has no
+    limit. Held from the next request on: a clinic already over a limit
+    keeps what it has and is refused more."""
+    await db.execute(delete(TierLimit))
+    db.add_all(TierLimit(tier=tier.value, **limits.model_dump()) for tier, limits in data.items())
+    await db.flush()
+    return ApiResponse(data=data)
 
 
 class ClinicAppsUpdate(BaseModel):

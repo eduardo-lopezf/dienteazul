@@ -98,7 +98,18 @@ export function useAuth() {
         }
       }
     }
-    return await requestFetch(path, { ...options, headers, onResponse } as never) as T
+    // A plain object, not the `Headers` instance: `useRequestFetch` keeps
+    // the headers it forwards from the incoming request and drops a
+    // `Headers` passed alongside them. What went missing were the two this
+    // function exists to add — `origin` and `x-csrf-token` — so every
+    // server-side refresh was rejected by our own BFF with a 403, and a
+    // render whose access token had expired bounced to the login screen
+    // instead of renewing the session.
+    return await requestFetch(path, {
+      ...options,
+      headers: Object.fromEntries(headers),
+      onResponse
+    } as never) as T
   }
 
   function request<T>(path: string, options: Record<string, unknown> = {}): Promise<T> {

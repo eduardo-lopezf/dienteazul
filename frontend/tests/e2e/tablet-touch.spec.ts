@@ -1031,8 +1031,11 @@ test.describe('touch adaptation', () => {
     const apiBase = process.env.API_BASE_URL || 'http://localhost:8000'
     const headers = { Authorization: `Bearer ${await tokenFor(page)}` }
 
-    /** The public token of the first budget in one of the given statuses. */
-    async function tokenFor(statuses: string[]): Promise<string | null> {
+    /** The public token of the first budget in one of the given statuses.
+     *  Named apart from the imported `tokenFor`: a function declaration
+     *  shadows the import for the whole test, and the Authorization
+     *  header above was handing this one a `Page`. */
+    async function publicTokenFor(statuses: string[]): Promise<string | null> {
       const query = statuses.map(s => `status=${s}`).join('&')
       const list = await page.request.get(
         `${apiBase}/api/v1/budget/budgets?${query}&page_size=1`,
@@ -1046,7 +1049,7 @@ test.describe('touch adaptation', () => {
     }
 
     // Rejected is a real state of a real budget; nothing to simulate.
-    const rejected = await tokenFor(['rejected'])
+    const rejected = await publicTokenFor(['rejected'])
     if (rejected) {
       await page.goto(`/p/budget/${rejected}`, {
         waitUntil: 'domcontentloaded',
@@ -1060,7 +1063,7 @@ test.describe('touch adaptation', () => {
       ).toEqual([])
     }
 
-    const anyToken = rejected ?? await tokenFor(['sent', 'accepted', 'completed'])
+    const anyToken = rejected ?? await publicTokenFor(['sent', 'accepted', 'completed'])
     if (!anyToken) {
       test.skip(true, 'no budget with a public link in this dataset')
     }

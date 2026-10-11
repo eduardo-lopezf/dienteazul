@@ -39,6 +39,38 @@ export async function login(page: Page, role: Role): Promise<void> {
 }
 
 /** A test-process-only bearer for legacy direct backend setup/inspection calls. */
+/**
+ * Wait until Vue has taken the page over.
+ *
+ * The login form is server-rendered and its button arrives **enabled** on
+ * purpose: the one page a user must always reach cannot depend on
+ * hydration finishing. That costs a test its old signal — `toBeEnabled()`
+ * used to imply "hydrated", because the button was disabled until
+ * `onMounted` ran, and it no longer does. The form is submitted by Vue
+ * alone now (`type="button"` with `@click`), so a click that lands before
+ * hydration does nothing at all: no request, no error on screen, just a
+ * page that stays where it was.
+ */
+export async function awaitHydration(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => (document.getElementById('__nuxt') as HTMLElement & { __vue_app__?: unknown })
+      ?.__vue_app__ !== undefined,
+    undefined,
+    { timeout: 60_000 }
+  )
+}
+
+/**
+ * An API token for `role`, signed in on purpose — **not** the token of
+ * whoever this page is logged in as.
+ *
+ * It used to be exactly that: it read the `access_token` cookie off the
+ * context. The BFF made that cookie httpOnly and its own, so the token has
+ * to be minted here, and the role became an argument with a default. A
+ * bare `tokenFor(page)` in a spec that runs as somebody else therefore asks
+ * for an **admin**, which is harmless where the call only needs permission
+ * and wrong where it needs an identity.
+ */
 export async function tokenFor(page: Page, role: Role = 'admin'): Promise<string> {
   const ctx = page.context()
   const cached = testTokens.get(ctx)?.get(role)

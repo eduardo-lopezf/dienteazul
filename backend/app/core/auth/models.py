@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Integer,
     LargeBinary,
     String,
     UniqueConstraint,
@@ -265,3 +266,16 @@ class ClinicMembership(Base, TimestampMixin):
     # Relationships
     user: Mapped["User"] = relationship(back_populates="memberships")
     clinic: Mapped["Clinic"] = relationship(back_populates="memberships")
+
+
+class TierLimit(Base):
+    """What a clinic of an account tier is allowed. ``None`` is no limit,
+    and so is a tier with no row. Written by the control plane."""
+
+    __tablename__ = "tier_limits"
+
+    tier: Mapped[str] = mapped_column(String(20), primary_key=True)
+    #: Users a clinic may add besides its holder.
+    extra_users: Mapped[int | None] = mapped_column(Integer)
+    #: Disk space for its files, in megabytes.
+    storage_mb: Mapped[int | None] = mapped_column(Integer)

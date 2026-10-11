@@ -1286,6 +1286,18 @@
   },
   "settings": {
     "workspace": {
+      "limits": {
+        "title": "Límites de tu cuenta",
+        "intro": "Lo que tu tipo de cuenta permite y lo que llevas usado.",
+        "usersLabel": "Usuarios",
+        "storageLabel": "Espacio en disco",
+        "users": "{used} de {limit}",
+        "usersUnlimited": "{used} · sin límite",
+        "storage": "{used} MB de {limit} MB",
+        "storageUnlimited": "{used} MB · sin límite",
+        "userLimitReached": "Tu cuenta ya tiene todos los usuarios que permite. Pide a soporte ampliar el límite.",
+        "storageLimitReached": "El archivo no cabe en el espacio en disco de tu cuenta. Pide a soporte ampliar el límite."
+      },
       "colorMode": {
         "light": "Claro",
         "dark": "Oscuro",

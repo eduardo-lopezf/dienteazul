@@ -40,7 +40,7 @@ minutes per process (`USAGE_TTL`).
 | `database_bytes` | `pg_database_size` of the deployment's database. |
 | `shared_database_bytes` | The part no clinic owns: tables without a `clinic_id`, rows with a null one, empty tables' overhead. |
 | `storage_bytes`, `storage_files` | The tenant's storage folder, counted as `GET /auth/tenant/storage` counts it. |
-| `clinics[]` | One entry per clinic: `id`, `name`, `created_at`, `apps` (chosen at creation; `null` = all), `status`, `deactivated_at`, `deletable_from`, `users`, `last_access_at`, `database_bytes`, `database_rows`, `storage_bytes`, `storage_files`. |
+| `clinics[]` | One entry per clinic: `id`, `name`, `created_at`, `account_tier` (what its limits go by), `apps` (chosen at creation; `null` = all), `status`, `deactivated_at`, `deletable_from`, `users`, `last_access_at`, `database_bytes`, `database_rows`, `storage_bytes`, `storage_files`. |
 
 - **A clinic's database figure is a share, not a measurement.** Clinics
   share tables, so PostgreSQL has no per-clinic size. Each table with a
@@ -229,6 +229,47 @@ The rules of creation hold — what its tier makes mandatory stays, an App
 comes with what it requires — and the change takes effect at the clinic's
 next request. It is how the console gives, offers or takes away one App
 at a time.
+
+### `PUT /api/v1/ops/clinics/{clinic_id}/tier`
+
+Moves a clinic to another account tier (`{"account_tier": "medium"}`) and
+changes nothing else it was not forced to. The clinic keeps its Apps and
+gains the ones the new tier makes mandatory, with what they require;
+nothing is taken away. Under an individual tier the record takes its
+holder's name; moved to a clinic tier it keeps the name it has until
+`PATCH` gives it its own. The new tier's limits hold from the next
+request on.
+
+### `GET /api/v1/ops/limits` · `PUT /api/v1/ops/limits`
+
+What a clinic of each account tier is allowed (`tier_limits`, migration
+`0020`): `extra_users`, the users it may add besides its holder, and
+`storage_mb`, the disk its uploaded files may take. `null`, or a tier
+left out, is no limit — which is every tier of an installation the
+control plane never wrote to.
+
+```json
+{ "basic": { "extra_users": 0, "storage_mb": 20 },
+  "clinic": { "extra_users": 9, "storage_mb": 100 } }
+```
+
+`PUT` replaces the whole table. The limits are held from the next request
+on (`app/core/auth/limits.py`):
+
+- `POST /api/v1/auth/users` answers `403 User limit reached` once the
+  clinic has its holder and `extra_users` more.
+- Every upload that lands in the clinic's folder — patient documents and
+  photographs (`media`), a professional's portrait — depends on
+  `require_storage_room` and answers `403 Storage limit reached` when the
+  folder plus the request would pass `storage_mb`. The folder is walked
+  each time, not cached. A new upload endpoint must take the dependency.
+
+A clinic already over a limit keeps what it has and is refused more.
+What is **not** counted: the clinic's share of the database, the reduced
+copies made of an image after it is accepted, and files a data migration
+imports. The clinic's administrators read their own figures at
+`GET /api/v1/auth/clinic/limits` (`admin.clinic.read`): `users`,
+`users_limit`, `storage_bytes`, `storage_limit_bytes`.
 
 ### Staff accounts: `GET /api/v1/ops/clinics/{clinic_id}/users` · `PATCH /api/v1/ops/users/{user_id}` · `DELETE /api/v1/ops/users/{user_id}`
 
