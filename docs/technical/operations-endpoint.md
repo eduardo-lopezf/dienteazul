@@ -40,7 +40,7 @@ minutes per process (`USAGE_TTL`).
 | `database_bytes` | `pg_database_size` of the deployment's database. |
 | `shared_database_bytes` | The part no clinic owns: tables without a `clinic_id`, rows with a null one, empty tables' overhead. |
 | `storage_bytes`, `storage_files` | The tenant's storage folder, counted as `GET /auth/tenant/storage` counts it. |
-| `clinics[]` | One entry per clinic: `id`, `name`, `created_at`, `account_tier` (what its limits go by), `apps` (chosen at creation; `null` = all), `status`, `deactivated_at`, `deletable_from`, `users`, `last_access_at`, `database_bytes`, `database_rows`, `storage_bytes`, `storage_files`. |
+| `clinics[]` | One entry per clinic: `id`, `name`, `created_at`, `account_tier` (what its limits go by), `limits` (its own, over the tier's), `privacy` (`accepted`, `outdated`, `declined`, `pending` or `not_asked`: where its holder stands with the privacy agreement of the welcome), `privacy_at` and `privacy_version` (the version accepted), `apps` (chosen at creation; `null` = all), `status`, `deactivated_at`, `deletable_from`, `users`, `last_access_at`, `database_bytes`, `database_rows`, `storage_bytes`, `storage_files`. |
 
 - **A clinic's database figure is a share, not a measurement.** Clinics
   share tables, so PostgreSQL has no per-clinic size. Each table with a
@@ -229,6 +229,56 @@ The rules of creation hold — what its tier makes mandatory stays, an App
 comes with what it requires — and the change takes effect at the clinic's
 next request. It is how the console gives, offers or takes away one App
 at a time.
+
+### The welcome of a clinic the control plane created
+
+`POST /api/v1/ops/clinics` marks the clinic `onboarding_pending`
+(migration `0022`). After the holder replaces the first password, the
+frontend holds every administrator of that clinic at `/onboarding`
+(`auth.global.ts`, from `onboarding_pending` in `/auth/me`): the clinic's
+details to review, then its hours and its cabinets — each may be skipped,
+and the page says where in Settings it is done later — and last the
+privacy agreement.
+
+| Route | What it does |
+|---|---|
+| `POST /api/v1/auth/clinic/onboarding/accept` | `admin.clinic.write`. Body `{"version": "2026-10-12"}`: the version of the agreement that was on the screen (`PRIVACY_AGREEMENT_VERSION` in `frontend/app/config/privacyAgreement.ts`, changed by hand whenever the text changes). Records it in `clinics.privacy_accepted_version` beside `privacy_accepted_at` and ends the welcome. |
+| `POST /api/v1/auth/clinic/onboarding/decline` | `admin.clinic.write`. Deactivates the clinic (`deactivated_at`), which closes it to its members; `409` when there is nothing to answer — the agreement in force was accepted. `POST /ops/clinics/{id}/reactivate` opens it again, back at the welcome, and its `privacy` goes from `declined` back to `pending`. |
+
+The steps are the settings pages themselves, looked up in the settings
+registry, so a step whose App the clinic lacks is not offered. **The
+backend holds it too**: while `onboarding_pending`, `get_clinic_context`
+answers `403 Onboarding required` to every path outside `ONBOARDING_OPEN`
+(`app/core/auth/dependencies.py`) — the clinic's own routes under
+`/auth/clinic…`, `/modules/-/active`, `/schedules/clinic-…` and
+`/agenda/cabinets`. A step added to the welcome adds its prefix there.
+**A new version is asked again.** The version in force is named in
+`backend/app/core/auth/privacy_agreement.py` and in the frontend's
+`privacyAgreement.ts`, changed together by hand when the text changes. A
+clinic that accepted another one (or accepted before versions were kept)
+reports `privacy_renewal` in `/auth/me`; its administrators — not the rest
+of its staff — are held at `/onboarding` by the frontend and by the same
+`403`, shown the agreement alone, until one accepts. Declining a
+renewal deactivates the clinic as declining the first agreement does —
+for all its staff, which the confirmation says; reactivated, it is still
+asked. `accept`
+answers `409` to a version that is not the one in force. The operator sees
+such a clinic as `privacy: outdated`.
+
+The agreement's text lives in
+the locale files (`onboarding.privacy.sections`) and is a draft nobody
+with legal training has reviewed.
+
+### `PUT /api/v1/ops/clinics/{clinic_id}/limits`
+
+A clinic's own limits, over its tier's (`clinics.limits`, migration
+`0021`). A field sent overrides that limit for this clinic — `null` being
+"no limit" — and a field left out goes back to the tier's:
+`{"extra_users": 6}` gives it six users and leaves its disk to the tier;
+`{}` inherits both. What a clinic answers to is worked out per request
+(`effective_limits`), so a change to the tier's limits still reaches
+every limit the clinic was not given its own of. `GET /ops/usage` and
+`GET /ops/clinics/{id}` return the overrides as `limits`.
 
 ### `PUT /api/v1/ops/clinics/{clinic_id}/tier`
 

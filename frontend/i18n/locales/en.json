@@ -1,4 +1,79 @@
 {
+  "onboarding": {
+    "progress": "Step {current} of {total}",
+    "back": "Back",
+    "next": "Continue",
+    "skip": "Skip for now",
+    "skipped": "You skipped “{step}”",
+    "skippedRoute": "You can set it up later in {route}.",
+    "steps": {
+      "renewal": {
+        "title": "The privacy agreement has changed",
+        "intro": "Read it through and accept it to keep using Diente Azul. Meanwhile the rest of your team keeps working as usual."
+      },
+      "clinic": {
+        "title": "Clinic information",
+        "intro": "Review the details your account was created with. Correct what is needed, save and continue."
+      },
+      "hours": {
+        "title": "Opening hours",
+        "intro": "Set the days and hours you see patients. You can skip this step and do it later."
+      },
+      "cabinets": {
+        "title": "Cabinets",
+        "intro": "Add the cabinets or chairs you work in. You can skip this step and do it later."
+      },
+      "privacy": {
+        "title": "Privacy agreement",
+        "intro": "Read it through. You need to accept it to use Diente Azul."
+      }
+    },
+    "privacy": {
+      "version": "Version {version}",
+      "accept": "Accept",
+      "decline": "Decline",
+      "accepted": "Agreement accepted. Welcome!",
+      "declineTitle": "Decline the privacy agreement?",
+      "declineWarning": "If you decline, your user will lose access to Diente Azul. To get it back you will have to contact support.",
+      "declineWarningRenewal": "If you decline, the account is deactivated: you and your whole team will lose access to Diente Azul. To get it back you will have to contact support.",
+      "declineConfirm": "Yes, decline",
+      "sections": {
+        "framework": {
+          "title": "1. Legal framework",
+          "body": "This agreement is governed by Mexico's Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) and its Regulations. Your patients' records are also governed by the Official Mexican Standard NOM-004-SSA3-2012, on the clinical record, and by the Ley General de Salud (article 51 Bis 1, on the patient's right to sufficient information and to give informed consent)."
+        },
+        "data": {
+          "title": "2. What data is processed",
+          "body": "Diente Azul stores your account details (name, e-mail, professional licence and tax ID) and what you record about your practice and your patients: identification and contact details, clinical history, odontograms, images, budgets and payments. Your patients' health data is sensitive personal data under the LFPDPPP."
+        },
+        "use": {
+          "title": "3. What it is used for",
+          "body": "The data is used only to provide the service: scheduling, clinical records, payments, reminders and reports. It is not sold or used for advertising."
+        },
+        "custody": {
+          "title": "4. Who is responsible",
+          "body": "Under the LFPDPPP you are the controller (responsable) of your patients' personal data: it is for you to make your privacy notice available to them and to have their consent to process it, including the informed consent letters that NOM-004-SSA3-2012 and the Ley General de Salud require the record to hold. Diente Azul acts as processor (encargado): it stores and processes that data on your behalf and on your instructions."
+        },
+        "rights": {
+          "title": "5. Data subjects' rights",
+          "body": "Under the LFPDPPP your patients may ask you to access, correct or cancel their data, or object to its processing (ARCO rights). Diente Azul gives you the tools to answer those requests from Settings."
+        },
+        "security": {
+          "title": "6. Security and access",
+          "body": "Access to your account is personal. Platform staff only see usage figures and user account details, never the content of your patients' records."
+        },
+        "changes": {
+          "title": "7. Changes, closing your account and retention",
+          "body": "If this agreement changes, you will be asked to accept it again. You can ask to close your account at any time. Clinical records are kept for the period NOM-004-SSA3-2012 sets: at least five years from the date of the last medical act; a cancellation request therefore does not erase the record before then."
+        }
+      }
+    },
+    "declined": {
+      "title": "You declined the privacy agreement",
+      "body": "Your access to Diente Azul is closed. If this was a mistake or you change your mind, contact support to reactivate it.",
+      "exit": "Sign out"
+    }
+  },
   "app": {
     "name": "Dental Demo",
     "tagline": "Dental clinic management"

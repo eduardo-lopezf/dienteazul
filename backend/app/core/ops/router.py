@@ -91,6 +91,8 @@ class ClinicUsageResponse(BaseModel):
     name: str
     created_at: datetime
     account_tier: str
+    #: Its own limits, over its tier's; a key absent inherits.
+    limits: dict[str, int | None]
     apps: list[str] | None
     users: int
     #: ``deactivated`` | ``active`` | ``offline`` | ``inactive``; read now,
@@ -99,6 +101,11 @@ class ClinicUsageResponse(BaseModel):
     last_access_at: datetime | None
     deactivated_at: datetime | None
     deletable_from: datetime | None
+    #: ``accepted`` | ``outdated`` | ``declined`` | ``pending`` | ``not_asked``, and when.
+    privacy: str
+    privacy_at: datetime | None
+    #: The version of the agreement accepted, where one was kept.
+    privacy_version: str | None
     database_bytes: int
     database_rows: int
     storage_bytes: int
@@ -423,6 +430,8 @@ async def create_clinic(
         apps=apps,
         available_apps=available_apps,
         timezone=data.timezone,
+        # Its holder is taken through the welcome at the first sign-in.
+        onboarding_pending=True,
     )
     if holder is None:
         holder = User(
@@ -464,6 +473,11 @@ class ClinicStateResponse(BaseModel):
     last_access_at: datetime | None
     deactivated_at: datetime | None
     deletable_from: datetime | None
+    #: ``accepted`` | ``outdated`` | ``declined`` | ``pending`` | ``not_asked``, and when.
+    privacy: str
+    privacy_at: datetime | None
+    #: The version of the agreement accepted, where one was kept.
+    privacy_version: str | None
 
 
 async def _set_deactivated(db: AsyncSession, clinic_id: UUID, deactivated: bool) -> ClinicState:
@@ -476,6 +490,9 @@ async def _set_deactivated(db: AsyncSession, clinic_id: UUID, deactivated: bool)
         clinic.deactivated_at = datetime.now(UTC)
     elif not deactivated:
         clinic.deactivated_at = None
+        # Opened again, a holder who declined the privacy agreement is
+        # back to being asked: pending, not declined.
+        clinic.privacy_declined_at = None
     await db.flush()
     return (await clinic_states(db))[clinic_id]
 
@@ -605,6 +622,8 @@ class ClinicDetailResponse(BaseModel):
     apps: list[str] | None
     #: Apps it may switch on itself.
     available_apps: list[str]
+    #: Its own limits, over its tier's; a key absent inherits.
+    limits: dict[str, int | None]
     #: The disciplines switched on in its treatment catalogue.
     specialties: list[str]
     #: Its longest-standing administrator.
@@ -667,6 +686,7 @@ async def _detail(
         email=clinic.email,
         apps=clinic.apps,
         available_apps=clinic.available_apps or [],
+        limits=clinic.limits or {},
         specialties=specialties,
         holder=(
             OpsUserResponse.model_validate(holder).model_copy(update={"role": "admin"})
@@ -736,6 +756,31 @@ async def update_clinic(
     return ApiResponse(data=await _detail(db, clinic, specialties))
 
 
+class TierLimits(BaseModel):
+    """What a clinic of a tier is allowed; ``None`` is no limit."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    #: Users it may add besides its holder.
+    extra_users: int | None = Field(default=None, ge=0)
+    #: Disk space for its files, in megabytes.
+    storage_mb: int | None = Field(default=None, gt=0)
+
+
+@router.put("/clinics/{clinic_id}/limits", response_model=ApiResponse[ClinicDetailResponse])
+async def set_clinic_limits(
+    data: TierLimits,
+    clinic: Annotated[Clinic, Depends(_clinic)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[ClinicDetailResponse]:
+    """Set a clinic's own limits, over its tier's. A field sent overrides
+    that limit — ``null`` being "no limit" for this clinic — and a field
+    left out goes back to the tier's. ``{}`` inherits both."""
+    clinic.limits = data.model_dump(exclude_unset=True) or None
+    await db.flush()
+    return ApiResponse(data=await _detail(db, clinic))
+
+
 class ClinicTierUpdate(BaseModel):
     account_tier: AccountTier
 
@@ -797,17 +842,6 @@ async def delete_clinic(
         raise HTTPException(
             status.HTTP_409_CONFLICT, f"Could not delete every record of the clinic: {exc.orig}"
         ) from None
-
-
-class TierLimits(BaseModel):
-    """What a clinic of a tier is allowed; ``None`` is no limit."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    #: Users it may add besides its holder.
-    extra_users: int | None = Field(default=None, ge=0)
-    #: Disk space for its files, in megabytes.
-    storage_mb: int | None = Field(default=None, gt=0)
 
 
 @router.get("/limits", response_model=ApiResponse[dict[AccountTier, TierLimits]])

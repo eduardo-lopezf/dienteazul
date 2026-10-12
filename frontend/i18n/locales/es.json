@@ -1,4 +1,79 @@
 {
+  "onboarding": {
+    "progress": "Paso {current} de {total}",
+    "back": "Atrás",
+    "next": "Continuar",
+    "skip": "Omitir por ahora",
+    "skipped": "Omitiste «{step}»",
+    "skippedRoute": "Podrás configurarlo después en {route}.",
+    "steps": {
+      "renewal": {
+        "title": "El acuerdo de privacidad cambió",
+        "intro": "Léelo completo y acéptalo para seguir usando Diente Azul. Mientras tanto, el resto de tu equipo sigue trabajando con normalidad."
+      },
+      "clinic": {
+        "title": "Información de la clínica",
+        "intro": "Revisa los datos con los que se creó tu cuenta. Corrige lo que haga falta, guarda y continúa."
+      },
+      "hours": {
+        "title": "Horarios",
+        "intro": "Define los días y las horas en que atiendes. Puedes omitir este paso y hacerlo después."
+      },
+      "cabinets": {
+        "title": "Gabinetes",
+        "intro": "Da de alta los gabinetes o sillones donde atiendes. Puedes omitir este paso y hacerlo después."
+      },
+      "privacy": {
+        "title": "Acuerdo de privacidad",
+        "intro": "Léelo completo. Para usar Diente Azul necesitas aceptarlo."
+      }
+    },
+    "privacy": {
+      "version": "Versión {version}",
+      "accept": "Aceptar",
+      "decline": "Declinar",
+      "accepted": "Acuerdo aceptado. ¡Bienvenido!",
+      "declineTitle": "¿Declinar el acuerdo de privacidad?",
+      "declineWarning": "Si lo declinas, tu usuario perderá el acceso a Diente Azul. Para recuperarlo tendrás que contactar a soporte.",
+      "declineWarningRenewal": "Si lo declinas, la cuenta se desactiva: tú y todo tu equipo perderán el acceso a Diente Azul. Para recuperarlo tendrás que contactar a soporte.",
+      "declineConfirm": "Sí, declinar",
+      "sections": {
+        "framework": {
+          "title": "1. Marco legal",
+          "body": "Este acuerdo se rige por la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y su Reglamento. Los expedientes de tus pacientes se rigen además por la Norma Oficial Mexicana NOM-004-SSA3-2012, Del expediente clínico, y por la Ley General de Salud (artículo 51 Bis 1, sobre el derecho del paciente a recibir información suficiente y a otorgar su consentimiento informado)."
+        },
+        "data": {
+          "title": "2. Qué datos se tratan",
+          "body": "Diente Azul guarda los datos de tu cuenta (nombre, correo electrónico, cédula profesional y RFC) y los que registres de tu consultorio y de tus pacientes: datos de identificación y contacto, historia clínica, odontogramas, imágenes, presupuestos y pagos. Los datos de salud de tus pacientes son datos personales sensibles en términos de la LFPDPPP."
+        },
+        "use": {
+          "title": "3. Para qué se usan",
+          "body": "Los datos se usan únicamente para prestarte el servicio: agenda, expediente clínico, cobros, recordatorios e informes. No se venden ni se usan con fines publicitarios."
+        },
+        "custody": {
+          "title": "4. Quién es responsable",
+          "body": "En términos de la LFPDPPP, tú eres el responsable de los datos personales de tus pacientes: te corresponde poner a su disposición tu aviso de privacidad y contar con su consentimiento para tratarlos, incluidas las cartas de consentimiento informado que la NOM-004-SSA3-2012 y la Ley General de Salud piden que consten en el expediente. Diente Azul actúa como encargado: almacena y procesa esos datos por tu cuenta y siguiendo tus instrucciones."
+        },
+        "rights": {
+          "title": "5. Derechos de los titulares",
+          "body": "Conforme a la LFPDPPP, tus pacientes pueden pedirte acceder a sus datos, rectificarlos, cancelarlos u oponerse a su tratamiento (derechos ARCO). Diente Azul te da las herramientas para atender esas solicitudes desde Configuración."
+        },
+        "security": {
+          "title": "6. Seguridad y acceso",
+          "body": "El acceso a tu cuenta es personal. El personal de la plataforma solo ve cifras de uso y los datos de las cuentas de usuario, nunca el contenido de los expedientes de tus pacientes."
+        },
+        "changes": {
+          "title": "7. Cambios, baja y conservación",
+          "body": "Si este acuerdo cambia, se te pedirá aceptarlo de nuevo. Puedes pedir la baja de tu cuenta en cualquier momento. Los expedientes clínicos se conservan por el plazo que fija la NOM-004-SSA3-2012: un mínimo de cinco años contados a partir de la fecha del último acto médico; por eso una solicitud de cancelación no borra el expediente antes de ese plazo."
+        }
+      }
+    },
+    "declined": {
+      "title": "Declinaste el acuerdo de privacidad",
+      "body": "Tu acceso a Diente Azul quedó cerrado. Si fue un error o cambias de opinión, contacta a soporte para reactivarlo.",
+      "exit": "Salir"
+    }
+  },
   "app": {
     "name": "Dental Demo",
     "tagline": "Gestión de clínica dental"

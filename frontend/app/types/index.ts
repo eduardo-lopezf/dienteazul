@@ -108,7 +108,7 @@ export interface AuthResponse extends AuthTokens {
 
 export interface MeResponse {
   user: User
-  clinics: Array<{ id: string, name: string, role: string, timezone: string }>
+  clinics: Array<{ id: string, name: string, role: string, timezone: string, onboarding_pending?: boolean, privacy_renewal?: boolean, deactivated?: boolean }>
   permissions: string[]
 }
 

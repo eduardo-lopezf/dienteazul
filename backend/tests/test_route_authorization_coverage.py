@@ -59,6 +59,9 @@ UNAUTHENTICATED: dict[str, str] = {
     "PUT /api/v1/ops/clinics/{clinic_id}/apps": (
         "control plane only, by signed token; gives, offers or takes away a clinic's Apps"
     ),
+    "PUT /api/v1/ops/clinics/{clinic_id}/limits": (
+        "control plane only, by signed token; sets a clinic's own limits over its tier's"
+    ),
     "PUT /api/v1/ops/clinics/{clinic_id}/tier": (
         "control plane only, by signed token; moves a clinic to another account tier"
     ),

@@ -27,6 +27,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import AuthSession, Clinic, ClinicMembership
+from app.core.auth.privacy_agreement import PRIVACY_AGREEMENT_VERSION
 from app.core.tenancy.usage import FileUsage, cached_file_usage, file_usage
 
 #: How long a measurement is good for. Counting every clinic's rows in
@@ -42,6 +43,8 @@ class ClinicUsage:
     created_at: datetime
     #: What its limits go by.
     account_tier: str
+    #: Its own limits, over its tier's; a key absent inherits.
+    limits: dict[str, int | None]
     #: Apps chosen for it at creation; ``None`` means all of them.
     apps: list[str] | None
     users: int
@@ -84,6 +87,16 @@ class ClinicState:
     deactivated_at: datetime | None
     #: From when a deactivated clinic may be deleted for good.
     deletable_from: datetime | None
+    #: Where its holder stands with the privacy agreement: ``accepted`` |
+    #: ``outdated`` (accepted a version that is no longer in force, and is
+    #: being asked again) | ``declined`` | ``pending`` (the welcome is not
+    #: over) | ``not_asked``
+    #: (a clinic nobody took through the welcome).
+    privacy: str = "not_asked"
+    #: When it was accepted or declined.
+    privacy_at: datetime | None = None
+    #: The version of the agreement that was accepted, where one was kept.
+    privacy_version: str | None = None
 
 
 async def clinic_states(db: AsyncSession) -> dict[UUID, ClinicState]:
@@ -116,7 +129,24 @@ async def clinic_states(db: AsyncSession) -> dict[UUID, ClinicState]:
     )
 
     states: dict[UUID, ClinicState] = {}
-    for clinic_id, deactivated_at in await db.execute(select(Clinic.id, Clinic.deactivated_at)):
+    clinics = await db.execute(
+        select(
+            Clinic.id,
+            Clinic.deactivated_at,
+            Clinic.onboarding_pending,
+            Clinic.privacy_accepted_at,
+            Clinic.privacy_declined_at,
+            Clinic.privacy_accepted_version,
+        )
+    )
+    for clinic_id, deactivated_at, pending, accepted_at, declined_at, version in clinics:
+        if declined_at is not None:
+            privacy, privacy_at = "declined", declined_at
+        elif accepted_at is not None:
+            current = version == PRIVACY_AGREEMENT_VERSION
+            privacy, privacy_at = ("accepted" if current else "outdated"), accepted_at
+        else:
+            privacy, privacy_at = ("pending" if pending else "not_asked"), None
         last = last_access.get(clinic_id)
         if deactivated_at is not None:
             status = "deactivated"
@@ -131,6 +161,9 @@ async def clinic_states(db: AsyncSession) -> dict[UUID, ClinicState]:
             last_access_at=last,
             deactivated_at=deactivated_at,
             deletable_from=deactivated_at + DELETION_WAIT if deactivated_at else None,
+            privacy=privacy,
+            privacy_at=privacy_at,
+            privacy_version=version if privacy in ("accepted", "outdated") else None,
         )
     return states
 
@@ -232,6 +265,7 @@ async def measure(db: AsyncSession, storage_root: Path, *, refresh: bool) -> Dep
                 name=clinic.name,
                 created_at=clinic.created_at,
                 account_tier=clinic.account_tier,
+                limits=clinic.limits or {},
                 apps=clinic.apps,
                 users=users.get(clinic.id, 0),
                 database_bytes=shares.get(clinic.id, (0, 0))[0],

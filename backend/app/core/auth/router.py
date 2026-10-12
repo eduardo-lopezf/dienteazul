@@ -1,7 +1,7 @@
 """Authentication router with rate limiting."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
@@ -372,6 +372,9 @@ async def refresh_token(
             name=m.clinic.name,
             role=m.role,
             timezone=m.clinic.timezone,
+            onboarding_pending=m.clinic.onboarding_pending,
+            privacy_renewal=needs_renewal(m.clinic),
+            deactivated=m.clinic.deactivated_at is not None,
         )
         for m in memberships
     ]
@@ -539,6 +542,9 @@ async def get_me(
             name=m.clinic.name,
             role=m.role,
             timezone=m.clinic.timezone,
+            onboarding_pending=m.clinic.onboarding_pending,
+            privacy_renewal=needs_renewal(m.clinic),
+            deactivated=m.clinic.deactivated_at is not None,
         )
         for m in memberships
     ]
@@ -1028,6 +1034,7 @@ from app.core.letterhead import (  # noqa: E402
 from app.core.tenancy.usage import by_clinical_kind, cached_file_usage  # noqa: E402
 
 from .limits import clinic_limits, ensure_user_room  # noqa: E402
+from .privacy_agreement import PRIVACY_AGREEMENT_VERSION, needs_renewal  # noqa: E402
 
 
 class _BudgetSettingsPatch(BaseModel):
@@ -1270,6 +1277,44 @@ async def get_storage_usage(
             measured_at=measured.measured_at,
         )
     )
+
+
+class _PrivacyAcceptance(BaseModel):
+    #: The version of the agreement that was on the screen.
+    version: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9._-]+$")
+
+
+@router.post("/clinic/onboarding/accept", status_code=status.HTTP_204_NO_CONTENT)
+async def accept_privacy_agreement(
+    data: _PrivacyAcceptance,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+) -> None:
+    """The holder accepts the privacy agreement: the welcome is over. Kept
+    with the date is the version of the text they were shown, which has
+    to be the one in force — a page loaded before the text changed is
+    refused, and shows the current text once reloaded."""
+    if data.version != PRIVACY_AGREEMENT_VERSION:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Not the privacy agreement in force")
+    ctx.clinic.privacy_accepted_at = datetime.now(UTC)
+    ctx.clinic.privacy_accepted_version = data.version
+    ctx.clinic.privacy_declined_at = None
+    ctx.clinic.onboarding_pending = False
+
+
+@router.post("/clinic/onboarding/decline", status_code=status.HTTP_204_NO_CONTENT)
+async def decline_privacy_agreement(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+) -> None:
+    """The holder declines the privacy agreement and loses access: the
+    clinic is deactivated, which closes it to its members until the
+    operator reactivates it. Only while there is an agreement to answer:
+    the welcome is pending, or the one accepted is no longer in force. In
+    the second case the clinic is in use, and it closes to all its staff."""
+    if not (ctx.clinic.onboarding_pending or needs_renewal(ctx.clinic)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The privacy agreement was already accepted")
+    ctx.clinic.deactivated_at = ctx.clinic.privacy_declined_at = datetime.now(UTC)
 
 
 class _ClinicLimitsResponse(BaseModel):

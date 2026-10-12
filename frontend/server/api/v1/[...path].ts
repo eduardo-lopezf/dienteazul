@@ -82,6 +82,72 @@ function appendSetCookies(event: Parameters<typeof setCookie>[0], response: Resp
   }
 }
 
+/**
+ * One rotation per token, replayed to whoever arrives with the spent one.
+ *
+ * Rotation spends the token it is given and treats a second presentation as
+ * theft: `sessions.rotate` revokes the family, with no grace window. The
+ * client honours that with an in-flight slot, but two tabs are two server
+ * renders and nothing on this side serialized them.
+ *
+ * They do not even overlap. Measured on a cold dev server: tab A refreshed
+ * and rotated, and tab B — whose render had left with the cookie it held at
+ * click time — presented the same token **4.3 s later**. Both tabs lost the
+ * session (`revoked_reason = reuse`). So collapsing concurrent calls is not
+ * enough; the answer has to outlive the first one.
+ *
+ * The first caller goes to the backend. Anyone presenting that same token
+ * while the entry lives gets the same rotated pair, so every tab ends up
+ * with the same cookies and the family is rotated once.
+ *
+ * What this costs, stated plainly: inside the window a stolen token is
+ * answered instead of triggering revocation. It is `REFRESH_REPLAY_MS`
+ * long, it lives in one process, and it only ever replays to a caller that
+ * already holds that exact token. Past the window, and for every token this
+ * process has not just rotated, reuse detection is untouched — including in
+ * another frontend replica, which shares none of this (ADR 0051).
+ */
+type RefreshSnapshot = {
+  status: number
+  statusText: string
+  headers: [string, string][]
+  body: string
+}
+
+/** Long enough for a slow render to follow a fast one; short enough to matter. */
+const REFRESH_REPLAY_MS = 10_000
+
+const refreshesInFlight = new Map<string, Promise<RefreshSnapshot>>()
+const refreshReplay = new Map<string, { at: number, snapshot: RefreshSnapshot }>()
+
+function refreshOnce(token: string, send: () => Promise<Response>): Promise<RefreshSnapshot> {
+  const now = Date.now()
+  for (const [spent, entry] of refreshReplay) {
+    if (now - entry.at > REFRESH_REPLAY_MS) refreshReplay.delete(spent)
+  }
+  const replayed = refreshReplay.get(token)
+  if (replayed) return Promise.resolve(replayed.snapshot)
+  const pending = refreshesInFlight.get(token)
+  if (pending) return pending
+
+  const attempt = (async (): Promise<RefreshSnapshot> => {
+    const response = await send()
+    const snapshot: RefreshSnapshot = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: [...response.headers] as [string, string][],
+      body: await response.text()
+    }
+    // Only a rotation is worth repeating. A refusal is the backend's answer
+    // to this caller and may not be the next one's.
+    if (snapshot.status === 200) refreshReplay.set(token, { at: Date.now(), snapshot })
+    return snapshot
+  })()
+  refreshesInFlight.set(token, attempt)
+  void attempt.catch(() => undefined).finally(() => refreshesInFlight.delete(token))
+  return attempt
+}
+
 async function tokenResponse(
   event: Parameters<typeof setCookie>[0],
   response: Response,
@@ -191,7 +257,17 @@ export default defineEventHandler(async (event) => {
       ...(replayableBody ? {} : { duplex: 'half' })
     } as RequestInit & { duplex?: 'half' })
 
-  let response = await send(body, headers)
+  let response: Response
+  if (authRefresh && refreshToken) {
+    const snapshot = await refreshOnce(refreshToken, () => send(body, headers))
+    response = new Response(snapshot.body || null, {
+      status: snapshot.status,
+      statusText: snapshot.statusText,
+      headers: new Headers(snapshot.headers)
+    })
+  } else {
+    response = await send(body, headers)
+  }
 
   if (authRefresh && response.status === 401) clearAuthCookies(event, secure)
   if (authLogout) clearAuthCookies(event, secure)

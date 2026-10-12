@@ -50,6 +50,11 @@ export function useAuth() {
   const user = useState<User | null>('auth:user', () => null)
   const permissions = useState<string[]>('auth:permissions', () => [])
   const clinicTimezone = useState<string | null>('auth:clinic-timezone', () => null)
+  // A new clinic whose holder has not been through the welcome yet (review
+  // it, accept the privacy agreement). Only its administrators are taken.
+  const onboardingPending = useState<boolean>('auth:onboarding-pending', () => false)
+  const clinicDeactivated = useState<boolean>('auth:clinic-deactivated', () => false)
+  const privacyRenewal = useState<boolean>('auth:privacy-renewal', () => false)
   const session = useState<boolean>('auth:session', () => import.meta.server && hasIncomingSessionCookie(requestEvent ?? undefined))
   const lastSessionSignal = useState<string>('auth:last-session-signal', () => '')
   const isAuthenticated = computed(() => !!user.value && session.value)
@@ -128,6 +133,9 @@ export function useAuth() {
     user.value = null
     permissions.value = []
     clinicTimezone.value = null
+    onboardingPending.value = false
+    clinicDeactivated.value = false
+    privacyRenewal.value = false
   }
 
   function broadcast(signal: SessionSignal): void {
@@ -146,6 +154,13 @@ export function useAuth() {
     user.value = response.data.user
     permissions.value = response.data.permissions
     clinicTimezone.value = response.data.clinics[0]?.timezone ?? null
+    const clinic = response.data.clinics[0]
+    const admin = clinic?.role === 'admin'
+    // Held at `/onboarding` either for the whole welcome or, when the
+    // agreement it accepted is no longer the one in force, for that alone.
+    onboardingPending.value = admin && (clinic?.onboarding_pending === true || clinic?.privacy_renewal === true)
+    privacyRenewal.value = admin && clinic?.onboarding_pending !== true && clinic?.privacy_renewal === true
+    clinicDeactivated.value = clinic?.deactivated === true
     session.value = true
   }
 
@@ -300,6 +315,9 @@ export function useAuth() {
     user: readonly(user),
     permissions: readonly(permissions),
     clinicTimezone: readonly(clinicTimezone),
+    onboardingPending: readonly(onboardingPending),
+    clinicDeactivated: readonly(clinicDeactivated),
+    privacyRenewal: readonly(privacyRenewal),
     request,
     isAuthenticated,
     hasStoredSession,

@@ -71,6 +71,14 @@ class ClinicResponse(BaseModel):
     # rarely share a zone, and without this the two disagree on what time —
     # and sometimes what day — it is for the clinic.
     timezone: str
+    #: The clinic is new and its holder has not accepted the privacy
+    #: agreement yet: its administrators are taken through the welcome.
+    onboarding_pending: bool = False
+    #: The agreement it accepted is no longer the one in force: its
+    #: administrators are asked to accept the current one.
+    privacy_renewal: bool = False
+    #: Closed by the operator, or by its holder declining the agreement.
+    deactivated: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

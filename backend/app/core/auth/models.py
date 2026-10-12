@@ -86,10 +86,28 @@ class Clinic(Base, TimestampMixin):
     # Apps the clinic does not have but may switch on itself, from
     # Settings → Apps. An App on neither list is not available to it.
     available_apps: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
+    #: Its own limits, over its tier's (``tier_limits``): a key present
+    #: (``extra_users``, ``storage_mb``) overrides that one, ``None`` in it
+    #: being "no limit"; a key absent inherits. Set by the control plane.
+    limits: Mapped[dict | None] = mapped_column(JSONB, default=None)
     # When the operator deactivated the clinic. While set, nobody can work
     # in it (``get_clinic_context``); its data is untouched and clearing
     # the column brings it all back.
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    #: A clinic the control plane created whose holder has not yet been
+    #: through the welcome: review it, then accept the privacy agreement.
+    onboarding_pending: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    privacy_accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    #: Which text was accepted: the version the frontend showed.
+    privacy_accepted_version: Mapped[str | None] = mapped_column(String(20), default=None)
+    #: The holder declined it, which closed the clinic; cleared on accepting.
+    privacy_declined_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     __table_args__ = (

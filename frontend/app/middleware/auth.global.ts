@@ -2,6 +2,7 @@ import { loginLocation, safeRedirect } from '~/utils/session'
 
 const SETUP_PATH = '/setup'
 const CHANGE_PASSWORD_PATH = '/change-password'
+const ONBOARDING_PATH = '/onboarding'
 
 // Module-level cache. The system can only flip from uninitialized → initialized
 // (never back), so once we've seen `true` we stop asking the backend.
@@ -55,6 +56,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     // The change-password screen itself is open to anyone signed in: it
     // must never bounce a user the backend is still holding to it.
     if (to.path === CHANGE_PASSWORD_PATH) return
+    // The holder of a new clinic goes through the welcome before anything
+    // else: review the clinic, then accept the privacy agreement.
+    if (auth.onboardingPending.value) {
+      return to.path === ONBOARDING_PATH ? undefined : navigateTo(ONBOARDING_PATH)
+    }
+    if (to.path === ONBOARDING_PATH) return navigateTo('/')
     // Authenticated users skip both the login page and the first-run wizard.
     // An open login tab that finds a session resumes where it was pointed.
     if (to.path === '/login' || to.path === SETUP_PATH) {

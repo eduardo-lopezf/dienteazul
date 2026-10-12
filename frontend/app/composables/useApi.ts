@@ -111,6 +111,12 @@ export function useApi() {
           'User limit reached': 'settings.workspace.limits.userLimitReached',
           'Storage limit reached': 'settings.workspace.limits.storageLimitReached'
         }[fetchError.data?.message ?? '']
+        // The same net under the welcome of a new clinic: the backend
+        // holds it until its holder accepts the privacy agreement.
+        if (fetchError.data?.message === 'Onboarding required') {
+          await navigateTo('/onboarding')
+          throw error
+        }
         toast.add({
           title: t('common.error'),
           description: limitReached ? t(limitReached) : t('common.forbidden', 'Acceso denegado'),

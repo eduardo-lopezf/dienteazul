@@ -125,6 +125,19 @@ async def get_current_user(
     return user
 
 
+#: What the welcome of a new clinic uses (``/onboarding``): the clinic's
+#: own details and its acceptance, its hours and its cabinets, and the
+#: list of Apps the frontend starts from. Paths, not imports — core knows
+#: where the two settings pages of the welcome call, nothing of the
+#: modules behind them. A step added to the welcome adds its prefix here.
+ONBOARDING_OPEN = (
+    "/api/v1/auth/clinic",
+    "/api/v1/modules/-/active",
+    "/api/v1/schedules/clinic-",
+    "/api/v1/agenda/cabinets",
+)
+
+
 async def get_clinic_context(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -194,6 +207,23 @@ async def get_clinic_context(
     # App switched off — not found — which is what the app already knows
     # how to live with (ADR 0038).
     from app.core.plugins.apps import modules_outside
+
+    # A clinic whose holder has not been through the welcome is open only
+    # to what the welcome itself uses, until the privacy agreement is
+    # accepted. The frontend takes the holder there; this is what holds
+    # whoever does not come through the frontend.
+    # The same holds its administrators when the agreement they accepted is
+    # no longer the one in force; the rest of its staff works on.
+    from .privacy_agreement import needs_renewal
+
+    held = membership.clinic.onboarding_pending or (
+        membership.role == "admin" and needs_renewal(membership.clinic)
+    )
+    if held and not request.url.path.startswith(ONBOARDING_OPEN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Onboarding required",
+        )
 
     segments = request.url.path.split("/")
     if len(segments) > 3 and segments[3] in modules_outside(membership.clinic.apps):

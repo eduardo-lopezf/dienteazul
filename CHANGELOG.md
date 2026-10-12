@@ -49,6 +49,21 @@ frontend as a Nuxt layer under its own Python package.
   instead of the copy cached at boot, and reports `pending_enabled` for an
   App whose status in the file differs from what is running. What is
   mounted is still decided at boot.
+- **The holder of a clinic the control plane created is welcomed.** After
+  replacing the first password they review the clinic's details, set its
+  hours and cabinets or skip them, and accept or decline the privacy
+  agreement (`/onboarding`, `clinics.onboarding_pending`, migration
+  `0022`). Accepting records `privacy_accepted_at`
+  (`POST /auth/clinic/onboarding/accept`); declining deactivates the
+  clinic (`…/decline`) until the operator reactivates it. Until then the
+  backend answers `403 Onboarding required` to everything the welcome
+  does not use. The version accepted is kept
+  (`clinics.privacy_accepted_version`, migration `0024`), and a clinic
+  that accepted an earlier one has its administrators asked again.
+- **A clinic can be given limits of its own.** `clinics.limits`
+  (migration `0021`) overrides its tier's limit by limit;
+  `PUT /ops/clinics/{id}/limits` sets it, and a limit left out keeps
+  following the tier.
 - **A clinic can be moved to another account tier on its own.**
   `PUT /ops/clinics/{id}/tier` changes the tier, adds the Apps the new
   one makes mandatory and leaves the rest; the new tier's limits hold

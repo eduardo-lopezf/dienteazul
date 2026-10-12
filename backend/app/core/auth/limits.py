@@ -1,7 +1,8 @@
-"""What a clinic's account tier allows it, and the refusals that hold it.
+"""What a clinic is allowed, and the refusals that hold it.
 
-The limits are per tier (``tier_limits``) and set by the control plane; a
-tier with none is unlimited. Two things are held: the users a clinic adds
+The limits are per tier (``tier_limits``), with a clinic's own over them
+(``clinics.limits``); both are set by the control plane, and a tier with
+none is unlimited. Two things are held: the users a clinic adds
 besides its holder, and the disk its uploaded files take.
 """
 
@@ -40,12 +41,21 @@ class ClinicLimits:
     storage_limit_bytes: int | None
 
 
-async def _tier_limit(db: AsyncSession, clinic_id: UUID) -> TierLimit | None:
-    return await db.scalar(
-        select(TierLimit)
-        .join(Clinic, Clinic.account_tier == TierLimit.tier)
-        .where(Clinic.id == clinic_id)
-    )
+async def effective_limits(db: AsyncSession, clinic_id: UUID) -> tuple[int | None, int | None]:
+    """``(extra_users, storage_mb)`` the clinic answers to: its own where
+    the operator set one, its tier's otherwise. ``None`` is no limit."""
+    own, tier = (
+        await db.execute(
+            select(Clinic.limits, TierLimit)
+            .outerjoin(TierLimit, TierLimit.tier == Clinic.account_tier)
+            .where(Clinic.id == clinic_id)
+        )
+    ).one()
+    held = {
+        "extra_users": tier.extra_users if tier else None,
+        "storage_mb": tier.storage_mb if tier else None,
+    } | (own or {})
+    return held["extra_users"], held["storage_mb"]
 
 
 async def _users(db: AsyncSession, clinic_id: UUID) -> int:
@@ -65,9 +75,7 @@ async def _storage_bytes(tenant: TenantContext, clinic_id: UUID) -> int:
 
 
 async def clinic_limits(db: AsyncSession, tenant: TenantContext, clinic_id: UUID) -> ClinicLimits:
-    limit = await _tier_limit(db, clinic_id)
-    extra_users = limit.extra_users if limit else None
-    storage_mb = limit.storage_mb if limit else None
+    extra_users, storage_mb = await effective_limits(db, clinic_id)
     return ClinicLimits(
         users=await _users(db, clinic_id),
         users_limit=None if extra_users is None else extra_users + 1,
@@ -77,11 +85,9 @@ async def clinic_limits(db: AsyncSession, tenant: TenantContext, clinic_id: UUID
 
 
 async def ensure_user_room(db: AsyncSession, clinic_id: UUID) -> None:
-    """Refuse a new user in a clinic that has all its tier allows."""
-    limit = await _tier_limit(db, clinic_id)
-    if limit is None or limit.extra_users is None:
-        return
-    if await _users(db, clinic_id) >= limit.extra_users + 1:
+    """Refuse a new user in a clinic that has all it is allowed."""
+    extra_users, _ = await effective_limits(db, clinic_id)
+    if extra_users is not None and await _users(db, clinic_id) >= extra_users + 1:
         raise HTTPException(status.HTTP_403_FORBIDDEN, USER_LIMIT_REACHED)
 
 
@@ -92,11 +98,11 @@ async def require_storage_room(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Dependency of every upload: refuse a file that does not fit in what
-    the clinic's tier allows. The request's size stands for the file's —
-    it is the file plus a few form fields."""
-    limit = await _tier_limit(db, ctx.clinic_id)
-    if limit is None or limit.storage_mb is None:
+    the clinic is allowed. The request's size stands for the file's — it
+    is the file plus a few form fields."""
+    _, storage_mb = await effective_limits(db, ctx.clinic_id)
+    if storage_mb is None:
         return
     incoming = int(request.headers.get("content-length") or 0)
-    if await _storage_bytes(tenant, ctx.clinic_id) + incoming > limit.storage_mb * _MB:
+    if await _storage_bytes(tenant, ctx.clinic_id) + incoming > storage_mb * _MB:
         raise HTTPException(status.HTTP_403_FORBIDDEN, STORAGE_LIMIT_REACHED)

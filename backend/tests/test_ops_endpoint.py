@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.auth.models import Clinic, User
+from app.core.auth.privacy_agreement import PRIVACY_AGREEMENT_VERSION
 from app.core.ops.router import OPS_AUDIENCE
 from app.modules.catalog.models import Specialty
 
@@ -341,6 +342,10 @@ async def test_a_set_of_apps_a_clinic_cannot_have_is_refused(
     assert response.status_code == 422, response.text
 
 
+#: What the welcome sends when its privacy agreement is accepted.
+ACCEPTED = {"version": PRIVACY_AGREEMENT_VERSION}
+
+
 async def _login(client: AsyncClient, password: str) -> dict[str, str]:
     response = await client.post(
         "/api/v1/auth/login", data={"username": HOLDER["holder_email"], "password": password}
@@ -374,6 +379,10 @@ async def test_the_holder_must_replace_the_password_before_anything_else(
     assert (await client.get("/api/v1/patients", headers=session)).status_code == 403
 
     assert await change(first, "Propia5678") == 204
+    # With its own password the account is let in — to the welcome first.
+    held = await client.get("/api/v1/patients", headers=session)
+    assert held.json()["message"] == "Onboarding required"
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=session)
     assert (await client.get("/api/v1/patients", headers=session)).status_code == 200
     me = await client.get("/api/v1/auth/me", headers=session)
     assert me.json()["data"]["user"]["must_change_password"] is False
@@ -693,6 +702,7 @@ async def test_a_clinic_is_deleted_whole_in_development_and_not_at_all_in_produc
         headers=holder,
     )
     assert changed.status_code == 204
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
     gone = await client.post(
         "/api/v1/patients", json={"first_name": "Se", "last_name": "Va"}, headers=holder
     )
@@ -740,6 +750,7 @@ async def test_a_clinic_only_has_the_apps_chosen_for_it(
         json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
         headers=holder,
     )
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
 
     # Its menu has no entry of an App it was not given…
     active = await client.get("/api/v1/modules/-/active", headers=holder)
@@ -782,6 +793,7 @@ async def test_a_clinic_switches_on_the_apps_it_was_offered_and_no_others(
         json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
         headers=holder,
     )
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
 
     async def apps() -> dict[str, dict]:
         response = await client.get("/api/v1/apps", headers=holder)
@@ -830,6 +842,7 @@ async def test_an_app_that_needs_one_not_offered_cannot_be_switched_on(
         json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
         headers=holder,
     )
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
     response = await client.post("/api/v1/apps/budgets_payments/enable", headers=holder)
     assert response.status_code == 409
 
@@ -873,6 +886,7 @@ async def test_a_clinics_apps_are_changed_on_their_own_and_at_once(
         json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
         headers=holder,
     )
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
     assert (await client.get("/api/v1/recalls/stats/dashboard", headers=holder)).status_code == 404
 
     # Give it Recalls and offer it Budgets: nothing else about it is sent.
@@ -973,6 +987,32 @@ async def test_a_clinic_adds_no_more_users_than_its_tier_allows(
     assert third.status_code == 201, third.text
 
 
+async def test_a_clinics_own_limit_goes_over_its_tiers(
+    client: AsyncClient, ops_enabled: None, test_clinic: Clinic, auth_headers: dict[str, str]
+) -> None:
+    await _set_limits(client, test_clinic.account_tier, extra_users=0, storage_mb=20)
+    url = f"/api/v1/ops/clinics/{test_clinic.id}/limits"
+
+    # One more user for this clinic alone; its disk stays the tier's.
+    own = await client.put(url, json={"extra_users": 1}, headers=_token())
+    assert own.json()["data"]["limits"] == {"extra_users": 1}
+    limits = (await client.get("/api/v1/auth/clinic/limits", headers=auth_headers)).json()["data"]
+    assert (limits["users_limit"], limits["storage_limit_bytes"]) == (2, 20 * 1024 * 1024)
+    first = await client.post("/api/v1/auth/users", json=_new_user(1), headers=auth_headers)
+    assert first.status_code == 201, first.text
+    second = await client.post("/api/v1/auth/users", json=_new_user(2), headers=auth_headers)
+    assert second.status_code == 403
+
+    # ``null`` is no limit for this clinic; nothing sent inherits again.
+    await client.put(url, json={"extra_users": None}, headers=_token())
+    third = await client.post("/api/v1/auth/users", json=_new_user(2), headers=auth_headers)
+    assert third.status_code == 201, third.text
+    back = await client.put(url, json={}, headers=_token())
+    assert back.json()["data"]["limits"] == {}
+    fourth = await client.post("/api/v1/auth/users", json=_new_user(3), headers=auth_headers)
+    assert fourth.status_code == 403
+
+
 async def test_an_upload_that_does_not_fit_is_refused(
     client: AsyncClient,
     ops_enabled: None,
@@ -1004,3 +1044,150 @@ async def test_an_upload_that_does_not_fit_is_refused(
     # that does not exist).
     await _set_limits(client, test_clinic.account_tier, storage_mb=2)
     assert (await client.post(url, **upload)).status_code == 404
+
+
+# --- The welcome of a new clinic's holder -----------------------------------
+
+
+async def test_accepting_keeps_the_version_that_was_shown(
+    client: AsyncClient, ops_enabled: None, db_session: AsyncSession
+) -> None:
+    clinic_id, holder = await _new_holder(client)
+    url = "/api/v1/auth/clinic/onboarding/accept"
+
+    # No acceptance without saying which text it was.
+    assert (await client.post(url, json={}, headers=holder)).status_code == 422
+    assert await _pending(client, holder) is True
+
+    # Nor of a text that is not the one in force.
+    assert (await client.post(url, json={"version": "1999"}, headers=holder)).status_code == 409
+
+    assert (await client.post(url, json=ACCEPTED, headers=holder)).status_code == 204
+    clinic = await db_session.get(Clinic, UUID(clinic_id))
+    assert clinic.privacy_accepted_version == PRIVACY_AGREEMENT_VERSION
+    usage = await client.get("/api/v1/ops/usage?refresh=true", headers=_token())
+    [told] = [c for c in usage.json()["data"]["clinics"] if c["id"] == clinic_id]
+    assert (told["privacy"], told["privacy_version"]) == ("accepted", PRIVACY_AGREEMENT_VERSION)
+
+
+async def test_a_new_version_of_the_agreement_is_asked_of_its_administrators(
+    client: AsyncClient,
+    ops_enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clinic_id, holder = await _new_holder(client)
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
+    assert (await client.get("/api/v1/patients", headers=holder)).status_code == 200
+
+    # The text changes: what the clinic accepted is no longer in force.
+    from app.core.auth import privacy_agreement, router
+    from app.core.ops import usage
+
+    for module in (privacy_agreement, router, usage):
+        monkeypatch.setattr(module, "PRIVACY_AGREEMENT_VERSION", "2099-01-01")
+
+    me = await client.get("/api/v1/auth/me", headers=holder)
+    assert me.json()["data"]["clinics"][0]["privacy_renewal"] is True
+    held = await client.get("/api/v1/patients", headers=holder)
+    assert (held.status_code, held.json()["message"]) == (403, "Onboarding required")
+    assert await _privacy(client, clinic_id) == "outdated"
+    # Declining the new one closes the clinic, as declining the first did;
+    # opened again by the operator, it is still asked.
+    declined = await client.post("/api/v1/auth/clinic/onboarding/decline", headers=holder)
+    assert declined.status_code == 204
+    assert await _privacy(client, clinic_id) == "declined"
+    await client.post(f"/api/v1/ops/clinics/{clinic_id}/reactivate", headers=_token())
+    assert await _privacy(client, clinic_id) == "outdated"
+
+    accepted = await client.post(
+        "/api/v1/auth/clinic/onboarding/accept", json={"version": "2099-01-01"}, headers=holder
+    )
+    assert accepted.status_code == 204
+    assert (await client.get("/api/v1/patients", headers=holder)).status_code == 200
+    assert await _privacy(client, clinic_id) == "accepted"
+
+
+async def _new_holder(client: AsyncClient) -> tuple[str, dict[str, str]]:
+    """A clinic made by the control plane and its holder, past the
+    password change."""
+    created = await client.post(
+        "/api/v1/ops/clinics", json=HOLDER | {"account_tier": "basic"}, headers=_token()
+    )
+    holder = await _login(client, HOLDER["holder_password"])
+    await client.post(
+        "/api/v1/auth/password",
+        json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
+        headers=holder,
+    )
+    return created.json()["data"]["clinic_id"], holder
+
+
+async def _pending(client: AsyncClient, headers: dict[str, str]) -> bool:
+    me = await client.get("/api/v1/auth/me", headers=headers)
+    return me.json()["data"]["clinics"][0]["onboarding_pending"]
+
+
+async def _privacy(client: AsyncClient, clinic_id: str) -> str:
+    """What the operator is told about the clinic and the agreement."""
+    usage = await client.get("/api/v1/ops/usage?refresh=true", headers=_token())
+    [clinic] = [c for c in usage.json()["data"]["clinics"] if c["id"] == clinic_id]
+    return clinic["privacy"]
+
+
+async def test_accepting_the_privacy_agreement_ends_the_welcome(
+    client: AsyncClient, ops_enabled: None, db_session: AsyncSession
+) -> None:
+    clinic_id, holder = await _new_holder(client)
+    assert await _pending(client, holder) is True
+    assert await _privacy(client, clinic_id) == "pending"
+
+    # Until then the clinic is open to the welcome and nothing else.
+    held = await client.get("/api/v1/patients", headers=holder)
+    assert (held.status_code, held.json()["message"]) == (403, "Onboarding required")
+    assert (await client.get("/api/v1/auth/clinics", headers=holder)).status_code == 200
+    assert (await client.get("/api/v1/agenda/cabinets", headers=holder)).status_code == 200
+
+    accepted = await client.post(
+        "/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder
+    )
+    assert accepted.status_code == 204
+    assert await _pending(client, holder) is False
+    assert (await client.get("/api/v1/patients", headers=holder)).status_code == 200
+    clinic = await db_session.get(Clinic, UUID(clinic_id))
+    assert clinic.privacy_accepted_at is not None
+    assert await _privacy(client, clinic_id) == "accepted"
+
+    # Once accepted there is nothing left to decline.
+    declined = await client.post("/api/v1/auth/clinic/onboarding/decline", headers=holder)
+    assert declined.status_code == 409
+
+
+async def test_declining_the_privacy_agreement_closes_the_clinic(
+    client: AsyncClient, ops_enabled: None
+) -> None:
+    clinic_id, holder = await _new_holder(client)
+
+    declined = await client.post("/api/v1/auth/clinic/onboarding/decline", headers=holder)
+    assert declined.status_code == 204
+    assert (await client.get("/api/v1/auth/clinic/limits", headers=holder)).status_code == 403
+    me = await client.get("/api/v1/auth/me", headers=holder)
+    assert me.json()["data"]["clinics"][0]["deactivated"] is True
+
+    # The operator sees it deactivated, and can open it again: the holder
+    # is back at the welcome.
+    usage = await client.get("/api/v1/ops/usage?refresh=true", headers=_token())
+    [clinic] = [c for c in usage.json()["data"]["clinics"] if c["id"] == clinic_id]
+    assert (clinic["status"], clinic["privacy"]) == ("deactivated", "declined")
+    assert clinic["privacy_at"] is not None
+    await client.post(f"/api/v1/ops/clinics/{clinic_id}/reactivate", headers=_token())
+    assert await _pending(client, holder) is True
+    assert await _privacy(client, clinic_id) == "pending"
+
+
+async def test_a_clinic_nobody_welcomed_has_no_welcome(
+    client: AsyncClient, ops_enabled: None, test_clinic: Clinic, auth_headers: dict[str, str]
+) -> None:
+    assert await _pending(client, auth_headers) is False
+    assert await _privacy(client, str(test_clinic.id)) == "not_asked"
+    declined = await client.post("/api/v1/auth/clinic/onboarding/decline", headers=auth_headers)
+    assert declined.status_code == 409
