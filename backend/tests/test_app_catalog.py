@@ -31,6 +31,9 @@ from app.core.plugins.registry import module_registry
 from app.core.plugins.service import ModuleService, installed_module_names
 from app.core.plugins.state import ModuleState
 
+#: ``apps.json`` as it ships, read before any test swaps the file.
+SHIPPED_APPS: list[dict] = json.loads(apps_mod.APPS_FILE.read_text(encoding="utf-8"))["apps"]
+
 AGENDA = {
     "name": "agenda",
     "version": "0.1",
@@ -275,6 +278,148 @@ async def test_boot_with_agenda_disabled_leaves_the_rest_running(
         assert module_registry.is_installed(dependent), dependent
     assert any(p.startswith("/api/v1/patients") for p in paths)
     assert any(p.startswith("/api/v1/recalls") for p in paths)
+
+
+# --- An App switched off with the one it requires (ADR 0053) ---------------
+
+PATIENTS = {
+    "name": "patients",
+    "version": "0.1",
+    "status": "enabled",
+    "modules": ["patients", "patients_clinical", "patient_timeline", "media"],
+}
+CLINICAL_RECORD = {
+    "name": "clinical_record",
+    "version": "0.1",
+    "status": "enabled",
+    "modules": ["record", "consents"],
+    "requires_apps": ["patients"],
+}
+TREATMENTS = {
+    "name": "treatments",
+    "version": "0.1",
+    "status": "enabled",
+    "modules": ["catalog", "treatment_plan", "odontogram", "periodontogram", "clinical_notes"],
+}
+
+
+def test_the_shipped_clinical_record_goes_off_with_patients() -> None:
+    assert _app("clinical_record").requires_apps == ("patients",)
+    assert _app("clinical_record").enabled and _app("clinical_record").held_back_by is None
+    # Nobody else declared it: dependents keep running, as ADR 0038 left it.
+    others = [app.name for app in load_app_catalog() if app.requires_apps]
+    assert others == ["clinical_record"]
+
+
+def test_patients_off_takes_the_clinical_record_and_nothing_else(apps_file) -> None:
+    apps_file([{**PATIENTS, "status": "disabled"}, CLINICAL_RECORD, TREATMENTS])
+
+    record = _app("clinical_record")
+    assert not record.enabled and record.held_back_by == "patients"
+    assert not _app("patients").enabled and _app("patients").held_back_by is None
+    # Treatments depends on patients too, and did not ask to go with it.
+    assert _app("treatments").enabled
+    assert modules_disabled_by_app() == {
+        "patients",
+        "patients_clinical",
+        "patient_timeline",
+        "media",
+        "record",
+        "consents",
+    }
+    # Not an edit waiting for a restart: the file and what runs agree.
+    assert apps_mod.statuses_on_disk()["clinical_record"] is record.status
+
+
+def test_the_clinical_record_off_leaves_patients_running(apps_file) -> None:
+    apps_file([PATIENTS, {**CLINICAL_RECORD, "status": "disabled"}, TREATMENTS])
+
+    assert _app("patients").enabled
+    # Disabled by the file, not held back by anything.
+    assert not _app("clinical_record").enabled
+    assert _app("clinical_record").held_back_by is None
+    assert modules_disabled_by_app() == {"record", "consents"}
+
+
+def test_going_off_with_a_required_app_carries_through_a_chain(apps_file) -> None:
+    apps_file(
+        [
+            {**PATIENTS, "status": "disabled"},
+            CLINICAL_RECORD,
+            {**TREATMENTS, "requires_apps": ["clinical_record"]},
+        ]
+    )
+    assert _app("treatments").held_back_by == "clinical_record"
+    assert not _app("treatments").enabled
+
+
+@pytest.mark.parametrize("required", ["nowhere", "clinical_record"])
+def test_an_app_requires_only_other_listed_apps(apps_file, required: str) -> None:
+    apps_file([PATIENTS, {**CLINICAL_RECORD, "requires_apps": [required]}])
+    with pytest.raises(AppCatalogError, match="requires"):
+        load_app_catalog()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("isolated_runtime")
+async def test_boot_without_the_clinical_record_leaves_patients_whole(
+    db_session: AsyncSession, apps_file
+) -> None:
+    """Patients integrates with the Clinical record; it does not need it."""
+    from app.main import lifespan
+
+    apps_file(
+        [
+            entry if entry["name"] != "clinical_record" else {**entry, "status": "disabled"}
+            for entry in SHIPPED_APPS
+        ]
+    )
+
+    app = FastAPI()
+    async with lifespan(app):
+        paths = list(app.openapi()["paths"])
+        dentist = get_role_permissions("dentist")
+
+    assert not any(p.startswith(("/api/v1/record", "/api/v1/consents")) for p in paths)
+    assert not module_registry.is_installed("record")
+    assert not module_registry.is_installed("consents")
+    assert not any(perm.startswith(("record.", "consents.")) for perm in dentist)
+
+    # The patient's file is all there: demographics, history, the ASA
+    # class, the health questionnaire, documents.
+    for prefix in (
+        "/api/v1/patients",
+        "/api/v1/patients_clinical/patients/{patient_id}/asa",
+        "/api/v1/patients_clinical/patients/{patient_id}/questionnaires",
+        "/api/v1/patients_clinical/patients/{patient_id}/alerts",
+        "/api/v1/media",
+    ):
+        assert any(p.startswith(prefix) for p in paths), prefix
+    assert "patients_clinical.asa.write" in dentist
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("isolated_runtime")
+async def test_boot_without_patients_mounts_neither(db_session: AsyncSession, apps_file) -> None:
+    from app.main import lifespan
+
+    apps_file(
+        [
+            entry if entry["name"] != "patients" else {**entry, "status": "disabled"}
+            for entry in SHIPPED_APPS
+        ]
+    )
+
+    app = FastAPI()
+    async with lifespan(app):
+        paths = list(app.openapi()["paths"])
+
+    gone = ("/api/v1/patients", "/api/v1/record", "/api/v1/consents")
+    assert not any(p.startswith(gone) for p in paths)
+    for name in ("patients", "patients_clinical", "record", "consents"):
+        assert not module_registry.is_installed(name), name
+    # Treatments did not ask to go with Patients (ADR 0038).
+    assert module_registry.is_installed("treatment_plan")
 
 
 # --- HTTP -----------------------------------------------------------------

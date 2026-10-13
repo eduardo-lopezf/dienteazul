@@ -1139,6 +1139,12 @@
     "tooth": "Tooth"
   },
   "appointments": {
+    "consentPrompt": {
+      "title": "This visit works on a plan with no signed consent letter",
+      "description": "Before completing the appointment, the patient should sign the informed consent letter for the plan. If you go on without it, the treatments marked as performed stay flagged in red until it is signed.",
+      "proceed": "Complete without the letter",
+      "write": "Write the letter"
+    },
     "title": "Schedule",
     "unavailable": "Appointments cannot be created",
     "patientsUnavailable": "Patients cannot be assigned",
@@ -1699,6 +1705,7 @@
       "integrates": "Integrates with",
       "alwaysOn": "Always enabled",
       "configure": "Configure",
+      "heldBackBy": "Disabled together with {name}",
       "pendingEnable": "Will be enabled on restart",
       "pendingDisable": "Will be disabled on restart",
       "tier": {
@@ -2294,6 +2301,21 @@
     "assignError": "Error assigning treatments"
   },
   "treatmentPlans": {
+    "consentMissing": {
+      "title": "The informed consent letter is missing",
+      "description": "Treatments were performed on this plan without an informed consent letter signed by the patient.",
+      "badge": "No letter"
+    },
+    "consentPrompt": {
+      "title": "This plan has no signed consent letter",
+      "description": "Before marking the treatment as performed, the patient should sign the informed consent letter for this plan. If you go on without it, the plan and the treatment stay flagged in red until it is signed.",
+      "proceed": "Mark as performed without the letter"
+    },
+    "consentRequired": {
+      "title": "The informed consent is missing",
+      "description": "This plan cannot be confirmed until the patient signs the informed consent letter written for it.",
+      "action": "Write the letter"
+    },
     "title": "Treatment Plans",
     "description": "Manage treatment plans for patients",
     "new": "New plan",
@@ -3437,7 +3459,71 @@
       "title": "Billing settings"
     }
   },
+  "asa": {
+    "booking": {
+      "titleBrief": "ASA {label} patient",
+      "title": "ASA {label} patient — {description}",
+      "advice": {
+        "3": "Take precautions and consider a shorter appointment.",
+        "4": "Check with the clinician whether the treatment should be done in the practice."
+      },
+      "assessed": "Assessed on {when}"
+    },
+    "title": "ASA classification",
+    "description": "The patient's physical status on the ASA scale, as a clinician assessed it on a given day.",
+    "empty": "No ASA assessment.",
+    "assess": "Assess",
+    "reassess": "Assess again",
+    "history": "Assessment history",
+    "noHistory": "No assessments yet.",
+    "current": "Current",
+    "class": "ASA class",
+    "classes": {
+      "1": "A healthy patient",
+      "2": "Mild systemic disease",
+      "3": "Severe systemic disease",
+      "4": "Severe systemic disease that is a constant threat to life"
+    },
+    "emergency": "Emergency procedure (E modifier)",
+    "rationale": "What it rests on",
+    "rationalePlaceholder": "For example: controlled hypertension, no functional limitation",
+    "save": "Save assessment",
+    "saved": "ASA assessment saved",
+    "retract": "Retract",
+    "retractPrompt": "Why is this assessment retracted? It stays in the record, marked as retracted.",
+    "note": "An assessment is not edited: a new one supersedes it, and the earlier one stays in the history. A class of III or higher shows as an alert on the patient's file."
+  },
+  "regulation": {
+    "label": "Reference regulation",
+    "title": "Record regulation",
+    "description": "The standard the clinic's clinical record refers to.",
+    "intro": "It shows on the health questionnaire — on screen and on the sheet the patient fills in and signs — on the Record tab and on the printed record. It is a reference: naming the standard does not certify that the record meets it.",
+    "field": "Standard",
+    "placeholder": "For example: NOM-004-SSA3-2012, Del expediente clínico",
+    "usingDefault": "The one suggested for the clinic's country is in use. Write another to change it.",
+    "emptyHint": "Leave it empty to show none.",
+    "save": "Save",
+    "saved": "Regulation saved",
+    "restore": "Use the suggested one",
+    "moved": "The reference regulation is set up in the Workspace:"
+  },
   "healthQuestionnaire": {
+    "sign": {
+      "title": "Patient's signature",
+      "statement": "I declare that the information I gave in this questionnaire is true.",
+      "name": "Name of whoever signs",
+      "capacity": "Signs as",
+      "capacities": {
+        "patient": "The patient",
+        "guardian": "Legal guardian",
+        "representative": "Representative"
+      },
+      "required": "Sign with a finger, a stylus or the mouse. The signature is required; if the patient prefers to sign on paper, choose 'On paper' and upload the signed questionnaire.",
+      "needsName": "Write the name of whoever signs.",
+      "signed": "Signed",
+      "signedBy": "Signed by {name} ({capacity})"
+    },
+    "regulation": "Reference regulation",
     "which": "Which?",
     "signature": "Name and signature of the patient or person responsible",
     "date": "Date",
@@ -3466,7 +3552,7 @@
     "paper": "On paper",
     "scan": "Scanned questionnaire",
     "scanHint": "PDF, JPG or PNG",
-    "paperSteps": "Print the blank questionnaire, have the patient fill it in by hand, and upload the scan here. The reason for the visit is entered separately so it shows in the record.",
+    "paperSteps": "Print the blank questionnaire, have the patient fill it in and sign it by hand, and upload the signed file here (PDF or photo). The reason for the visit is entered separately so it shows in the record.",
     "empty": {
       "title": "No questionnaires",
       "description": "The health questionnaire the patient answers at their visit: on screen, or printed and scanned."
@@ -3564,6 +3650,8 @@
     }
   },
   "letterhead": {
+    "description": "The head of printed documents: the clinic's and each professional's.",
+    "license": "Licence {number}",
     "mine": {
       "title": "My letterhead",
       "description": "What heads the documents you print or explain.",
@@ -3598,6 +3686,7 @@
   },
   "record": {
     "settings": {
+      "letterheadMoved": "The documents' letterhead is set up in the Workspace:",
       "intro": "How the clinical record is put together in this clinic: which sections it carries, in what order, and which points are reviewed. It applies to the Record tab and to the printed document.",
       "saved": "Record format updated",
       "sections": {
@@ -3667,6 +3756,7 @@
       "retracted": "Retracted"
     },
     "section": {
+      "asa_assessments": "ASA classification",
       "health_questionnaires": "Health questionnaires",
       "disclosures": "Disclosures of the record",
       "family_history": "Family history",
@@ -3685,6 +3775,8 @@
       "imaging": "Radiographs and photographs"
     },
     "field": {
+      "asa_class": "Class",
+      "rationale": "What it rests on",
       "systolic": "Systolic BP (mmHg)",
       "diastolic": "Diastolic BP (mmHg)",
       "heart_rate": "Heart rate",
@@ -4219,6 +4311,17 @@
     "empty": "No finance module is installed."
   },
   "consents": {
+    "rule": {
+      "title": "Require informed consent to confirm a plan",
+      "description": "A treatment plan is not confirmed until the patient signs an informed consent letter written for that plan. A revoked letter no longer counts.",
+      "saved": "Rule saved"
+    },
+    "forPlan": {
+      "pending": "A letter for a treatment plan: the informed consent letter written here is filed for the plan. Once the patient signs it, the plan can be confirmed.",
+      "signed": "The informed consent for this plan is signed. The plan can be confirmed.",
+      "back": "Back to the plan",
+      "badge": "For a plan"
+    },
     "title": "Consents",
     "new": "New consent",
     "view": "View",

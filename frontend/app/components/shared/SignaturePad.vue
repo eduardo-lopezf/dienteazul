@@ -2,8 +2,13 @@
 /**
  * A canvas the patient signs on with a finger, a stylus or a mouse.
  * Emits the drawing as a PNG data URL, or null once cleared.
+ *
+ * In the host because more than one App asks for a signature: a consent
+ * letter (Clinical record) and the health questionnaire (Patients).
  */
 const model = defineModel<string | null>({ default: null })
+
+withDefaults(defineProps<{ testid?: string }>(), { testid: 'consent-signature-pad' })
 
 const { t } = useI18n()
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -67,7 +72,7 @@ function clear() {
         width="800"
         height="240"
         class="block w-full h-44 cursor-crosshair"
-        data-testid="consent-signature-pad"
+        :data-testid="testid"
         @pointerdown="start"
         @pointermove="move"
         @pointerup="end"

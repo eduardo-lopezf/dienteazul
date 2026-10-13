@@ -32,6 +32,7 @@ const { t, locale } = useI18n()
 const toast = useToast()
 const { fetchAppointments, transition, assignCabinet } = useAppointments()
 const completionFollowup = useCompletionFollowup()
+const completionCheck = useCompletionCheck()
 const { canTransition, statusColour, statusLabel } = useAppointmentStatus()
 // Manual 30-second tick — @vueuse/core is not a dependency in this repo.
 const now = ref(new Date())
@@ -465,6 +466,7 @@ async function commitDrop(col: ColumnDef, cabinetName?: string) {
       const cabId = cabinetIdByName(cabinetName)
       if (cabId) await safeAssign(aptId, cabId)
     }
+    if (target === 'completed' && !(await completionCheck.confirm(apt))) return
     await transition(aptId, target)
     if (target === 'completed') {
       completionFollowup.trigger(apt)

@@ -80,6 +80,17 @@ DESTRUCTIVE). Invalid transitions return the allowed next states from
 `find_free_slots` is intentionally **not** here — free-slot computation belongs to
 `schedules`, which will register its own tool. Agenda does not cross that boundary.
 
+## Asked before completing
+
+`GET /appointments/{id}/completion-check` → `plans_lacking_consent`: the
+plans with a treatment still pending in this visit whose required
+informed consent is not signed (`AppointmentService.plans_lacking_consent`,
+through the `PlannedTreatments` and `PlanConsents` contracts — empty when
+either App is off). A notice, never a stop: `transition` does not read
+it. Every frontend path into `completed` awaits
+`useCompletionCheck().confirm(appointment)` first; the question is
+rendered once by `CompletionCheckHost.vue`.
+
 ## Frontend slots exposed
 
 - `appointment.completed.followup` — rendered by `AppointmentQuickActions.vue`
@@ -87,6 +98,10 @@ DESTRUCTIVE). Invalid transitions return the allowed next states from
   (e.g. `recalls`) register components that prompt the receptionist
   for a follow-up action. Modal stays hidden when no registrations
   exist. Slot ctx: `{ appointment }`.
+- `appointment.patient.alerts` — rendered by `AppointmentModal.vue` under
+  the patient picker, once a patient is chosen. What whoever books should
+  know before picking a time; `patients_clinical` puts the ASA III/IV
+  notice there. Slot ctx: `{ patientId }`.
 
 ## Events emitted
 

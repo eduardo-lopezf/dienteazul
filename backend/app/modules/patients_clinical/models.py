@@ -14,7 +14,17 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,6 +33,10 @@ from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.patients.models import Patient
+
+
+#: ASA class → how it is written.
+ASA_NUMERALS: dict[int, str] = {1: "I", 2: "II", 3: "III", 4: "IV"}
 
 
 class ClinicalEntryMixin:
@@ -273,6 +287,59 @@ class HealthQuestionnaire(Base, TimestampMixin, ClinicalEntryMixin):
     #: The scanned sheet, when it was filled in by hand. An id among the
     #: patient's documents, checked through ``PatientDocuments``.
     scan_document_id: Mapped[UUID | None] = mapped_column(UUID(as_uuid=True))
+
+    # The patient's signature, when the questionnaire was answered on
+    # screen and signed there. On paper the signature is on the scan.
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    signed_by_name: Mapped[str | None] = mapped_column(String(200), info=pii(PiiKind.NAME))
+    #: In what capacity they signed: the patient, or someone for them.
+    signer_capacity: Mapped[str | None] = mapped_column(String(20))
+    #: ``{"png": "data:image/png;base64,…"}``: the drawing, as it was made.
+    #: Classified like a name — it identifies the person as surely as one —
+    #: so an erasure request removes the drawing too.
+    signature_data: Mapped[dict | None] = mapped_column(JSONB, info=pii(PiiKind.NAME))
+    #: The regulation the form named when it was signed — the clinic may
+    #: change the line later, and what was signed under must not move.
+    regulation: Mapped[str | None] = mapped_column(String(300))
+
+
+class AsaAssessment(Base, TimestampMixin, ClinicalEntryMixin):
+    """An ASA physical status, as a clinician judged it on a given day (N:1).
+
+    A judgement, not a property of the patient: who was ASA II before a
+    cardiac event is not retroactively ASA III. So it is never edited — a
+    new assessment supersedes the previous one, and the newest that was
+    not retracted is the patient's current class.
+
+    ``ended_at`` is not used: an assessment does not stop being true, it
+    is followed by another.
+    """
+
+    __tablename__ = "patients_clinical_asa_assessment"
+    __table_args__ = (CheckConstraint("asa_class BETWEEN 1 AND 4", name="ck_asa_assessment_class"),)
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    patient_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        index=True,
+    )
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
+
+    assessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    #: 1–4, the ASA Physical Status class (I–IV). The scale goes on to V
+    #: and VI — a moribund patient, a declared brain death — which are not
+    #: patients of a dental practice, so they are not offered.
+    asa_class: Mapped[int] = mapped_column(Integer)
+    #: The ``E`` modifier: assessed for an emergency procedure.
+    is_emergency: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: What the class rests on, in the assessor's words.
+    rationale: Mapped[str | None] = mapped_column(Text)
+
+    @property
+    def label(self) -> str:
+        """``III``, ``IIE``: the class as it is written."""
+        return ASA_NUMERALS[self.asa_class] + ("E" if self.is_emergency else "")
 
 
 class EmergencyContact(Base, TimestampMixin):

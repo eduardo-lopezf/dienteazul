@@ -15,6 +15,10 @@ export const PERMISSIONS = {
     read: 'patients_clinical.medical.read',
     write: 'patients_clinical.medical.write'
   },
+  asa: {
+    read: 'patients_clinical.asa.read',
+    write: 'patients_clinical.asa.write'
+  },
   emergencyContact: {
     read: 'patients_clinical.emergency.read',
     write: 'patients_clinical.emergency.write'

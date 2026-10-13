@@ -109,6 +109,10 @@ AUTHENTICATED_ONLY: dict[str, str] = {
     "GET /api/v1/auth/clinic/settings/letterheads/mine": (
         "the caller's own letterhead, resolved from their own professional profile"
     ),
+    "GET /api/v1/auth/clinic/settings/record-regulation": (
+        "the standard the caller's own clinic names on its record; printed on the "
+        "health questionnaire every member can open"
+    ),
     "GET /api/v1/auth/clinic/settings/brand": (
         "the caller's own clinic's name for the sidebar; every member's shell reads it"
     ),

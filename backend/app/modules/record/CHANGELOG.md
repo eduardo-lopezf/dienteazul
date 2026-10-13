@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- feat(expediente): la pestaña *Expediente* y el expediente impreso
+  muestran la **normativa de referencia** de la clínica
+  (`app.core.regulation`). Se configura en *Configuración → General →
+  Normativa del expediente*; la página de la app enlaza ahí.
+
+- refactor(expediente): **el membrete sale de este módulo**. La edición de
+  membretes (el de la clínica y el de cada profesional) y *Mi membrete*
+  pasan a Espacio de trabajo: *Configuración → General → Membretes* y
+  *Configuración → Cuenta → Mi membrete*. Con Expediente clínico
+  deshabilitado no había dónde editarlos, y el cuestionario de salud los
+  sigue imprimiendo. La página de la app conserva un enlace. *Mi membrete*
+  ya no pide `record.read`.
+
 - fix(record): las descargas de documentos protegidos usan `useApi` y la sesión HttpOnly del mismo origen.
 - feat(expediente): página **Mi membrete** (Configuración → Cuenta): cada
   profesional configura su propio membrete — logotipo, encabezado, línea

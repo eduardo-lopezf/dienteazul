@@ -40,10 +40,37 @@ test.describe('clinical history', () => {
       if (process.env.RECORD_SHOT) {
         await page.getByTestId('questionnaire-form').screenshot({ path: process.env.RECORD_SHOT })
       }
+      // Answered, and still not saved: on screen the patient signs it.
+      await expect(page.getByTestId('questionnaire-save')).toBeDisabled()
+      // Their name is offered, and a drawing with no name under it is not
+      // a signature either.
+      const pad = page.getByTestId('questionnaire-signature-pad')
+      await pad.scrollIntoViewIfNeeded()
+      const box = (await pad.boundingBox())!
+      await page.mouse.move(box.x + 30, box.y + 40)
+      await page.mouse.down()
+      await page.mouse.move(box.x + 140, box.y + 90, { steps: 6 })
+      await page.mouse.move(box.x + 220, box.y + 50, { steps: 6 })
+      await page.mouse.up()
+      const signer = page.getByTestId('questionnaire-signer-name')
+      await expect(signer).not.toHaveValue('')
+      const offered = await signer.inputValue()
+      await signer.fill('')
+      await expect(page.getByTestId('questionnaire-save')).toBeDisabled()
+      await signer.fill(offered)
+      if (process.env.RECORD_SHOT) {
+        await page.screenshot({ path: `${process.env.RECORD_SHOT}-signature.png` })
+      }
       await page.getByTestId('questionnaire-save').click()
 
       const row = page.getByTestId('questionnaire-row').filter({ hasText: complaint })
       await expect(row).toBeVisible({ timeout: 30_000 })
+      await expect(row.getByTestId('questionnaire-signed')).toBeVisible()
+      const saved = ((await (await page.request.get(questionnaires, { headers: auth })).json()) as {
+        data: { chief_complaint: string | null, signed_by_name: string | null, signature_data: { png?: string } | null }[]
+      }).data.find(q => q.chief_complaint === complaint)!
+      expect(saved.signed_by_name).toBe(offered)
+      expect(saved.signature_data?.png).toMatch(/^data:image\/png;base64,/)
 
       const active = await (await page.request.get(`${api}/modules/-/active`, { headers: auth })).json()
       if ((active.data as { name: string }[]).some(m => m.name === 'record')) {

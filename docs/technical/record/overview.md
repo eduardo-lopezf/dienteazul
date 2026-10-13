@@ -29,7 +29,7 @@ So the module has no models and no migrations, like `reports`.
 | Category | Section | Module |
 |---|---|---|
 | Identification | `identification` | `patients` |
-| Antecedents | `health_questionnaires`, `family_history`, `medical_context`, `allergies`, `medications`, `systemic_diseases`, `surgical_history` | `patients_clinical` |
+| Antecedents | `health_questionnaires`, `asa_assessments`, `family_history`, `medical_context`, `allergies`, `medications`, `systemic_diseases`, `surgical_history` | `patients_clinical` |
 | Odontogram | `chart` — findings and treatments, with teeth and surfaces | `odontogram` |
 | Periodontal | `chartings` — one per probing, with its indices | `periodontogram` |
 | Evolution | `notes` — clinical notes only, administrative ones left out | `clinical_notes` |
@@ -72,9 +72,9 @@ accepts all follow it. Hiding deletes nothing.
 The head of the printed record is a **letterhead**
 (`app.core.letterhead`, [ADR 0046](../../adr/0046-the-letterhead-belongs-to-the-clinic.md)):
 that of the professional who hands the record over, or the clinic's when
-they have none — never another professional's. The settings page edits
-the clinic's letterhead and each professional's; they are not part of the
-record's format.
+they have none — never another professional's. Letterheads are edited in the
+Workspace's settings (*Settings → General → Letterheads*), not on this
+App's page; they are not part of the record's format.
 
 ## Handing it over
 

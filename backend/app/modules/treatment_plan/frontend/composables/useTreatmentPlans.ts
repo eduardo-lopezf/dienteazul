@@ -551,7 +551,14 @@ export function useTreatmentPlans() {
   // etc.). Local merges from the action response had race conditions
   // because the ``TreatmentPlan`` schema returned here lacks ``items``.
 
-  async function confirmPlan(planId: string) {
+  /**
+   * `patientId` is where to send whoever confirms when the clinic asks for
+   * a signed informed consent first: the patient's consents, by URL. The
+   * letters belong to another App, so nothing of it is imported here.
+   * `onConsentRequired` lets the caller get its dialog out of the way: the
+   * notice carries the way forward, and a dialog left open covers it.
+   */
+  async function confirmPlan(planId: string, patientId?: string, onConsentRequired?: () => void) {
     loading.value = true
     try {
       const response = await api.post<ApiResponse<TreatmentPlan>>(
@@ -560,6 +567,24 @@ export function useTreatmentPlans() {
       toast.add({ title: t('treatmentPlans.confirmed'), color: 'success' })
       return response.data
     } catch (error) {
+      const refusal = error as { statusCode?: number, data?: { message?: string } }
+      if (refusal.statusCode === 409 && refusal.data?.message === 'informed_consent_required') {
+        onConsentRequired?.()
+        toast.add({
+          title: t('treatmentPlans.consentRequired.title'),
+          description: t('treatmentPlans.consentRequired.description'),
+          color: 'warning',
+          icon: 'i-lucide-file-signature',
+          duration: 15000,
+          actions: patientId
+            ? [{
+                label: t('treatmentPlans.consentRequired.action'),
+                onClick: () => { navigateTo(`/patients/${patientId}?tab=consents&plan=${planId}`) }
+              }]
+            : undefined
+        })
+        return null
+      }
       console.error('Error confirming plan:', error)
       toast.add({ title: t('errors.updateFailed'), color: 'error' })
       return null

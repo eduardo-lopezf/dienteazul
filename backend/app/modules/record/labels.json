@@ -9,6 +9,7 @@
       "anesthesia_reaction_details": "Reaction details",
       "anticoagulant_medication": "Anticoagulant",
       "arch": "Arch",
+      "asa_class": "Class",
       "blood_type": "Blood group",
       "bop_pct": "Bleeding on probing (%)",
       "bruxism": "Bruxism",
@@ -65,6 +66,7 @@
       "prognosis": "Prognosis",
       "prognosis_notes": "Reason for the prognosis",
       "purpose": "Purpose",
+      "rationale": "What it rests on",
       "reaction": "Reaction",
       "relative": "Relative",
       "respiratory_rate": "Respiratory rate",
@@ -90,6 +92,7 @@
     "no": "No",
     "section": {
       "record.section.allergies": "Allergies",
+      "record.section.asa_assessments": "ASA classification",
       "record.section.chart": "Dental chart",
       "record.section.chartings": "Periodontal chartings",
       "record.section.consents": "Consents",
@@ -261,6 +264,7 @@
         "select": "Select gender"
       },
       "kind": {
+        "conformity": "Agreement with the treatment",
         "data_use": "Use of personal data",
         "informed": "Informed consent"
       },
@@ -371,6 +375,7 @@
       "anesthesia_reaction_details": "Detalle de la reacción",
       "anticoagulant_medication": "Anticoagulante",
       "arch": "Arcada",
+      "asa_class": "Clase",
       "blood_type": "Grupo sanguíneo",
       "bop_pct": "Sangrado al sondaje (%)",
       "bruxism": "Bruxismo",
@@ -427,6 +432,7 @@
       "prognosis": "Pronóstico",
       "prognosis_notes": "Motivo del pronóstico",
       "purpose": "Motivo",
+      "rationale": "En qué se basa",
       "reaction": "Reacción",
       "relative": "Familiar",
       "respiratory_rate": "Frecuencia respiratoria",
@@ -452,6 +458,7 @@
     "no": "No",
     "section": {
       "record.section.allergies": "Alergias",
+      "record.section.asa_assessments": "Clasificación ASA",
       "record.section.chart": "Odontograma",
       "record.section.chartings": "Periodontogramas",
       "record.section.consents": "Consentimientos",
@@ -623,6 +630,7 @@
         "select": "Seleccionar género"
       },
       "kind": {
+        "conformity": "Conformidad con el tratamiento",
         "data_use": "Uso de datos personales",
         "informed": "Consentimiento informado"
       },

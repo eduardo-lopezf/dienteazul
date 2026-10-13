@@ -95,3 +95,4 @@ Triggers (any one):
 | 0049 | [The control plane is a separate service, and a tenant is a stack](0049-the-control-plane-is-a-separate-service.md) | accepted | 2026-10-05 |
 | 0050 | [A deployed image is pinned, carries only what runs, and is audited](0050-a-deployed-image-is-pinned-stripped-and-audited.md) | accepted | 2026-10-06 |
 | 0051 | [A backend process is one of several](0051-a-backend-process-is-one-of-several.md) | accepted | 2026-10-07 |
+| 0053 | [An App can declare the Apps it goes off with](0053-an-app-can-declare-the-apps-it-goes-off-with.md) | accepted | 2026-10-12 |

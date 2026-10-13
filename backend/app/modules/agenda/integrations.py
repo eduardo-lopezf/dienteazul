@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from app.core.contracts import (
     PatientDirectory,
+    PlanConsents,
     PlannedTreatments,
     ProfessionalDirectory,
     WorkingHours,
@@ -37,6 +38,10 @@ def planned_treatments() -> PlannedTreatments | None:
 
 def working_hours() -> WorkingHours | None:
     return provider(WorkingHours)
+
+
+def plan_consents() -> PlanConsents | None:
+    return provider(PlanConsents)
 
 
 def patients_available() -> bool:

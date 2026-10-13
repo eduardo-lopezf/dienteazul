@@ -24,8 +24,10 @@ test.describe('my letterhead', () => {
 
     const active = await (await page.request.get(`${API_BASE}/api/v1/modules/-/active`, { headers: auth })).json()
     test.skip(
-      !(active.data as { name: string }[]).some(m => m.name === 'record'),
-      'the record module is not enabled in this environment'
+      // The page is the Workspace's; what it needs is the directory that
+      // says which professional an account is.
+      !(active.data as { name: string }[]).some(m => m.name === 'professionals'),
+      'the professionals module is not enabled in this environment'
     )
     type Mine = {
       professional_id: string | null

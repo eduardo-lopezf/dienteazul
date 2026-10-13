@@ -5,10 +5,6 @@ import { API_BASE, expect, test, tokenFor } from './_fixtures'
  * Clinical record App opens its own page — how the clinic lays its record
  * out. The format is put back as it was.
  */
-const ONE_PIXEL_PNG
-  = '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489'
-    + '0000000d49444154789c6360000002000001e221bc330000000049454e44ae426082'
-
 test.describe('settings · clinical record', () => {
   test.use({ role: 'admin' })
   test.describe.configure({ timeout: 180_000 })
@@ -31,14 +27,6 @@ test.describe('settings · clinical record', () => {
       'the record module is not enabled in this environment'
     )
     const before = (await (await page.request.get(`${api}/record/format`, { headers: auth })).json()).data
-    // Letterheads are the clinic's: its own, and one per professional.
-    const letterheads = `${api}/auth/clinic/settings/letterheads`
-    type Stored = { professional_id: string | null, heading: string | null, subheading: string | null, show_address: boolean, show_contact: boolean, has_logo: boolean }
-    const stored = (await (await page.request.get(letterheads, { headers: auth })).json()).data as Stored[]
-    const clinicBefore = stored.find(item => item.professional_id === null)
-    const doctor = ((await (await page.request.get(`${api}/professionals`, { headers: auth })).json()) as {
-      data: { id: string }[]
-    }).data.find(pro => !stored.some(item => item.professional_id === pro.id))
     const patient = ((await (await page.request.get(`${api}/patients?page_size=1`, { headers: auth })).json()) as {
       data: { id: string }[]
     }).data[0]!
@@ -51,36 +39,11 @@ test.describe('settings · clinical record', () => {
       const save = page.getByTestId('record-format-save')
       await expect(save).toBeDisabled({ timeout: 60_000 })
 
-      // The clinic's letterhead: a heading, saved with the card's own button.
-      const clinicCard = page.getByTestId('letterhead-clinic')
-      await clinicCard.getByTestId('letterhead-heading').fill('Dent+Art')
-      await clinicCard.getByTestId('letterhead-save').click()
-      await expect.poll(async () => {
-        const now = (await (await page.request.get(letterheads, { headers: auth })).json()).data as Stored[]
-        return now.find(item => item.professional_id === null)?.heading
-      }, { timeout: 30_000 }).toBe('Dent+Art')
-      // A logo, saved as it is chosen — never over one the clinic already had.
-      if (!clinicBefore?.has_logo) {
-        await clinicCard.getByTestId('letterhead-logo-input').setInputFiles({
-          name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(ONE_PIXEL_PNG, 'hex')
-        })
-        await expect(clinicCard.getByTestId('letterhead-logo')).toBeVisible({ timeout: 30_000 })
-      }
-
-      // A doctor gets their own, offered with their name and licence.
-      if (doctor) {
-        await page.getByTestId('letterhead-add-select').click()
-        await page.getByRole('option').first().click()
-        await page.getByTestId('letterhead-add').click()
-        // The card just added is the last one that is not the clinic's.
-        const card = page.locator('[data-testid^="letterhead-"]:not([data-testid="letterhead-clinic"])')
-          .filter({ has: page.getByTestId('letterhead-save') }).last()
-        await card.getByTestId('letterhead-save').click()
-        await expect.poll(async () => {
-          const now = (await (await page.request.get(letterheads, { headers: auth })).json()).data as Stored[]
-          return now.filter(item => item.professional_id !== null).length
-        }, { timeout: 30_000 }).toBe(stored.filter(item => item.professional_id !== null).length + 1)
-      }
+      // The letterhead and the regulation are the Workspace's; the page says where.
+      await expect(page.getByTestId('record-format-letterhead-link').getByRole('link').first())
+        .toHaveAttribute('href', '/settings/general/letterheads')
+      await expect(page.getByTestId('record-format-regulation-link'))
+        .toHaveAttribute('href', '/settings/general/record-regulation')
 
       await page.getByTestId('record-format-section-periodontogram.chartings').getByRole('switch').click()
       await page.getByTestId('record-format-requirement-prognosis').click()
@@ -111,26 +74,6 @@ test.describe('settings · clinical record', () => {
           disabled_requirements: before.disabled_requirements
         }
       })
-      // Letterheads the test created are removed; the clinic's is put back.
-      const now = (await (await page.request.get(letterheads, { headers: auth })).json()).data as Stored[]
-      for (const item of now) {
-        if (item.professional_id && !stored.some(s => s.professional_id === item.professional_id)) {
-          await page.request.delete(`${letterheads}/${item.professional_id}`, { headers: auth })
-        }
-      }
-      if (clinicBefore) {
-        await page.request.put(`${letterheads}/clinic`, {
-          headers: auth,
-          data: {
-            heading: clinicBefore.heading,
-            subheading: clinicBefore.subheading,
-            show_address: clinicBefore.show_address,
-            show_contact: clinicBefore.show_contact
-          }
-        })
-      } else {
-        await page.request.delete(`${letterheads}/clinic`, { headers: auth })
-      }
     }
   })
 })

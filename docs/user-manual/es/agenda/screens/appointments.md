@@ -8,6 +8,7 @@ related_endpoints:
   - GET /api/v1/agenda/appointments
   - GET /api/v1/agenda/appointments/{appointment_id}
   - GET /api/v1/agenda/appointments/{appointment_id}/cabinet-history
+  - GET /api/v1/agenda/appointments/{appointment_id}/completion-check
   - GET /api/v1/agenda/appointments/{appointment_id}/transitions
   - GET /api/v1/agenda/cabinets
   - GET /api/v1/agenda/kanban/day
@@ -130,6 +131,15 @@ verse cuando se habilita.
 3. Al transicionar a **completada** aparece un modal de seguimiento
    con acciones de módulos hermanos (p. ej. *Programar recall*). El
    modal solo se muestra si hay módulos que lo aporten.
+
+### Finalizar una cita sin carta de consentimiento
+
+Si la clínica exige consentimiento informado para sus planes y la cita
+trabaja sobre un plan que no tiene carta firmada, **Finalizar cita**
+pregunta antes: *Crear la carta* abre los consentimientos del paciente
+para ese plan, y *Finalizar sin carta* sigue adelante. La regla viene
+apagada; se activa en *Configuración → Clínica → Plantillas de
+consentimiento*.
 
 ## Permisos
 

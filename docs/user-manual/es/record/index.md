@@ -12,8 +12,9 @@ la app **Expediente clínico**.
 
 - [Configuración del Expediente clínico](./screens/settings_apps_clinical-record.md) — qué secciones lleva, en qué orden y qué puntos se revisan.
 
-- **Mi membrete** (Configuración → Cuenta): cada profesional configura el
-  membrete que encabeza sus propios documentos.
+- El membrete de los documentos se configura en Espacio de trabajo:
+  *Configuración → General → Membretes* y *Configuración → Cuenta → Mi
+  membrete*.
 
 ## Dónde está
 
@@ -32,6 +33,10 @@ papel:
 
 Cada entrada lleva su fecha clínica (la de cuando ocurrió, no la de cuando se
 capturó) y, cuando se conoce, el profesional responsable con su cédula.
+
+La pestaña y el expediente impreso muestran la **normativa de referencia**
+de la clínica, que se configura en *Configuración → General → Normativa del
+expediente*.
 
 ## Qué debe tener el expediente
 

@@ -21,9 +21,30 @@ export interface HealthQuestionnaire {
   drugs_detail: string | null
   other_conditions: string | null
   scan_document_id: string | null
+  /** Set when the patient signed on screen. */
+  signed_at: string | null
+  signed_by_name: string | null
+  signer_capacity: SignerCapacity | null
+  signature_data: { png?: string } | null
+  /** The regulation the form named when it was recorded. */
+  regulation: string | null
 }
 
-export type HealthQuestionnaireDraft = Partial<Omit<HealthQuestionnaire, 'id' | 'patient_id' | 'taken_at'>>
+export type SignerCapacity = 'patient' | 'guardian' | 'representative'
+export const SIGNER_CAPACITIES: SignerCapacity[] = ['patient', 'guardian', 'representative']
+
+/** The patient's signature, drawn on screen. */
+export interface QuestionnaireSignature {
+  png: string
+  signed_by_name: string
+  signer_capacity: SignerCapacity
+}
+
+type Declared = Omit<
+  HealthQuestionnaire,
+  'id' | 'patient_id' | 'taken_at' | 'signed_at' | 'signed_by_name' | 'signer_capacity' | 'signature_data' | 'regulation'
+>
+export type HealthQuestionnaireDraft = Partial<Declared> & { signature?: QuestionnaireSignature | null }
 
 /** The questions, in the order they are asked. Mirrors `questionnaire.py`. */
 export const QUESTIONS = [

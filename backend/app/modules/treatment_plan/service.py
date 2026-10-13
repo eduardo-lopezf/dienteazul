@@ -12,7 +12,13 @@ from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.contracts import Collections, PlanBudgets, ProfessionalDirectory, provider
+from app.core.contracts import (
+    Collections,
+    PlanBudgets,
+    PlanConsents,
+    ProfessionalDirectory,
+    provider,
+)
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.core.utils.search import FOLD_FROM, FOLD_TO, search_tokens
@@ -167,6 +173,15 @@ VALID_CLOSURE_REASONS: set[str] = {
     "patient_abandoned",
     "other",
 }
+
+
+class InformedConsentRequiredError(ValueError):
+    """The clinic asks for a signed informed consent before a plan is
+    confirmed, and this plan has none."""
+
+
+#: What the API answers (409) when that is why a plan was not confirmed.
+CONSENT_REQUIRED = "informed_consent_required"
 
 
 class PlanLockedError(ValueError):
@@ -2240,6 +2255,25 @@ class TreatmentPlanService:
         }
 
     @staticmethod
+    async def informed_consent_missing(
+        db: AsyncSession, clinic_id: UUID, plan: TreatmentPlan
+    ) -> bool:
+        """Whether the clinic asks for a signed informed consent for this
+        plan and it has none.
+
+        The consents module's to say (ADR 0039); with that App off nobody
+        asks. A plan in this state is not confirmed. One confirmed before
+        the clinic asked, or whose letter was revoked, keeps going — its
+        treatments can still be performed — and the screen says in red
+        that the letter is missing.
+        """
+        consents = provider(PlanConsents)
+        return bool(
+            consents
+            and await consents.lacks_required_consent(db, clinic_id, plan.patient_id, plan.id)
+        )
+
+    @staticmethod
     async def confirm(
         db: AsyncSession,
         clinic_id: UUID,
@@ -2269,6 +2303,13 @@ class TreatmentPlanService:
             raise ValueError(f"Cannot confirm plan in status '{plan.status}'")
         if not plan.items:
             raise ValueError("Cannot confirm plan without treatments")
+
+        # The clinic may ask for the patient's informed consent to this
+        # plan first.
+        if await TreatmentPlanService.informed_consent_missing(db, clinic_id, plan):
+            raise InformedConsentRequiredError(
+                "The plan needs a signed informed consent before it is confirmed"
+            )
 
         # Atomic transition.
         plan.status = "pending"

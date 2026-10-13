@@ -39,7 +39,21 @@ async function load() {
   }
 }
 
-onMounted(load)
+// Arriving from a plan that waits for its consent (`?plan=<id>`): the
+// letter written here is filed for that plan, and the way back is offered.
+const route = useRoute()
+const planId = computed(() => (typeof route.query.plan === 'string' ? route.query.plan : null))
+const planConsent = computed(() =>
+  planId.value
+    ? items.value.find(c => c.plan_id === planId.value && c.kind === 'informed' && ['draft', 'signed'].includes(c.status)) ?? null
+    : null
+)
+
+onMounted(async () => {
+  await load()
+  // Nothing written for the plan yet: start the letter straight away.
+  if (planId.value && canWrite.value && !planConsent.value) open('new')
+})
 watch(() => props.ctx.patient.id, load)
 
 const STATUS_ROLE: Record<ConsentStatus, 'success' | 'neutral' | 'warning' | 'danger'> = {
@@ -133,6 +147,19 @@ async function act(consent: Consent, action: 'revoke' | 'discard') {
       </template>
     </SectionHeader>
 
+    <UAlert
+      v-if="planId"
+      class="mb-4"
+      :color="planConsent?.status === 'signed' ? 'success' : 'warning'"
+      variant="subtle"
+      icon="i-lucide-file-signature"
+      :title="planConsent?.status === 'signed' ? t('consents.forPlan.signed') : t('consents.forPlan.pending')"
+      :actions="planConsent?.status === 'signed'
+        ? [{ label: t('consents.forPlan.back'), to: `/treatments/plans/${planId}` }]
+        : undefined"
+      data-testid="consent-for-plan"
+    />
+
     <div
       v-if="loading"
       class="space-y-3"
@@ -164,6 +191,15 @@ async function act(consent: Consent, action: 'revoke' | 'discard') {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-medium text-default">{{ consent.title }}</span>
+            <UBadge
+              v-if="consent.plan_id"
+              color="primary"
+              variant="subtle"
+              size="xs"
+              icon="i-lucide-clipboard-list"
+            >
+              {{ t('consents.forPlan.badge') }}
+            </UBadge>
             <StatusBadge
               :role="STATUS_ROLE[consent.status]"
               :label="t(`consents.status.${consent.status}`)"
@@ -259,6 +295,7 @@ async function act(consent: Consent, action: 'revoke' | 'discard') {
       v-model:open="formOpen"
       :patient-id="ctx.patient.id"
       :consent="selected"
+      :plan-id="planId"
       @saved="load"
     />
     <ConsentSignModal

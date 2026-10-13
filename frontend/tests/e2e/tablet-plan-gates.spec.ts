@@ -47,6 +47,17 @@ test.describe('plan gates by status', () => {
     })
     const planId = ((await created.json()) as { data: { id: string } }).data.id
 
+    // This is about the plan's own gates. The clinic's rule that a plan
+    // waits for a signed informed consent has its own spec
+    // (`plan-consent-required.spec.ts`); switched off here, put back after.
+    const consentRule = `${API_BASE}/api/v1/consents/settings`
+    const ruleBefore = await page.request.get(consentRule, { headers: auth })
+    const ruleWasOn = ruleBefore.ok()
+      && ((await ruleBefore.json()) as { data: { require_informed_for_plan: boolean } }).data.require_informed_for_plan
+    if (ruleWasOn) {
+      await page.request.put(consentRule, { headers: auth, data: { require_informed_for_plan: false } })
+    }
+
     try {
       const lines = [24, 25].map(tooth => ({
         catalog_item_id: item!.id,
@@ -136,6 +147,9 @@ test.describe('plan gates by status', () => {
         await page.request.patch(`${PLANS}/${planId}/items/${done.id}/reopen`, { headers: auth })
       }
       await page.request.delete(`${PLANS}/${planId}`, { headers: auth })
+      if (ruleWasOn) {
+        await page.request.put(consentRule, { headers: auth, data: { require_informed_for_plan: true } })
+      }
     }
   })
 })

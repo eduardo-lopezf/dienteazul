@@ -62,6 +62,13 @@ class ConsentsModule(BaseModule):
     def get_router(self) -> APIRouter:
         return router
 
+    def get_providers(self) -> dict[type, object]:
+        from app.core.contracts import PlanConsents
+
+        from .providers import plan_consents
+
+        return {PlanConsents: plan_consents}
+
     def get_permissions(self) -> list[str]:
         return ["read", "write", "templates.write"]
 

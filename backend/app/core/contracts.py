@@ -219,6 +219,21 @@ class Collections(Protocol):
         """Whether money the patient paid sits on these budgets or treatments."""
 
 
+class PlanConsents(Protocol):
+    async def lacks_required_consent(
+        self, db: AsyncSession, clinic_id: UUID, patient_id: UUID, plan_id: UUID
+    ) -> bool:
+        """True when the clinic requires an informed consent for a plan and
+        this plan has none signed.
+
+        The rule is the owner's — whether the clinic asks for it, and what
+        counts as having it. Whoever asks only obeys: a plan is not
+        confirmed while this is true, and a treatment performed while it is
+        true is shown as lacking its letter. ``None`` from :func:`provider`
+        means consents are not kept here at all, and nothing can be
+        required."""
+
+
 class PlanQuotes(Protocol):
     async def snapshot(self, db: AsyncSession, clinic_id: UUID, plan_id: UUID) -> dict | None:
         """The plan as ``treatment_plan.confirmed`` announces it, plus

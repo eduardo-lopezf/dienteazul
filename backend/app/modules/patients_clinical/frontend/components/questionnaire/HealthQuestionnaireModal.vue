@@ -5,16 +5,23 @@
  * patient declared that day and is not edited — a new visit is a new one.
  */
 import { PERMISSIONS } from '~~/app/config/permissions'
-import type { QuestionAnswer } from '../../composables/useHealthQuestionnaires'
-import { CONDITION_GROUPS, QUESTIONS } from '../../composables/useHealthQuestionnaires'
+import type { QuestionAnswer, SignerCapacity } from '../../composables/useHealthQuestionnaires'
+import { CONDITION_GROUPS, QUESTIONS, SIGNER_CAPACITIES } from '../../composables/useHealthQuestionnaires'
 
-const props = defineProps<{ open: boolean, patientId: string }>()
+const props = defineProps<{
+  open: boolean
+  patientId: string
+  /** Offered as the name of whoever signs; they may be someone else. */
+  patientName?: string
+}>()
 const emit = defineEmits<{ 'update:open': [value: boolean], 'saved': [] }>()
 
 const { t } = useI18n()
 const toast = useToast()
 const { can } = usePermissions()
 const { isActive } = useModules()
+const { regulation, load: loadRegulation } = useRecordRegulation()
+onMounted(() => loadRegulation())
 const questionnaires = useHealthQuestionnaires()
 
 type Mode = 'screen' | 'paper'
@@ -53,7 +60,22 @@ watch(() => props.open, (opened) => {
   drugsDetail.value = ''
   other.value = ''
   scan.value = null
+  signature.value = null
+  signerName.value = props.patientName ?? ''
+  signerCapacity.value = 'patient'
 })
+
+// The patient's signature. Required on screen; the other valid way is the
+// "on paper" mode, where the signed sheet is uploaded.
+const signature = ref<string | null>(null)
+const signerName = ref('')
+const signerCapacity = ref<SignerCapacity>('patient')
+const capacityItems = computed(() => SIGNER_CAPACITIES.map(value => ({
+  value,
+  label: t(`healthQuestionnaire.sign.capacities.${value}`)
+})))
+/** A signature is a drawing with a name under it. */
+const signed = computed(() => signature.value !== null && signerName.value.trim().length > 0)
 
 const conditions = computed(() => Object.keys(ticked.value).filter(key => ticked.value[key]))
 const answered = computed(() => {
@@ -68,7 +90,8 @@ const answered = computed(() => {
 
 const canSave = computed(() => mode.value === 'paper'
   ? scan.value !== null
-  : chiefComplaint.value.trim().length > 0 || Object.keys(answered.value).length > 0 || conditions.value.length > 0
+  : signed.value
+    && (chiefComplaint.value.trim().length > 0 || Object.keys(answered.value).length > 0 || conditions.value.length > 0)
 )
 
 function pickScan(event: Event) {
@@ -91,7 +114,10 @@ async function save() {
         answers: answered.value,
         conditions: conditions.value,
         drugs_detail: drugsDetail.value.trim() || null,
-        other_conditions: other.value.trim() || null
+        other_conditions: other.value.trim() || null,
+        signature: signature.value
+          ? { png: signature.value, signed_by_name: signerName.value.trim(), signer_capacity: signerCapacity.value }
+          : null
       })
     }
     emit('saved')
@@ -247,6 +273,63 @@ async function save() {
               </UFormField>
             </div>
           </template>
+
+          <!-- What the questionnaire is kept under, said where the
+               patient declares. -->
+          <p
+            v-if="regulation?.text"
+            class="text-caption text-subtle"
+            data-testid="questionnaire-regulation"
+          >
+            {{ t('regulation.label') }}: {{ regulation.text }}
+          </p>
+
+          <!-- The patient signs what they declared. On paper the signature
+               is on the sheet. -->
+          <div
+            v-if="mode === 'screen'"
+            class="space-y-3 border-t border-default pt-4"
+            data-testid="questionnaire-signature"
+          >
+            <div>
+              <p class="font-medium text-default">
+                {{ t('healthQuestionnaire.sign.title') }}
+              </p>
+              <p class="text-caption text-muted">
+                {{ t('healthQuestionnaire.sign.statement') }}
+              </p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField :label="t('healthQuestionnaire.sign.name')">
+                <UInput
+                  v-model="signerName"
+                  class="w-full"
+                  :maxlength="200"
+                  data-testid="questionnaire-signer-name"
+                />
+              </UFormField>
+              <UFormField :label="t('healthQuestionnaire.sign.capacity')">
+                <USelect
+                  v-model="signerCapacity"
+                  :items="capacityItems"
+                  value-key="value"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <SignaturePad
+              v-model="signature"
+              testid="questionnaire-signature-pad"
+            />
+            <p
+              class="text-caption"
+              :class="signature !== null && !signed ? 'text-warning' : 'text-subtle'"
+            >
+              {{ signature !== null && !signed
+                ? t('healthQuestionnaire.sign.needsName')
+                : t('healthQuestionnaire.sign.required') }}
+            </p>
+          </div>
         </div>
 
         <template #footer>

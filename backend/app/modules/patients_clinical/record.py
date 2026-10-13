@@ -22,6 +22,7 @@ from app.core.record import EntryStatus, RecordEntry, RecordSection, SectionCate
 
 from .models import (
     Allergy,
+    AsaAssessment,
     FamilyHistory,
     HealthQuestionnaire,
     MedicalContext,
@@ -209,6 +210,9 @@ async def _collect_questionnaires(
                 "other_conditions": row.other_conditions,
                 "scan_document_id": row.scan_document_id,
                 "on_paper": True if row.scan_document_id else None,
+                "signed_by_name": row.signed_by_name,
+                "signer_capacity": row.signer_capacity,
+                "signed_at": row.signed_at,
             },
             status=_status(row),
             source_table="patients_clinical_health_questionnaire",
@@ -216,6 +220,23 @@ async def _collect_questionnaires(
             **_attribution(row),
         )
         for row in await _rows(db, HealthQuestionnaire, clinic_id, patient_id)
+    ]
+
+
+async def _collect_asa(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> list[RecordEntry]:
+    """Every assessment, on the day it was made: the current class and the
+    ones it superseded."""
+    return [
+        RecordEntry(
+            occurred_at=row.assessed_at,
+            summary=f"ASA {row.label}",
+            detail={"asa_class": f"ASA {row.label}", "rationale": row.rationale},
+            status=_status(row),
+            source_table="patients_clinical_asa_assessment",
+            source_id=row.id,
+            **_attribution(row),
+        )
+        for row in await _rows(db, AsaAssessment, clinic_id, patient_id)
     ]
 
 
@@ -274,6 +295,13 @@ def get_record_sections() -> list[RecordSection]:
             category=SectionCategory.ANTECEDENTS,
             collect=_collect_questionnaires,
             order=1,
+        ),
+        RecordSection(
+            name="asa_assessments",
+            title_key="record.section.asa_assessments",
+            category=SectionCategory.ANTECEDENTS,
+            collect=_collect_asa,
+            order=2,
         ),
         RecordSection(
             name="family_history",

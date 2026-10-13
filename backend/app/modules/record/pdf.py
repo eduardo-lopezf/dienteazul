@@ -27,6 +27,7 @@ from app.core.auth.models import Clinic
 from app.core.contracts import PersonBrief
 from app.core.letterhead import LETTERHEAD_CSS, render_letterhead
 from app.core.record import EntryStatus, RecordEntry
+from app.core.regulation import record_regulation
 
 from .models import Disclosure
 from .service import ComposedRecord
@@ -48,6 +49,7 @@ _HIDDEN = frozenset(
 _TEXT = {
     "es": {
         "title": "Expediente clínico",
+        "regulation": "Normativa de referencia",
         "patient": "Paciente",
         "generated": "Generado el",
         "folio": "Folio de entrega",
@@ -70,6 +72,7 @@ _TEXT = {
     },
     "en": {
         "title": "Clinical record",
+        "regulation": "Reference regulation",
         "patient": "Patient",
         "generated": "Generated",
         "folio": "Disclosure ref.",
@@ -204,6 +207,12 @@ def _render_html(
     locale = disclosure.locale if disclosure.locale in _TEXT else "es"
     text, labels = _TEXT[locale], _labels()[locale]
     authors = {person.id: person for person in record.professionals}
+    regulation = record_regulation(clinic) if clinic is not None else None
+    regulation_line = (
+        f"<p class='notice'>{escape(text['regulation'])}: {escape(regulation)}</p>"
+        if regulation
+        else ""
+    )
 
     identity = next(
         (
@@ -287,6 +296,7 @@ def _render_html(
   <h1>{text["title"]}</h1>
   <table class="cover">{cover_rows}</table>
   <p class="notice">{text["confidential"]}</p>
+  {regulation_line}
   {"".join(body)}
 </body>
 </html>"""

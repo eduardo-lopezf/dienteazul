@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+- feat(patients_clinical): **aviso de ASA III/IV al agendar**. Al elegir
+  al paciente en la ventana de cita aparece su clase vigente cuando es III
+  (aviso) o IV (alerta), con la fecha, quién la valoró y en qué se basa.
+  Es un aviso: no impide guardar la cita.
+  - En el aviso, recepción ve solo «Paciente ASA IV» y la recomendación:
+    ni el significado de la clase, ni la fecha, ni quién la valoró, ni en
+    qué se basa.
+  - **Recepción ve la clase, sin el detalle clínico.** Permiso nuevo
+    `patients_clinical.asa.read`, para todos los roles, y
+    `GET /patients/{id}/asa/class`: la clase vigente, nada más (ni
+    la fecha). Quién la valoró y en qué se basa solo lo ve quien puede leer el
+    historial médico.
+
+- feat(patients_clinical): **firma del paciente en el cuestionario de
+  salud en pantalla**. Al pie del formulario el paciente (o su tutor o
+  representante) firma con el dedo, un lápiz o el ratón. Se guarda con el
+  cuestionario: el dibujo, el nombre de quien firma, en calidad de qué, la
+  fecha y la normativa de referencia que el formulario mostraba ese día.
+  - **Es obligatoria**: un cuestionario contestado en pantalla no se
+    guarda sin la firma (dibujo y nombre). La alternativa igual de válida
+    es *En papel*: subir el cuestionario firmado a mano (PDF o foto). El
+    servidor rechaza uno que no traiga ni firma ni archivo.
+  - En papel no se firma en pantalla: la firma está en la hoja subida.
+  - El dibujo se clasifica como dato personal: una solicitud de supresión
+    lo elimina. No viaja en el expediente compuesto; sí quién firmó y
+    cuándo.
+  - Migración `pc_0007`. El lienzo de firma pasa al núcleo
+    (`frontend/app/components/shared/SignaturePad.vue`).
+
+- feat(patients_clinical): el cuestionario de salud muestra la
+  **normativa de referencia** de la clínica: al pie del formulario en
+  pantalla y, en la hoja en blanco, encima de la firma del paciente. El
+  texto es de la clínica (`app.core.regulation`), no del módulo.
+
+- feat(patients_clinical): **clasificación ASA** del paciente. Una
+  valoración es un juicio clínico fechado y atribuido (clase I–IV,
+  modificador E, en qué se basa): no se edita, una nueva la sustituye y
+  una equivocada se anula (ADR 0032). La más reciente no anulada es la
+  clase vigente.
+  - Tarjeta *Clasificación ASA* en el Resumen del paciente, con la clase
+    vigente, su fecha y quién la valoró; desde ahí se valora de nuevo y
+    se lee el historial.
+  - Una clase III aparece entre las alertas del paciente como *alta*; IV,
+    como *crítica*. Las clases V y VI de la escala no se ofrecen: no son
+    pacientes de consultorio.
+  - Permiso propio `patients_clinical.asa.write` (dentista y
+    administrador), distinto del que edita el historial médico.
+  - API: `GET/POST /patients/{id}/asa`, `POST …/asa/{aid}/retract`.
+    Migración `pc_0006`.
+  - Llega al expediente como la sección `asa_assessments`.
+  - `compute_alerts` recibe ahora la clínica además del paciente.
+
 - fix(patients_clinical): las cargas y aperturas de cuestionarios usan el BFF autenticado de mismo origen.
 - fix(types): la tarjeta de antecedentes del Resumen usaba `a.id` como
   `key` de las alergias, y `AllergyEntry` no tiene `id`: todas las filas

@@ -836,6 +836,8 @@ watch(isPhone, async (mobile) => {
          whole agenda page. Triggered by `useCompletionFollowup()`
          from QuickActions and Kanban after a `completed` transition. -->
     <CompletionFollowupHost />
+    <!-- And the question asked before one: `useCompletionCheck()`. -->
+    <CompletionCheckHost />
   </div>
 </template>
 

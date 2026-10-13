@@ -39,6 +39,24 @@ clínico**.
   pasa a **Firmado**, marcada como *Firmado en papel*; el botón *Escaneo*
   la abre.
 
+## Consentimiento antes de confirmar un plan
+
+La carta no es obligatoria: la regla viene apagada. Si la clínica la
+activa, un plan de tratamiento no se confirma sin una carta de
+consentimiento informado firmada y escrita para ese plan, y al marcar un
+tratamiento como realizado o finalizar una cita de ese plan se pregunta
+antes por la carta.
+
+- Desde el plan, *Confirmar* avisa de que falta y **Crear la carta** abre
+  esta pestaña para ese plan. La carta que se guarda queda marcada *De un
+  plan*.
+- Cuenta solo una carta de **consentimiento informado**, **firmada** (en
+  pantalla o en papel) y no revocada. Una carta de otro plan, o el
+  consentimiento de uso de datos, no la sustituyen.
+- Se apaga con el interruptor *Exigir consentimiento informado para
+  confirmar un plan*, en *Configuración → Clínica → Plantillas de
+  consentimiento*.
+
 ## Lo que conviene saber
 
 - Sin el escaneo, una carta en papel no se puede marcar como firmada: el

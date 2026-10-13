@@ -12,7 +12,7 @@ Returned by `AgendaModule.get_permissions()`
 
 | Permission | Allows | Required by |
 |------------|--------|-------------|
-| `agenda.appointments.read` | _Describe what this allows._ | _List the endpoints._ |
+| `agenda.appointments.read` | _Describe what this allows._ | `GET /appointments/{id}/completion-check` — _list the others._ |
 | `agenda.appointments.write` | _Describe what this allows._ | _List the endpoints._ |
 | `agenda.cabinets.read` | _Describe what this allows._ | _List the endpoints._ |
 | `agenda.cabinets.write` | _Describe what this allows._ | _List the endpoints._ |

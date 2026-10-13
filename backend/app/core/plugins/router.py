@@ -80,6 +80,8 @@ async def list_apps(
                     if app.name in on_disk and on_disk[app.name] is not app.status
                     else None
                 ),
+                # Switched off with this App, which it cannot run without.
+                "held_back_by": app.held_back_by,
                 "tier": app.tier.value,
                 "modules": list(app.modules),
                 "requires": required_modules(app),

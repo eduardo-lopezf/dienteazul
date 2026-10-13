@@ -159,6 +159,7 @@ const cardStyle = computed(() => ({
       appointment.status === 'cancelled' ? 'line-through' : ''
     ]"
     :style="cardStyle"
+    :data-appointment-id="appointment.id"
     @click="emit('click', appointment)"
   >
     <div class="flex items-start justify-between gap-2">
@@ -189,11 +190,18 @@ const cardStyle = computed(() => ({
           :style="{ backgroundColor: professional.color, color: '#fff' }"
           size="xs"
         />
-        <AppointmentQuickActions
+        <!-- The host may pick the card up on pointerdown (the kanban
+             captures the pointer to drag): the menu's press is not that. -->
+        <span
           v-if="!hideQuickActions"
-          :appointment="appointment"
-          @transitioned="(apt, to) => emit('transitioned', apt, to)"
-        />
+          class="contents"
+          @pointerdown.stop
+        >
+          <AppointmentQuickActions
+            :appointment="appointment"
+            @transitioned="(apt, to) => emit('transitioned', apt, to)"
+          />
+        </span>
       </div>
     </div>
     <div class="flex items-center justify-between gap-2 mt-1">

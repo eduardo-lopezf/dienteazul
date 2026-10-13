@@ -139,6 +139,7 @@ class TestComposition:
         assert [section.qualified_name for section in record.sections] == [
             "patients.identification",
             "patients_clinical.health_questionnaires",
+            "patients_clinical.asa_assessments",
             "patients_clinical.family_history",
             "patients_clinical.medical_context",
             "patients_clinical.allergies",

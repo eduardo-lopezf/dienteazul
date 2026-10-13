@@ -1031,6 +1031,9 @@ from app.core.letterhead import (  # noqa: E402
     get_letterhead,
     logo_mime_type,
 )
+from app.core.regulation import MAX_LENGTH as REGULATION_MAX_LENGTH  # noqa: E402
+from app.core.regulation import SETTINGS_KEY as REGULATION_KEY  # noqa: E402
+from app.core.regulation import default_regulation, record_regulation  # noqa: E402
 from app.core.tenancy.usage import by_clinical_kind, cached_file_usage  # noqa: E402
 
 from .limits import clinic_limits, ensure_user_room  # noqa: E402
@@ -1349,6 +1352,58 @@ async def get_brand(
     sidebar reads it, so it asks for no permission beyond belonging to the
     clinic."""
     return ApiResponse(data=await _brand_response(db, ctx.clinic))
+
+
+class _RegulationResponse(BaseModel):
+    #: The line that is printed. None: nothing is.
+    text: str | None
+    #: What the product offers for the clinic's country, if it knows one.
+    default: str | None
+    #: True while the clinic has not written its own.
+    is_default: bool
+
+
+class _RegulationUpdate(BaseModel):
+    #: The line to print. Empty prints none; ``null`` goes back to the default.
+    text: str | None = Field(default=None, max_length=REGULATION_MAX_LENGTH)
+
+
+def _regulation_response(clinic: Clinic) -> _RegulationResponse:
+    return _RegulationResponse(
+        text=record_regulation(clinic),
+        default=default_regulation(clinic),
+        is_default=(clinic.settings or {}).get(REGULATION_KEY) is None,
+    )
+
+
+@router.get("/clinic/settings/record-regulation", response_model=ApiResponse[_RegulationResponse])
+async def get_record_regulation(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+) -> ApiResponse[_RegulationResponse]:
+    """The regulation the clinic's record refers to. It is printed on what
+    every member fills in or reads, so it asks for no permission beyond
+    belonging to the clinic."""
+    return ApiResponse(data=_regulation_response(ctx.clinic))
+
+
+@router.put("/clinic/settings/record-regulation", response_model=ApiResponse[_RegulationResponse])
+async def update_record_regulation(
+    data: _RegulationUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[_RegulationResponse]:
+    """Set the line, clear it, or go back to the default."""
+    clinic = ctx.clinic
+    settings_now = dict(clinic.settings or {})
+    if data.text is None:
+        settings_now.pop(REGULATION_KEY, None)
+    else:
+        settings_now[REGULATION_KEY] = data.text.strip()
+    clinic.settings = settings_now
+    await db.commit()
+    await db.refresh(clinic)
+    return ApiResponse(data=_regulation_response(clinic))
 
 
 @router.put("/clinic/settings/brand", response_model=ApiResponse[_BrandResponse])

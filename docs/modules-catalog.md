@@ -26,7 +26,7 @@ Maintained by `backend/scripts/generate_catalogs.py`. CI fails if a manifest cha
 | `odontogram` | 0.3.0 | official | patients, catalog | — | auto | no | 4 | 7 | 0 | yes |
 | `patient_timeline` | 0.1.0 | official | patients | — | auto | no | 1 | 0 | 35 | yes |
 | `patients` | 0.1.0 | official | — | — | auto | no | 2 | 3 | 0 | yes |
-| `patients_clinical` | 0.1.0 | official | patients | professionals | auto | no | 4 | 1 | 0 | yes |
+| `patients_clinical` | 0.1.0 | official | patients | professionals | auto | no | 5 | 1 | 0 | yes |
 | `payments` | 0.1.0 | official | patients, budget | — | auto | no | 4 | 3 | 3 | yes |
 | `periodontogram` | 0.1.0 | official | patients, odontogram | — | manual | yes | 2 | 1 | 2 | yes |
 | `professionals` | 0.1.0 | official | media, catalog | — | auto | yes | 2 | 0 | 0 | yes |
@@ -482,6 +482,7 @@ Normalized medical history, allergies, medications, emergency contacts.
 - **Integrates:** `professionals`
 - **Frontend layer:** `frontend`
 - **Permissions:**
+  - `patients_clinical.asa.write`
   - `patients_clinical.emergency.read`
   - `patients_clinical.emergency.write`
   - `patients_clinical.medical.read`

@@ -229,6 +229,9 @@ class TreatmentPlanDetailResponse(TreatmentPlanResponse):
     items: list["PlannedTreatmentItemResponse"] = []
     #: Computed per request — never stored. ``None`` once the plan is over.
     next_action: PlanNextAction | None = None
+    #: The clinic asks for a signed informed consent for this plan and it
+    #: has none. A treatment performed meanwhile is shown as lacking it.
+    informed_consent_missing: bool = False
     #: Treatments added after confirmation that no budget prices yet.
     unbudgeted_count: int = 0
     #: The plan's other live budgets — today, its addenda. ``budget`` above

@@ -98,6 +98,22 @@ class AppointmentTreatmentBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- Before completing --------------------------------------------------
+
+
+class PlanLackingConsent(BaseModel):
+    plan_id: UUID
+    plan_number: str | None = None
+
+
+class AppointmentCompletionCheck(BaseModel):
+    """What whoever completes the visit is told first."""
+
+    #: Plans with a treatment still to do in this visit, for which the
+    #: clinic asks for a signed informed consent and there is none.
+    plans_lacking_consent: list[PlanLackingConsent] = []
+
+
 # --- Appointment CRUD ---------------------------------------------------
 
 

@@ -26,6 +26,7 @@ const pendingNote = ref('')
 // level (`CompletionFollowupHost.vue`) so it stays consistent across
 // the dropdown path and the kanban drag-drop path.
 const completionFollowup = useCompletionFollowup()
+const completionCheck = useCompletionCheck()
 
 const transitions = computed(() => nextTransitions(props.appointment.status))
 const hasActions = computed(() => transitions.value.length > 0)
@@ -52,6 +53,7 @@ async function runTransition(tr: TransitionDescriptor, note?: string) {
   if (isBusy.value) return
   isBusy.value = true
   try {
+    if (tr.to === 'completed' && !(await completionCheck.confirm(props.appointment))) return
     await transition(props.appointment.id, tr.to, note?.trim() || undefined)
     emit('transitioned', props.appointment, tr.to)
     if (tr.to === 'completed') {

@@ -37,6 +37,14 @@ class TemplateResponse(BaseModel):
     updated_at: datetime
 
 
+class ConsentSettings(BaseModel):
+    """How this clinic uses consent letters."""
+
+    #: A treatment plan is not confirmed without a signed informed consent
+    #: written for it.
+    require_informed_for_plan: bool = False
+
+
 class ConsentCreate(BaseModel):
     """A draft, written from a template or from scratch."""
 

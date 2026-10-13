@@ -23,7 +23,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.models import Clinic
 from app.core.letterhead import LETTERHEAD_CSS, render_letterhead
+from app.core.regulation import record_regulation
 from app.modules.patients.models import Patient
 
 from .questionnaire import CONDITION_GROUPS, QUESTIONS
@@ -59,9 +61,18 @@ def _field(label: str, value: str | None, width: int) -> str:
     )
 
 
-def render_html(patient: Patient, locale: str, letterhead: str) -> str:
+def render_html(
+    patient: Patient, locale: str, letterhead: str, regulation: str | None = None
+) -> str:
     text = _labels().get(locale) or _labels()["es"]
     yes, no = ("SÍ", "NO") if locale != "en" else ("YES", "NO")
+
+    # What the sheet is kept under, said above the line the patient signs.
+    regulation_line = (
+        f"<p class='regulation'>{escape(text['regulation'])}: {escape(regulation)}</p>"
+        if regulation
+        else ""
+    )
 
     questions = []
     for number, key in enumerate(QUESTIONS, start=1):
@@ -118,6 +129,7 @@ def render_html(patient: Patient, locale: str, letterhead: str) -> str:
            text-indent: -7mm; }}
   .tick {{ margin-right: 5px; vertical-align: -2px; }}
   .ruled {{ border-bottom: 0.8pt solid #000; height: 7mm; }}
+  .regulation {{ margin: 6mm 0 0; font-size: 8.5pt; color: #333; }}
   .sign {{ margin-top: 12mm; }}
   .sign td {{ vertical-align: top; }}
   .hand {{ border-top: 0.8pt solid #000; text-align: center; font-weight: 700; font-style: italic;
@@ -160,6 +172,7 @@ def render_html(patient: Patient, locale: str, letterhead: str) -> str:
     <table class="fields"><tr>{_field(text["drugsDetail"], "", 70)}</tr></table>
     <div class="b" style="margin-top:8px">{escape(text["otherConditions"])}</div>
     <div class="ruled"></div><div class="ruled"></div>
+    {regulation_line}
     <table class="sign"><tr>
       <td style="width:58%"><div class="hand">{escape(text["signature"])}</div></td>
       <td style="width:10%"></td>
@@ -185,4 +198,8 @@ async def render_blank_pdf(
     of the clinic's professionals: the form carries their letterhead."""
     letterhead = await render_letterhead(db, patient.clinic_id, professional_id)
     # WeasyPrint is CPU-bound; keep the event loop free.
-    return await asyncio.to_thread(_html_to_pdf, render_html(patient, locale, letterhead))
+    clinic = await db.get(Clinic, patient.clinic_id)
+    regulation = record_regulation(clinic) if clinic is not None else None
+    return await asyncio.to_thread(
+        _html_to_pdf, render_html(patient, locale, letterhead, regulation)
+    )

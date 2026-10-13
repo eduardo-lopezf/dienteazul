@@ -14,6 +14,9 @@ Returned by `PatientsClinicalModule.get_permissions()`
 |------------|--------|-------------|
 | `patients_clinical.medical.read` | See a patient's health questionnaires and print the blank form. | `GET /patients/{id}/questionnaires`, `GET /patients/{id}/questionnaire-form` |
 | `patients_clinical.medical.write` | Record a health questionnaire, or take one back. | `POST /patients/{id}/questionnaires`, `POST /patients/{id}/questionnaires/{qid}/retract` |
+| `patients_clinical.medical.read` | See a patient's ASA class and the assessments behind it. | `GET /patients/{id}/asa` |
+| `patients_clinical.asa.read` | See a patient's current ASA class — nothing else: no date, no reason, no assessor. Granted to every role, reception included: it is what the booking dialog shows. | `GET /patients/{id}/asa/class` |
+| `patients_clinical.asa.write` | Assess a patient's ASA physical status, or take an assessment back. A clinical judgement, so it is not the permission that edits the history. | `POST /patients/{id}/asa`, `POST /patients/{id}/asa/{aid}/retract` |
 | `patients_clinical.medical.read` | _Describe what this allows._ | _List the endpoints._ |
 | `patients_clinical.medical.write` | _Describe what this allows._ | _List the endpoints._ |
 | `patients_clinical.emergency.read` | _Describe what this allows._ | _List the endpoints._ |

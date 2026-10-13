@@ -21,6 +21,30 @@ export default defineNuxtPlugin(() => {
     searchKeywords: ['clinica', 'clinic', 'cif', 'nif', 'razon social', 'direccion', 'address', 'tax id'],
     order: 10
   })
+  // The standard the clinical record refers to: printed by more than one App.
+  registerSettingsPage({
+    path: 'record-regulation',
+    category: 'general',
+    labelKey: 'regulation.title',
+    descriptionKey: 'regulation.description',
+    icon: 'i-lucide-scale',
+    permission: 'admin.clinic.read',
+    component: () => import('~/components/settings/pages/RecordRegulationPage.vue'),
+    searchKeywords: ['normativa', 'norma', 'nom', 'nom-004', 'regulation', 'expediente', 'ley'],
+    order: 30
+  })
+  // What heads every printed document, whichever App prints it (ADR 0046).
+  registerSettingsPage({
+    path: 'letterheads',
+    category: 'general',
+    labelKey: 'letterhead.title',
+    descriptionKey: 'letterhead.description',
+    icon: 'i-lucide-stamp',
+    permission: 'admin.clinic.read',
+    component: () => import('~/components/settings/pages/LetterheadsPage.vue'),
+    searchKeywords: ['membrete', 'letterhead', 'logotipo', 'logo', 'encabezado', 'cédula', 'pdf'],
+    order: 20
+  })
 
   // ---- Workspace -----------------------------------------------------
   registerSettingsPage({
@@ -185,6 +209,18 @@ export default defineNuxtPlugin(() => {
     component: () => import('~/components/settings/pages/LanguagePage.vue'),
     searchKeywords: ['idioma', 'language', 'locale', 'lang'],
     order: 20
+  })
+  // A professional's own letterhead. Open to every account: the page says
+  // so when the account is not one of the clinic's professionals.
+  registerSettingsPage({
+    path: 'my-letterhead',
+    category: 'account',
+    labelKey: 'letterhead.mine.title',
+    descriptionKey: 'letterhead.mine.description',
+    icon: 'i-lucide-stamp',
+    component: () => import('~/components/settings/pages/MyLetterheadPage.vue'),
+    searchKeywords: ['membrete', 'letterhead', 'logotipo', 'logo', 'encabezado', 'cédula'],
+    order: 25
   })
   // Of the whole account, so only whoever administers it sees it.
   registerSettingsPage({

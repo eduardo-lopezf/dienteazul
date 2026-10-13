@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- feat(treatment_plan): **la carta se pide antes de marcar un tratamiento
+  como realizado**. En un plan en curso sin carta de consentimiento
+  informado firmada (confirmado antes de exigirla, o con la carta
+  revocada), completar un tratamiento o una sesión pregunta primero:
+  *Crear la carta* o *Marcar como realizado sin carta*. Si se sigue sin
+  ella, el plan muestra una alerta roja —*Falta la carta de consentimiento
+  informado*— y cada tratamiento realizado, la marca *Sin carta*, hasta
+  que la carta se firme. El servidor no lo impide: es un aviso.
+  - El detalle del plan lleva `informed_consent_missing`.
+
+- feat(treatment_plan): **confirmar un plan pide su consentimiento
+  informado** cuando la clínica lo exige (app Expediente clínico). Sin la
+  carta firmada, `POST …/confirm` responde `409 informed_consent_required`
+  y el plan sigue en borrador; la pantalla lo dice y lleva a los
+  consentimientos del paciente para escribirla. Con Expediente clínico
+  apagado nadie lo pide. La regla la decide `consents` (contrato
+  `PlanConsents`); este módulo no lo importa.
+
 - fix(treatment_plan): la descarga de recetas usa el transporte BFF autenticado con refresh compartido entre pestañas.
 - feat(treatment_plan): **el selector de plantillas agrupa por
   especialidad**. Con 125 plantillas de referencia la rejilla plana ya no

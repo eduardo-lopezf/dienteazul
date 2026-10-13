@@ -38,6 +38,22 @@ The patient's consent letters. Part of the **Clinical record** App.
   the letter becomes **Signed**, marked *Signed on paper*; the *Scan*
   button opens it.
 
+## Consent before confirming a plan
+
+The letter is not mandatory: the rule comes switched off. Once the
+clinic switches it on, a treatment plan is not confirmed without a signed
+informed consent letter written for that plan, and marking a treatment as
+performed or completing an appointment of that plan asks for the letter
+first.
+
+- From the plan, *Confirm* says it is missing and **Write the letter**
+  opens this tab for that plan. The letter saved is marked *For a plan*.
+- Only an **informed consent** letter counts, **signed** (on screen or on
+  paper) and not revoked. A letter for another plan, or the consent to
+  the use of data, does not stand in for it.
+- Switch it off with *Require informed consent to confirm a plan*, under
+  *Settings → Clinical → Consent templates*.
+
 ## Worth knowing
 
 - Without the scan a paper letter cannot be marked as signed: the scan is

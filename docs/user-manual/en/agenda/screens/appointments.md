@@ -8,6 +8,7 @@ related_endpoints:
   - GET /api/v1/agenda/appointments
   - GET /api/v1/agenda/appointments/{appointment_id}
   - GET /api/v1/agenda/appointments/{appointment_id}/cabinet-history
+  - GET /api/v1/agenda/appointments/{appointment_id}/completion-check
   - GET /api/v1/agenda/appointments/{appointment_id}/transitions
   - GET /api/v1/agenda/cabinets
   - GET /api/v1/agenda/kanban/day
@@ -127,6 +128,15 @@ when it is enabled.
 3. When transitioning to **completed** a follow-up modal appears with
    actions contributed by sibling modules (e.g. *Schedule recall*).
    The modal stays hidden when no module contributes to it.
+
+### Completing an appointment without a consent letter
+
+When the clinic requires informed consent for its plans and the
+appointment works on a plan with no signed letter, **Complete
+appointment** asks first: *Write the letter* opens the patient's consents
+for that plan, and *Complete without the letter* goes on. The rule comes
+switched off; it is switched on in *Settings → Clinic → Consent
+templates*.
 
 ## Permissions
 

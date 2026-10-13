@@ -99,7 +99,10 @@ async function refreshPlan() {
 async function onConfirmPlan() {
   transitioning.value = true
   try {
-    const result = await confirmPlan(props.plan.id)
+    const result = await confirmPlan(props.plan.id, props.plan.patient_id, () => {
+      showConfirmModal.value = false
+      pendingItemIntent.value = null
+    })
     if (result) {
       showConfirmModal.value = false
       await refreshPlan()
@@ -632,6 +635,29 @@ function handleItemEditBlocked() {
   })
 }
 
+// --- The informed consent the clinic asks for -----------------------------
+// A plan is not confirmed without it. One already under way — confirmed
+// before the clinic asked, or whose letter was revoked — keeps going, so
+// performing a treatment asks for the letter first and, if it is done
+// anyway, the plan says in red that the letter is missing.
+const consentMissing = computed(() => props.plan.informed_consent_missing === true)
+const performedWithoutConsent = computed(() =>
+  consentMissing.value && props.plan.items.some(item => item.status === 'completed')
+)
+const consentUrl = computed(() => `/patients/${props.plan.patient_id}?tab=consents&plan=${props.plan.id}`)
+/** What was about to be marked as performed, waiting on "there is no letter". */
+const awaitingConsent = shallowRef<(() => Promise<void>) | null>(null)
+const showConsentPrompt = computed({
+  get: () => awaitingConsent.value !== null,
+  set: (open) => { if (!open) awaitingConsent.value = null }
+})
+
+async function completeWithoutConsent() {
+  const proceed = awaitingConsent.value
+  awaitingConsent.value = null
+  await proceed?.()
+}
+
 async function handleCompleteItem(
   itemId: string,
   payload: { noteBody: string | null }
@@ -640,6 +666,11 @@ async function handleCompleteItem(
   // the clinic confirms the plan.
   if (isDraft.value) {
     askToConfirmPlan('complete', itemId)
+    return
+  }
+  // Ask for the letter first. Going on without it is allowed, and shown.
+  if (consentMissing.value) {
+    awaitingConsent.value = () => completeItemNow(itemId, payload)
     return
   }
   await completeItemNow(itemId, payload)
@@ -711,9 +742,17 @@ async function handleItemDoctorChange(itemId: string, professionalId: string | n
 }
 
 async function handleSessionComplete(itemId: string, sessionId: string) {
-  await completeSession(props.plan.id, itemId, sessionId, {})
-  await odontogramRef.value?.refetchTreatments()
-  emit('updated')
+  const complete = async () => {
+    await completeSession(props.plan.id, itemId, sessionId, {})
+    await odontogramRef.value?.refetchTreatments()
+    emit('updated')
+  }
+  // A session is work performed too: the same question first.
+  if (consentMissing.value) {
+    awaitingConsent.value = complete
+    return
+  }
+  await complete()
 }
 
 async function handleSessionCancel(itemId: string, sessionId: string) {
@@ -1237,6 +1276,19 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
          PlanNextActionBar. Renders in the patient record too, where the
          same buttons work — `readonly` there means no write access, not
          "embedded". -->
+    <!-- Work was performed and the letter the clinic asks for is not on
+         file. Red, and it stays until the letter is signed. -->
+    <UAlert
+      v-if="performedWithoutConsent"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-file-warning"
+      :title="t('treatmentPlans.consentMissing.title')"
+      :description="t('treatmentPlans.consentMissing.description')"
+      :actions="readonly ? undefined : [{ label: t('treatmentPlans.consentRequired.action'), to: consentUrl }]"
+      data-testid="plan-consent-missing"
+    />
+
     <PlanNextActionBar
       :action="plan.next_action"
       :budget-id="plan.budget_id ?? null"
@@ -1385,6 +1437,7 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
             :collections="collectionsAvailable ? sessionCollections : undefined"
             :treatment-collections="collectionsAvailable ? treatmentCollections : undefined"
             :phase-money="phaseMoney"
+            :consent-missing="consentMissing"
             @item-hover="hoveredItemId = $event"
             @item-open="openItemId = $event"
             @item-complete="handleCompleteItem"
@@ -1484,6 +1537,44 @@ const moreMenuItems = computed<DropdownMenuItem[]>(() => {
 
     <!-- Workflow modals (PR1/PR2) — owned by this view so any parent
          (standalone page, patient ficha) gets the same flow. -->
+    <!-- Performing a treatment on a plan with no signed consent: ask for
+         the letter first; going on without it is the clinician's call. -->
+    <UModal
+      v-model:open="showConsentPrompt"
+      :title="t('treatmentPlans.consentPrompt.title')"
+      :description="t('treatmentPlans.consentPrompt.description')"
+    >
+      <template #footer>
+        <div
+          class="flex w-full flex-wrap justify-end gap-2"
+          data-testid="plan-consent-prompt"
+        >
+          <UButton
+            color="neutral"
+            variant="ghost"
+            @click="awaitingConsent = null"
+          >
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton
+            color="error"
+            variant="soft"
+            data-testid="plan-consent-proceed"
+            @click="completeWithoutConsent"
+          >
+            {{ t('treatmentPlans.consentPrompt.proceed') }}
+          </UButton>
+          <UButton
+            icon="i-lucide-file-signature"
+            :to="consentUrl"
+            data-testid="plan-consent-write"
+          >
+            {{ t('treatmentPlans.consentRequired.action') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
     <ConfirmPlanModal
       :open="showConfirmModal"
       :plan-number="planSummary.number"

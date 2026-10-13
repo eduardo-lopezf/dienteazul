@@ -50,7 +50,7 @@ related_paths:
   - backend/app/modules/treatment_plan/prescriptions.py
   - backend/app/modules/treatment_plan/proposals.py
   - backend/app/modules/treatment_plan/router.py
-last_verified_commit: 01eb2d1
+last_verified_commit: f9ad75a
 ---
 
 # Treatment plan detail
@@ -211,6 +211,21 @@ green or grey, nothing to do.
    budget right away.
 3. If the budget did not get created, the plan's next step is
    **Generate budget**, which creates it.
+
+**If the clinic requires informed consent** (Clinical record App, on by
+default), the plan is not confirmed until the patient signs an informed
+consent letter written for that plan. Clicking *Confirm* shows the notice
+*The informed consent is missing* with the **Write the letter** button,
+which leads to the patient's consents: the letter written there is filed
+for the plan and, once signed, *Back to the plan* returns to confirm it.
+The rule is switched off under *Settings → Clinical → Consent templates*.
+
+**Marking a treatment as performed without the letter.** On a plan already
+under way that lacks the letter (confirmed before it was required, or the
+patient revoked it), marking a treatment as performed asks first: **Write
+the letter** or **Mark as performed without the letter**. Going on without
+it, the plan shows in red *The informed consent letter is missing* and
+each performed treatment the *No letter* mark, until the letter is signed.
 
 **If the Budgets app is not enabled**, a confirmed plan goes straight to
 *In treatment*: there is no budget to accept and the budget actions are

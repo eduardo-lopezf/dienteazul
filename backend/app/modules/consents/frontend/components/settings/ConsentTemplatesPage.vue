@@ -32,9 +32,26 @@ const kindOptions = computed(() => [
   { label: t('consents.kinds.conformity'), value: 'conformity' }
 ])
 
+// Whether a treatment plan waits for a signed informed consent.
+const requireForPlan = ref(true)
+const savingRule = ref(false)
+
+async function setRequireForPlan(value: boolean) {
+  savingRule.value = true
+  try {
+    requireForPlan.value = (await consents.saveSettings({ require_informed_for_plan: value })).require_informed_for_plan
+    toast.add({ title: t('consents.rule.saved'), color: 'success' })
+  } catch {
+    toast.add({ title: t('errors.updateFailed'), color: 'error' })
+  } finally {
+    savingRule.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   try {
+    requireForPlan.value = (await consents.getSettings()).require_informed_for_plan
     templates.value = await consents.listTemplates({ includeInactive: true })
   } catch {
     templates.value = []
@@ -85,6 +102,28 @@ async function toggle(template: ConsentTemplate) {
     class="space-y-4"
     data-testid="consent-templates"
   >
+    <div
+      class="rounded-md border border-default p-4 flex items-start gap-3"
+      data-testid="consent-rule"
+    >
+      <USwitch
+        :model-value="requireForPlan"
+        :disabled="!canEdit || savingRule || loading"
+        :aria-label="t('consents.rule.title')"
+        class="mt-0.5"
+        data-testid="consent-rule-switch"
+        @update:model-value="(value: boolean) => setRequireForPlan(value)"
+      />
+      <div>
+        <p class="font-medium text-default">
+          {{ t('consents.rule.title') }}
+        </p>
+        <p class="text-caption text-muted">
+          {{ t('consents.rule.description') }}
+        </p>
+      </div>
+    </div>
+
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <p class="text-sm text-muted max-w-2xl">
         {{ t('consents.templates.intro') }}

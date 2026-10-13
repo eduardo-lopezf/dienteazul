@@ -110,6 +110,17 @@ const summary = computed(() => {
       >
         {{ t(app.pending_enabled ? 'settings.apps.pendingEnable' : 'settings.apps.pendingDisable') }}
       </UBadge>
+      <!-- Off because an App it cannot run without is off (ADR 0053). -->
+      <UBadge
+        v-if="app.held_back_by"
+        color="neutral"
+        variant="subtle"
+        size="xs"
+        icon="i-lucide-link-2-off"
+        :data-testid="`app-held-back-${app.name}`"
+      >
+        {{ t('settings.apps.heldBackBy', { name: t(`settings.apps.catalog.${app.held_back_by}.title`) }) }}
+      </UBadge>
       <!-- The base App groups no modules: it is the core and the shell. -->
       <span
         v-if="app.tier === 'base'"

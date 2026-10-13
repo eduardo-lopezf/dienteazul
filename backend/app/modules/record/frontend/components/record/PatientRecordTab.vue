@@ -57,6 +57,9 @@ async function load() {
 }
 
 onMounted(load)
+
+const { regulation, load: loadRegulation } = useRecordRegulation()
+onMounted(() => loadRegulation())
 watch([() => props.ctx.patient.id, includeRetracted], load)
 
 const professionals = computed(() => new Map(
@@ -137,6 +140,11 @@ const composedAt = computed(() => record.value
       <p class="text-caption text-muted">
         {{ t('record.intro') }}
         <span v-if="composedAt">· {{ t('record.composedAt', { when: composedAt }) }}</span>
+        <span
+          v-if="regulation?.text"
+          class="block mt-0.5"
+          data-testid="record-regulation-line"
+        >{{ t('regulation.label') }}: {{ regulation.text }}</span>
       </p>
       <div class="flex items-center gap-4 flex-wrap">
         <USwitch

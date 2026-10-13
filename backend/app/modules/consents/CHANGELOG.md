@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- change(consents): la regla «exigir consentimiento informado para
+  confirmar un plan» viene **apagada**. La carta no es obligatoria hasta
+  que la clínica active el interruptor; con él apagado nada bloquea ni
+  pregunta (ni al confirmar un plan, ni al marcar un tratamiento como
+  realizado, ni al finalizar una cita).
+
+- refactor(consents): el método del contrato `PlanConsents` pasa a
+  llamarse `lacks_required_consent`: ya no responde solo a «¿se puede
+  confirmar?», también a «¿falta la carta de un plan en curso?».
+
+- feat(consents): **un plan de tratamiento espera su consentimiento
+  informado**. La clínica exige, por defecto, que el paciente firme una
+  carta de consentimiento informado escrita para el plan antes de
+  confirmarlo. Cuenta una carta `informed`, firmada, ligada a ese plan y
+  no revocada.
+  - La regla es de este módulo: la ofrece a Tratamientos por el contrato
+    `PlanConsents` (ADR 0039), que solo obedece.
+  - Se apaga en *Configuración → Clínica → Plantillas de consentimiento*
+    (`GET/PUT /consents/settings`, `require_informed_for_plan`).
+  - Con la app Profesionales apagada no se exige: un consentimiento
+    informado no se puede firmar sin nombrar quién lo explicó.
+  - La pestaña *Consentimientos* acepta `?plan=<id>`: la carta que se
+    escribe queda ligada al plan, se marca *De un plan* y, una vez
+    firmada, ofrece volver a él.
+
+- refactor(consents): el lienzo de firma (`SignaturePad`) pasa al núcleo
+  (`frontend/app/components/shared/`), porque el cuestionario de salud de
+  Pacientes también firma. Sin cambios en la firma de cartas.
+
 - fix(consents): cargas de escaneos y aperturas de documentos usan el transporte BFF autenticado con cookie HttpOnly.
 - feat(consents): la carta impresa lleva el **membrete del profesional
   que la explicó** o, si no tiene uno propio, el de la clínica — nunca el

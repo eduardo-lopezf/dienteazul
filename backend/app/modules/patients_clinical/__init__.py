@@ -15,6 +15,7 @@ from app.core.plugins import BaseModule
 
 from .models import (
     Allergy,
+    AsaAssessment,
     EmergencyContact,
     FamilyHistory,
     HealthQuestionnaire,
@@ -48,10 +49,24 @@ class PatientsClinicalModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["medical.read", "medical.write", "emergency.read", "emergency.write"],
-            "hygienist": ["medical.read", "emergency.read"],
-            "assistant": ["medical.read", "emergency.read", "emergency.write"],
-            "receptionist": ["emergency.read", "emergency.write"],
+            # `asa.write` is its own permission: an ASA class is a clinical
+            # judgement, and a clinic may let someone edit the history
+            # without letting them make it.
+            #
+            # `asa.read` is the class alone — "ASA III" — for whoever books
+            # the patient. No date, no history, no reason, no assessor: reception needs to know the patient asks
+            # for care in the scheduling, not why.
+            "dentist": [
+                "medical.read",
+                "medical.write",
+                "asa.read",
+                "asa.write",
+                "emergency.read",
+                "emergency.write",
+            ],
+            "hygienist": ["medical.read", "asa.read", "emergency.read"],
+            "assistant": ["medical.read", "asa.read", "emergency.read", "emergency.write"],
+            "receptionist": ["asa.read", "emergency.read", "emergency.write"],
         },
         "frontend": {
             "layer_path": "frontend",
@@ -67,6 +82,7 @@ class PatientsClinicalModule(BaseModule):
             SurgicalHistory,
             FamilyHistory,
             HealthQuestionnaire,
+            AsaAssessment,
             EmergencyContact,
             LegalGuardian,
         ]
@@ -88,6 +104,8 @@ class PatientsClinicalModule(BaseModule):
         return [
             "medical.read",
             "medical.write",
+            "asa.read",
+            "asa.write",
             "emergency.read",
             "emergency.write",
         ]

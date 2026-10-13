@@ -4,6 +4,8 @@ The App's own version, which moves independently of its modules' (ADR 0036). Eac
 
 ## 0.1
 
+- 2026-10-12: *Settings → General → Record regulation* — the standard the clinic's clinical record refers to, one line of text, printed on the health questionnaire and on the record.
+- 2026-10-12: the letterheads are set up here — *Settings → General → Letterheads*, and *My letterhead* under Account. They were on the Clinical record's page, out of reach with that App off.
 - Declared as the base App: no modules, always enabled (ADR 0043).
 - Settings → Apps → Espacio de trabajo, with the home page layout (which widgets, in what order).
 - 2026-10-04: the clinic picks the default theme (light, dark or the device's); each person keeps their own switch.

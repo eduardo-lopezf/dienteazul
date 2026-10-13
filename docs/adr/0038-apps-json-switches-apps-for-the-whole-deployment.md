@@ -143,7 +143,9 @@ for unreadable state: mount everything and log the exception.
   rule would refuse, or with a cascade take six dependents down. It
   would also make a per-database fact out of a per-deployment choice.
 - **Cascade to dependents.** Coherent, and not what was asked: Agenda
-  off must not mean Recalls and Treatment plans off.
+  off must not mean Recalls and Treatment plans off. An App that does
+  want it declares it, one by one
+  ([ADR 0053](0053-an-app-can-declare-the-apps-it-goes-off-with.md)).
 - **An environment variable.** Fine for one flag, awkward for a list of
   Apps with versions and modules.
 

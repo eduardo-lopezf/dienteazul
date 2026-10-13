@@ -27,6 +27,7 @@ from .presenter import present, present_one
 from .schemas import (
     AppointmentCabinetAssignment,
     AppointmentCabinetEventResponse,
+    AppointmentCompletionCheck,
     AppointmentCreate,
     AppointmentResponse,
     AppointmentStatusEventResponse,
@@ -38,6 +39,7 @@ from .schemas import (
     CabinetResponse,
     CabinetUpdate,
     KanbanDaySnapshot,
+    PlanLackingConsent,
 )
 from .service import (
     AlreadyInStateError,
@@ -278,6 +280,37 @@ async def transition_appointment(
     response = await present_one(db, appointment)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
     return ApiResponse(data=response)
+
+
+@router.get(
+    "/appointments/{appointment_id}/completion-check",
+    response_model=ApiResponse[AppointmentCompletionCheck],
+)
+async def check_appointment_completion(
+    appointment_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("agenda.appointments.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AppointmentCompletionCheck]:
+    """What to ask before this visit is marked as completed.
+
+    A notice, never a stop: the transition itself does not look at it.
+    """
+    appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
+    if not appointment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found",
+        )
+    lacking = await AppointmentService.plans_lacking_consent(db, appointment)
+    return ApiResponse(
+        data=AppointmentCompletionCheck(
+            plans_lacking_consent=[
+                PlanLackingConsent(plan_id=plan_id, plan_number=number)
+                for plan_id, number in lacking
+            ]
+        )
+    )
 
 
 @router.get(

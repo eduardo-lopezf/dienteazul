@@ -64,6 +64,8 @@ export interface AppInfo {
   available?: boolean
   /** What `apps.json` says now, when it differs from what runs; null otherwise. */
   pending_enabled: boolean | null
+  /** The App this one was switched off with, because it cannot run without it. */
+  held_back_by?: string | null
   /** `base`: the App everything runs on, never disabled (ADR 0043). */
   tier: 'base' | 'core' | 'optional'
   modules: string[]

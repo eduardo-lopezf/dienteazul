@@ -18,6 +18,7 @@ Not verified.
 
 ## Notes
 
+- Goes off with Patients: it lists it in `requires_apps`, so disabling Patients disables this App too ([ADR 0053](../../adr/0053-an-app-can-declare-the-apps-it-goes-off-with.md)). Patients runs without it.
 - Requires Patients; `record` also requires Professionals, `consents` only integrates with it. Neither module is installed by default.
 - Scope decided for NOM-004: the dental record, plus family history and prognosis. Built so far: consent letters. Pending: family history, prognosis, and a per-patient check of what the norm asks for.
 - The legal wording of consents is the clinic's; the App supplies the mechanism and the custody.

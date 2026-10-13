@@ -18,6 +18,17 @@ tables. It is never edited; a mistaken one is retracted. On paper, the
 scan (`scan_document_id`, checked through `PatientDocuments`) is the
 questionnaire and `answers` may be empty.
 
+Answered on screen it may carry the **patient's signature**
+(`signature` on create: PNG data URL, `signed_by_name`,
+`signer_capacity`), stored with `signed_at` and the `regulation` the form
+named that day (`app.core.regulation`) — a copy, so a later change of the
+clinic's line does not move what was signed under. Refused together
+with a scan. `signature_data` is `pii()`-classified so erasure
+drops the drawing, and it is left out of the record section on purpose.
+**One of the two is required**: the signature on screen, or the scan of
+the signed sheet — `create_questionnaire` refuses a questionnaire with
+neither. Rows from before the rule stay unsigned.
+
 The form is fixed in `questionnaire.py` (`FORM_VERSION`): a changed
 question is a new key, never a reworded one, or old answers change
 meaning. The frontend mirrors the keys in `useHealthQuestionnaires.ts`
@@ -25,6 +36,23 @@ and holds the wording (`healthQuestionnaire.*`); after touching either,
 run `python backend/scripts/generate_record_labels.py` from the host.
 The blank PDF prints nothing clinical — a filled-in questionnaire leaves
 the clinic only through a record disclosure.
+
+### ASA physical status
+
+`GET/POST /patients/{id}/asa`, `POST …/asa/{aid}/retract`. An assessment
+is a **dated, attributed judgement** (`AsaAssessment`): class 1–4 (I–IV; V and VI are not offered), the `E`
+modifier, what it rests on. Never edited — a new one supersedes it, a
+mistaken one is retracted, and the newest not retracted is the current
+class. `GET` answers `{current, history}`. Writing needs
+`patients_clinical.asa.write`, its own permission on purpose. A class of
+III or more is one of `compute_alerts`' alerts (`type: "asa"`).
+`GET …/asa/class` (`asa.read`, every role) answers the class alone, for
+the booking dialog: keep the date, the reason, the assessor and the
+history out of it.
+
+It lives here, in the Patients App, so the class is on the patient's
+summary with the Clinical record off; the record reads it as the section
+`asa_assessments`.
 
 ## Dependencies
 
@@ -37,7 +65,7 @@ professional. The foreign key stays, ordered by `depends_on` in `pc_0003`.
 
 ## Permissions
 
-`patients_clinical.medical.{read,write}`,
+`patients_clinical.medical.{read,write}`, `patients_clinical.asa.{read,write}`,
 `patients_clinical.emergency.{read,write}`.
 
 ## Events emitted

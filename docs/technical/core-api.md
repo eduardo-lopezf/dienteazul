@@ -208,6 +208,7 @@ via `<ModuleSlot :name="..." :ctx="..." />`.
 | `patient.detail.tabs` | `/patients/:id` | `{ patient: Patient }` |
 | `patient.detail.sidebar` | `/patients/:id` | `{ patient: Patient }` |
 | `appointment.detail.actions` | appointment modal | `{ appointment: Appointment }` |
+| `appointment.patient.alerts` | appointment modal, under the patient picker | `{ patientId: string }` |
 | `dashboard.widgets` | `/` | `{}` |
 | `settings.sections` | `/settings` | `{}` |
 

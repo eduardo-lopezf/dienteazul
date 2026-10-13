@@ -720,6 +720,14 @@ function openPatientFile() {
                   />
                 </UFormField>
               </template>
+              <!-- What whoever books should know about this patient before
+                   choosing a time. Other Apps say it here; the agenda does
+                   not know what they are (ADR 0041). -->
+              <ModuleSlot
+                v-if="selectedPatient"
+                name="appointment.patient.alerts"
+                :ctx="{ patientId: selectedPatient.id }"
+              />
               <div v-if="selectedPatient">
                 <p class="text-caption text-subtle mb-1.5">
                   {{ t('appointments.treatments') }}

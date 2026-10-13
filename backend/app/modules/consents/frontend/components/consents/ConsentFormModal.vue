@@ -11,6 +11,8 @@ const props = defineProps<{
   patientId: string
   /** Set when editing an existing draft. */
   consent?: Consent | null
+  /** The treatment plan a new letter is written for, when it is for one. */
+  planId?: string | null
 }>()
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -87,7 +89,13 @@ async function save() {
     }
     const saved = props.consent
       ? await consents.update(props.consent.id, payload)
-      : await consents.create(props.patientId, { kind: kind.value, template_id: templateId.value ?? null, ...payload })
+      : await consents.create(props.patientId, {
+          kind: kind.value,
+          template_id: templateId.value ?? null,
+          // Only an informed consent answers for a plan.
+          plan_id: kind.value === 'informed' ? (props.planId ?? null) : null,
+          ...payload
+        })
     emit('saved', saved)
     emit('update:open', false)
   } catch (error: unknown) {

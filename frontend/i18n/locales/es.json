@@ -1139,6 +1139,12 @@
     "tooth": "Diente"
   },
   "appointments": {
+    "consentPrompt": {
+      "title": "La cita trabaja sobre un plan sin carta de consentimiento firmada",
+      "description": "Antes de finalizar la cita conviene que el paciente firme la carta de consentimiento informado del plan. Si continúas sin ella, los tratamientos que se marquen como realizados quedarán señalados en rojo hasta que se firme.",
+      "proceed": "Finalizar sin carta",
+      "write": "Crear la carta"
+    },
     "title": "Agenda",
     "unavailable": "No se pueden crear citas",
     "patientsUnavailable": "No se pueden asignar pacientes",
@@ -1699,6 +1705,7 @@
       "integrates": "Se integra con",
       "alwaysOn": "Siempre habilitada",
       "configure": "Configurar",
+      "heldBackBy": "Deshabilitada junto con {name}",
       "pendingEnable": "Se habilitará al reiniciar",
       "pendingDisable": "Se deshabilitará al reiniciar",
       "tier": {
@@ -2294,6 +2301,21 @@
     "assignError": "Error al asignar tratamientos"
   },
   "treatmentPlans": {
+    "consentMissing": {
+      "title": "Falta la carta de consentimiento informado",
+      "description": "Hay tratamientos realizados en este plan sin una carta de consentimiento informado firmada por el paciente.",
+      "badge": "Sin carta"
+    },
+    "consentPrompt": {
+      "title": "Este plan no tiene carta de consentimiento firmada",
+      "description": "Antes de marcar el tratamiento como realizado conviene que el paciente firme la carta de consentimiento informado de este plan. Si continúas sin ella, el plan y el tratamiento quedarán señalados en rojo hasta que se firme.",
+      "proceed": "Marcar como realizado sin carta"
+    },
+    "consentRequired": {
+      "title": "Falta el consentimiento informado",
+      "description": "Este plan no se puede confirmar hasta que el paciente firme la carta de consentimiento informado escrita para él.",
+      "action": "Crear la carta"
+    },
     "title": "Planes de tratamiento",
     "description": "Gestiona planes de tratamiento para pacientes",
     "new": "Nuevo plan",
@@ -3331,7 +3353,71 @@
     "totalDiscount": "Descuento total",
     "totalPaid": "Total cobrado"
   },
+  "asa": {
+    "booking": {
+      "titleBrief": "Paciente ASA {label}",
+      "title": "Paciente ASA {label} — {description}",
+      "advice": {
+        "3": "Conviene tomar precauciones y considerar una cita más corta.",
+        "4": "Conviene valorar con el clínico si el tratamiento debe hacerse en el consultorio."
+      },
+      "assessed": "Valorado el {when}"
+    },
+    "title": "Clasificación ASA",
+    "description": "Estado físico del paciente según la escala ASA, valorado por un clínico en una fecha.",
+    "empty": "Sin valoración ASA.",
+    "assess": "Valorar",
+    "reassess": "Valorar de nuevo",
+    "history": "Historial de valoraciones",
+    "noHistory": "Todavía no hay valoraciones.",
+    "current": "Vigente",
+    "class": "Clase ASA",
+    "classes": {
+      "1": "Paciente sano",
+      "2": "Enfermedad sistémica leve",
+      "3": "Enfermedad sistémica grave",
+      "4": "Enfermedad sistémica grave que amenaza la vida de forma constante"
+    },
+    "emergency": "Procedimiento de urgencia (modificador E)",
+    "rationale": "En qué se basa",
+    "rationalePlaceholder": "Por ejemplo: hipertensión controlada, sin limitación funcional",
+    "save": "Guardar valoración",
+    "saved": "Valoración ASA guardada",
+    "retract": "Anular",
+    "retractPrompt": "¿Por qué se anula esta valoración? Se conserva en el expediente, marcada como anulada.",
+    "note": "Una valoración no se edita: una nueva la sustituye, y la anterior queda en el historial. Una clase III o superior se muestra como alerta en la ficha del paciente."
+  },
+  "regulation": {
+    "label": "Normativa de referencia",
+    "title": "Normativa del expediente",
+    "description": "La norma a la que hace referencia el expediente clínico de la clínica.",
+    "intro": "Se muestra en el cuestionario de salud —en pantalla y en la hoja que el paciente llena y firma—, en la pestaña Expediente y en el expediente impreso. Es una referencia: indicar la norma no certifica que el expediente la cumpla.",
+    "field": "Norma",
+    "placeholder": "Por ejemplo: NOM-004-SSA3-2012, Del expediente clínico",
+    "usingDefault": "Se usa la sugerida para el país de la clínica. Escribe otra para cambiarla.",
+    "emptyHint": "Si lo dejas vacío no se muestra ninguna.",
+    "save": "Guardar",
+    "saved": "Normativa guardada",
+    "restore": "Usar la sugerida",
+    "moved": "La normativa de referencia se configura en Espacio de trabajo:"
+  },
   "healthQuestionnaire": {
+    "sign": {
+      "title": "Firma del paciente",
+      "statement": "Declaro que la información que proporcioné en este cuestionario es verdadera.",
+      "name": "Nombre de quien firma",
+      "capacity": "Firma como",
+      "capacities": {
+        "patient": "El paciente",
+        "guardian": "Tutor legal",
+        "representative": "Representante"
+      },
+      "required": "Firma con el dedo, un lápiz o el ratón. La firma es obligatoria; si el paciente prefiere firmar en papel, elige «En papel» y sube el cuestionario firmado.",
+      "needsName": "Escribe el nombre de quien firma.",
+      "signed": "Firmado",
+      "signedBy": "Firmado por {name} ({capacity})"
+    },
+    "regulation": "Normativa de referencia",
     "which": "¿Cuál?",
     "signature": "Nombre y firma del paciente o responsable",
     "date": "Fecha",
@@ -3360,7 +3446,7 @@
     "paper": "En papel",
     "scan": "Cuestionario escaneado",
     "scanHint": "PDF, JPG o PNG",
-    "paperSteps": "Imprime el cuestionario en blanco, que el paciente lo llene a mano, y sube aquí el escaneo. El motivo de consulta se captura aparte para que aparezca en el expediente.",
+    "paperSteps": "Imprime el cuestionario en blanco, que el paciente lo llene y lo firme a mano, y sube aquí el archivo firmado (PDF o foto). El motivo de consulta se captura aparte para que aparezca en el expediente.",
     "empty": {
       "title": "Sin cuestionarios",
       "description": "El cuestionario de salud que el paciente contesta en su consulta: en pantalla, o impreso y escaneado."
@@ -3458,6 +3544,8 @@
     }
   },
   "letterhead": {
+    "description": "El encabezado de los documentos impresos: el de la clínica y el de cada profesional.",
+    "license": "Cédula {number}",
     "mine": {
       "title": "Mi membrete",
       "description": "Lo que encabeza los documentos que imprimes o explicas.",
@@ -3492,6 +3580,7 @@
   },
   "record": {
     "settings": {
+      "letterheadMoved": "El membrete de los documentos se configura en Espacio de trabajo:",
       "intro": "Cómo se arma el expediente clínico en esta clínica: qué secciones lleva, en qué orden y qué puntos se revisan. Aplica a la pestaña Expediente y al documento que se imprime.",
       "saved": "Formato del expediente actualizado",
       "sections": {
@@ -3561,6 +3650,7 @@
       "retracted": "Anulado"
     },
     "section": {
+      "asa_assessments": "Clasificación ASA",
       "health_questionnaires": "Cuestionarios de salud",
       "disclosures": "Entregas del expediente",
       "family_history": "Antecedentes heredo-familiares",
@@ -3579,6 +3669,8 @@
       "imaging": "Radiografías y fotografías"
     },
     "field": {
+      "asa_class": "Clase",
+      "rationale": "En qué se basa",
       "systolic": "TA sistólica (mmHg)",
       "diastolic": "TA diastólica (mmHg)",
       "heart_rate": "Frecuencia cardiaca",
@@ -4219,6 +4311,17 @@
     "empty": "Ningún módulo financiero está instalado."
   },
   "consents": {
+    "rule": {
+      "title": "Exigir consentimiento informado para confirmar un plan",
+      "description": "Un plan de tratamiento no se confirma hasta que el paciente firme una carta de consentimiento informado escrita para ese plan. Una carta revocada deja de contar.",
+      "saved": "Regla guardada"
+    },
+    "forPlan": {
+      "pending": "Carta para un plan de tratamiento: la carta de consentimiento informado que escribas aquí queda ligada al plan. Cuando el paciente la firme, el plan se podrá confirmar.",
+      "signed": "El consentimiento informado de este plan ya está firmado. El plan se puede confirmar.",
+      "back": "Volver al plan",
+      "badge": "De un plan"
+    },
     "title": "Consentimientos",
     "new": "Nuevo consentimiento",
     "view": "Ver",

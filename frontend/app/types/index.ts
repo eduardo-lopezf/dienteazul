@@ -2050,7 +2050,7 @@ export interface MedicalHistory {
 
 // Patient Alert
 export interface PatientAlert {
-  type: 'allergy' | 'pregnancy' | 'lactating' | 'anticoagulant' | 'anesthesia_reaction' | 'systemic_disease'
+  type: 'asa' | 'allergy' | 'pregnancy' | 'lactating' | 'anticoagulant' | 'anesthesia_reaction' | 'systemic_disease'
   severity: 'low' | 'medium' | 'high' | 'critical'
   title: string
   details?: string
@@ -2545,6 +2545,8 @@ export interface TreatmentPlanDetail extends TreatmentPlan {
   patient?: PatientBrief
   budget?: BudgetBrief
   next_action?: PlanNextAction | null
+  /** The clinic asks for a signed informed consent for this plan and it has none. */
+  informed_consent_missing?: boolean
   /** Treatments added after the plan was confirmed that no budget prices. */
   unbudgeted_count?: number
   /** The plan's other live budgets — its addenda. */

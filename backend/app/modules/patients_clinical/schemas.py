@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 # --- Medical context -----------------------------------------------------
 
@@ -167,6 +167,27 @@ class QuestionAnswer(BaseModel):
     detail: str | None = Field(default=None, max_length=500)
 
 
+SignerCapacity = Literal["patient", "guardian", "representative"]
+
+#: A drawn signature is a few kilobytes; this is room to spare and a lid.
+_SIGNATURE_MAX_CHARS = 400_000
+
+
+class QuestionnaireSignature(BaseModel):
+    """The patient's signature, drawn on screen."""
+
+    png: str = Field(max_length=_SIGNATURE_MAX_CHARS)
+    signed_by_name: str = Field(min_length=1, max_length=200)
+    signer_capacity: SignerCapacity = "patient"
+
+    @field_validator("png")
+    @classmethod
+    def _is_a_png(cls, value: str) -> str:
+        if not value.startswith("data:image/png;base64,"):
+            raise ValueError("The signature must be a PNG data URL")
+        return value
+
+
 class HealthQuestionnaireCreate(BaseModel):
     """What the patient declared, or the scan of the sheet they filled in."""
 
@@ -179,6 +200,8 @@ class HealthQuestionnaireCreate(BaseModel):
     drugs_detail: str | None = Field(default=None, max_length=300)
     other_conditions: str | None = Field(default=None, max_length=2000)
     scan_document_id: UUID | None = None
+    #: On screen only: a sheet filled in by hand carries its own.
+    signature: QuestionnaireSignature | None = None
 
 
 class HealthQuestionnaireResponse(BaseModel):
@@ -196,9 +219,68 @@ class HealthQuestionnaireResponse(BaseModel):
     drugs_detail: str | None
     other_conditions: str | None
     scan_document_id: UUID | None
+    signed_at: datetime | None
+    signed_by_name: str | None
+    signer_capacity: str | None
+    #: ``{"png": …}``: the drawing, for whoever reads the questionnaire.
+    signature_data: dict | None
+    #: The regulation the form named when it was recorded.
+    regulation: str | None
     retracted_at: datetime | None
     recorded_by_professional_id: UUID | None
     created_at: datetime
+
+
+# --- ASA physical status -------------------------------------------------
+
+
+class AsaAssessmentCreate(BaseModel):
+    """A clinician's judgement of the patient's physical status, today."""
+
+    asa_class: int = Field(ge=1, le=4)
+    is_emergency: bool = False
+    rationale: str | None = Field(default=None, max_length=2000)
+    assessed_at: datetime | None = None
+
+
+class AsaAssessmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    patient_id: UUID
+    assessed_at: datetime
+    asa_class: int
+    is_emergency: bool
+    #: ``III``, ``IIE``: the class as it is written.
+    label: str
+    rationale: str | None
+    retracted_at: datetime | None
+    recorded_by_professional_id: UUID | None
+    #: Who answers for it, when the directory knows them.
+    assessed_by_name: str | None = None
+    created_at: datetime
+
+
+class AsaClassResponse(BaseModel):
+    """The current class and nothing else: what reception sees when booking.
+
+    Deliberately without the date, the reason, the assessor or the
+    history — those are the medical history's, behind ``medical.read``.
+    """
+
+    #: None when nobody assessed the patient.
+    asa_class: int | None
+    label: str | None
+    is_emergency: bool
+
+
+class AsaStatusResponse(BaseModel):
+    """The patient's current class and the assessments behind it."""
+
+    #: The newest assessment that was not retracted. None: never assessed.
+    current: AsaAssessmentResponse | None
+    #: Every assessment that was not retracted, newest first.
+    history: list[AsaAssessmentResponse]
 
 
 class RetractRequest(BaseModel):

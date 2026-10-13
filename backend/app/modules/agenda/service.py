@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.contracts import TreatmentLink
 from app.core.events import EventType, event_bus
 
 from .integrations import (
@@ -22,6 +23,7 @@ from .integrations import (
     TREATMENTS_UNAVAILABLE,
     patients,
     patients_available,
+    plan_consents,
     planned_treatments,
     professionals,
     professionals_available,
@@ -298,6 +300,46 @@ class AppointmentService:
         if directory is None:
             return True
         return await directory.is_bookable(db, clinic_id, professional_id)
+
+    @staticmethod
+    async def plans_lacking_consent(
+        db: AsyncSession, appointment: Appointment
+    ) -> list[tuple[UUID, str | None]]:
+        """The plans this visit works on whose required consent is not signed.
+
+        ``(plan_id, plan_number)`` for each plan with a treatment still to
+        do in this appointment. Whether a consent is required, and what
+        counts as having it, is the consents' owner's rule; with that App
+        or the plans' off there is nothing to ask (ADR 0037).
+        """
+        treatments, consents = planned_treatments(), plan_consents()
+        if treatments is None or consents is None or appointment.patient_id is None:
+            return []
+        briefs = await treatments.briefs(
+            db,
+            appointment.clinic_id,
+            [
+                TreatmentLink(
+                    id=link.id,
+                    planned_item_id=link.planned_treatment_item_id,
+                    catalog_item_id=link.catalog_item_id,
+                )
+                for link in appointment.treatments
+                if link.planned_treatment_item_id
+            ],
+        )
+        plans = {
+            brief.plan_id: brief.plan_number
+            for brief in briefs.values()
+            if brief.plan_id and brief.planned_item_status == "pending"
+        }
+        return [
+            (plan_id, number)
+            for plan_id, number in plans.items()
+            if await consents.lacks_required_consent(
+                db, appointment.clinic_id, appointment.patient_id, plan_id
+            )
+        ]
 
     @staticmethod
     async def validate_planned_items(

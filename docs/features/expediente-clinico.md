@@ -104,8 +104,9 @@ Whether `recalls` contributes a "recommended follow-up" section is **TBD**
 
 ### ASA physical status is an assessment, not a profile field
 
-*Committed, not built — see the
-[commitments register](../technical/commitments-register.md).*
+*Built 2026-10-12 in `patients_clinical` — see the
+[commitments register](../technical/commitments-register.md) for the two
+open questions below and how they were settled.*
 
 The ASA Physical Status Classification (I–VI, with the `E` modifier for
 emergencies) is what tells the operator whether this patient can be

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- feat(agenda): **finalizar una cita pregunta antes por la carta de
+  consentimiento** cuando la cita trabaja sobre un plan para el que la
+  clínica exige consentimiento informado y no hay ninguno firmado.
+  Pregunta, no impide: se puede finalizar sin carta.
+  - `GET /appointments/{id}/completion-check` responde
+    `plans_lacking_consent` (`plan_id`, `plan_number`); la transición no
+    lo consulta. La agenda lo sabe por los contratos `PlannedTreatments` y
+    `PlanConsents` (ADR 0039): no importa a nadie, y con Tratamientos o
+    Expediente Clínico apagados no pregunta.
+  - `useCompletionCheck().confirm(appointment)` antes de pasar a
+    `completed`, en el menú de la tarjeta y al arrastrar en el kanban;
+    la pregunta se pinta una vez en `CompletionCheckHost.vue`.
+
+- feat(agenda): la ventana de cita ofrece el slot
+  `appointment.patient.alerts` (`{ patientId }`), bajo el selector de
+  paciente: ahí otras apps avisan lo que conviene saber antes de elegir
+  hora. La agenda no sabe qué avisos son ni importa a quien los pone
+  (ADR 0041). El primero es el de ASA III/IV, de Pacientes.
+
 - feat(agenda): `appointment.completed` (y `status_changed` a
   `completed`) lleva `planned_items`: `[{planned_item_id, completed}]`,
   lo que la visita cubrió. `treatment_plan` actúa con eso y ya no lee

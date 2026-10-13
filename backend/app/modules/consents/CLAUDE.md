@@ -82,10 +82,21 @@ page (`consent-templates`, category `clinical`). No pages of its own.
 - **Subject rights:** exported, never erased (`privacy.py` states the
   retention reason).
 
+## A plan waits for its consent
+
+`providers.py` offers `PlanConsents.lacks_required_consent` (core contract):
+true when the clinic asks for it (`clinic.settings["consents"]
+["require_informed_for_plan"]`, **off unless set to true**) and the plan
+has no `informed` consent that is `signed` and carries its `plan_id`.
+`treatment_plan` asks it on confirm and answers `409`; it never imports
+this module. Not asked with Professionals off — an informed consent
+cannot be signed without naming who explained it, and a rule nobody can
+meet would stop every plan. `GET/PUT /settings` reads and writes the
+switch (`consents.read` / `consents.templates.write`).
+
 ## Not built yet
 
-Remote signing by expiring link; "this plan needs a
-consent" from Treatments; enforcement of a data-use consent before
+Remote signing by expiring link; enforcement of a data-use consent before
 messaging a patient; guardians read from `patients_clinical`.
 
 ## CHANGELOG

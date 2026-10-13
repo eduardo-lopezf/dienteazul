@@ -245,6 +245,16 @@ watch(canRead, (ok) => {
       >
         {{ t('settings.categories.modules.label') }}
       </UButton>
+      <UButton
+        to="/settings/general/letterheads"
+        variant="ghost"
+        size="sm"
+        icon="i-lucide-stamp"
+        class="ml-auto"
+        data-testid="workspace-letterheads"
+      >
+        {{ t('letterhead.title') }}
+      </UButton>
     </div>
 
     <div class="flex items-start justify-between gap-4 flex-wrap">

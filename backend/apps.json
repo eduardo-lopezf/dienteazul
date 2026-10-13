@@ -75,6 +75,7 @@
       "version": "0.1",
       "tier": "optional",
       "status": "enabled",
+      "requires_apps": ["patients"],
       "modules": ["record", "consents"]
     },
     {

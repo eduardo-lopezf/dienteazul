@@ -28,8 +28,8 @@
 |---|---|---|
 | 1 | Electronic clinical record (*expediente clínico electrónico*) | **Partial** |
 | 2 | NOM-004-SSA3-2012 | **Partial** |
-| 3 | ASA classification on the patient profile | **Not started** |
-| 4 | Medical record per Ley General de Salud Art. 51 Bis 1 | **Partial** — informed consent letters exist; nothing requires one |
+| 3 | ASA classification on the patient profile | **Done** — clinical review of the wording pending |
+| 4 | Medical record per Ley General de Salud Art. 51 Bis 1 | **Partial** — informed consent letters exist; a clinic can require one to confirm a plan (off by default) |
 | 5 | Catalogue generation for all specialties | **Done** — 17 of 17 as specialty packs; clinical review pending |
 | 6 | Periodontogram integrated with Periodontics | **Partial** — API only |
 | 7 | Settings menu working on tablet | **Not started** (unverified) |
@@ -132,22 +132,56 @@ record holds and lacks.
 - The patient's signature when a treatment changes is not captured as
   such; a new consent letter is the way to record it.
 
-## 3. ASA classification on the patient profile — **Not started**
+**Added 2026-10-12.** The record names the standard it refers to: one
+line of text per clinic (`app.core.regulation`), defaulting to
+*NOM-004-SSA3-2012, Del expediente clínico* for a clinic in Mexico, shown
+on the health questionnaire, the *Expediente* tab and the printed record.
+It is a reference the clinic owns, not a claim of compliance — the
+content requirements below are unchanged by it.
+
+## 3. ASA classification on the patient profile — **Done**
 
 Design: [`../features/expediente-clinico.md`](../features/expediente-clinico.md) §2,
 *ASA physical status is an assessment, not a profile field*.
 
-Nothing exists: no column, no enum, no reference anywhere in the
-codebase. The inputs a clinician weighs are already recorded in
-`patients_clinical_medical_context` — pregnancy, anticoagulants with INR,
-smoking, alcohol, prior adverse reactions to anaesthesia — so what is
-missing is the conclusion, not the evidence for it.
+**Done (2026-10-12).** In `patients_clinical`, so it belongs to the
+Patients App and works with the Clinical record off:
 
-The design point that matters is recorded in the spec: an ASA class is a
-dated, attributed clinical judgement, so it is an appended entry under
-[ADR 0032](../adr/0032-clinical-record-is-append-only.md), never a
-mutable field on the profile. Two decisions are open — who may assess,
-and whether class III+ raises an alert on the same surface as allergies.
+- **An appended judgement, never a field.** `patients_clinical_asa_assessment`
+  (`pc_0006`): class I–IV (V and VI are not offered: they are not patients
+  of a dental practice), the `E` modifier, what it rests on, the day it
+  was made, the account that typed it and the professional who answers
+  for it. It is not edited: a new assessment supersedes it, a mistaken
+  one is retracted ([ADR 0032](../adr/0032-clinical-record-is-append-only.md)).
+  The newest one not retracted is the patient's current class.
+- **On the profile.** A card on the patient's summary shows the current
+  class, its date and who made it, and opens the dialog to assess again
+  and read the history.
+- **In the record.** Section `asa_assessments`, every assessment on its
+  day.
+
+The two decisions the spec left open were taken here, and are the
+product owner's to revisit:
+
+- **Who may assess:** its own permission, `patients_clinical.asa.write`,
+  granted to dentists (and administrators). Not the permission that edits
+  the medical history, so a clinic can let someone keep the history
+  without letting them make the judgement.
+- **Whether it alerts:** yes. Class III shows among the patient's alerts
+  as *high*, IV as *critical* — the same surface as allergies.
+
+**Remaining.**
+
+- The class descriptions are this product's wording of the ASA scale and
+  have not been reviewed by a clinician.
+- Nothing suggests a class from the history on file, and nothing asks
+  for a reassessment when the history changes (a new systemic disease, a
+  pregnancy).
+- Booking an appointment warns of a class III or IV (2026-10-13).
+  Reception sees the class and the scheduling advice (`asa.read`); what
+  the class means, its date, the reason and the assessor stay with
+  whoever may read the medical history. Nothing warns
+  when a plan is made, and nothing blocks.
 
 ## 4. Medical record per Ley General de Salud Art. 51 Bis 1 — **Partial**
 
@@ -169,8 +203,15 @@ edited or deleted — only revoked — and appear in the composed record.
 
 **Remaining.**
 
-- **Nothing requires it.** A treatment can be planned and performed with
-  no consent on file; the screen does not say that one is missing.
+- **Required to confirm a plan (2026-10-13), and no further.** A plan is
+  not confirmed without a signed informed consent written for it — on by
+  default, switched off per clinic; `consents` owns the rule and
+  Treatments obeys it through `PlanConsents`. Performing a treatment of
+  a plan under way with no letter (confirmed before the rule, or the
+  letter revoked) asks for it first and, if done anyway, flags the plan
+  and the treatment in red until it is signed — a warning, not a stop.
+  A treatment charted with no plan at all is not covered; and the rule
+  is not asked with the Professionals App off.
 - **The wording is not supplied.** What a letter must say per procedure is
   the clinic's, and needs clinical and legal authorship.
 - **Remote signing** (expiring link with second factor, as budgets have)

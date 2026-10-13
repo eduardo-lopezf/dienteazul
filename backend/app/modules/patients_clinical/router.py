@@ -26,6 +26,10 @@ from .schemas import (
     AllergyCreate,
     AllergyResponse,
     AllergyUpdate,
+    AsaAssessmentCreate,
+    AsaAssessmentResponse,
+    AsaClassResponse,
+    AsaStatusResponse,
     EmergencyContactResponse,
     EmergencyContactUpsert,
     HealthQuestionnaireCreate,
@@ -622,8 +626,122 @@ async def get_patient_alerts(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[PatientAlertsResponse]:
     await _ensure_patient(db, ctx.clinic_id, patient_id)
-    alerts = await PatientsClinicalService.compute_alerts(db, patient_id)
+    alerts = await PatientsClinicalService.compute_alerts(db, ctx.clinic_id, patient_id)
     return ApiResponse(data=PatientAlertsResponse(alerts=alerts))
+
+
+# --- ASA physical status --------------------------------------------------
+
+
+async def _asa_responses(
+    db: AsyncSession, clinic_id: UUID, assessments: list
+) -> list[AsaAssessmentResponse]:
+    """Assessments as the API answers them, each naming who made it.
+
+    The name comes from the directory through its contract (ADR 0039); with
+    the Professionals App off, or for an account with no profile, it is
+    left blank.
+    """
+    directory = provider(ProfessionalDirectory)
+    ids = {a.recorded_by_professional_id for a in assessments if a.recorded_by_professional_id}
+    briefs = await directory.briefs(db, clinic_id, ids) if directory and ids else {}
+    responses = []
+    for assessment in assessments:
+        response = AsaAssessmentResponse.model_validate(assessment)
+        brief = briefs.get(assessment.recorded_by_professional_id)
+        if brief is not None:
+            response.assessed_by_name = f"{brief.first_name} {brief.last_name}".strip()
+        responses.append(response)
+    return responses
+
+
+@router.get("/patients/{patient_id}/asa", response_model=ApiResponse[AsaStatusResponse])
+async def get_asa_status(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AsaStatusResponse]:
+    """The patient's current ASA class and the assessments behind it."""
+    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    rows = await PatientsClinicalService.list_asa_assessments(db, ctx.clinic_id, patient_id)
+    history = await _asa_responses(db, ctx.clinic_id, rows)
+    return ApiResponse(
+        data=AsaStatusResponse(current=history[0] if history else None, history=history)
+    )
+
+
+@router.get("/patients/{patient_id}/asa/class", response_model=ApiResponse[AsaClassResponse])
+async def get_asa_class(
+    patient_id: UUID,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.asa.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AsaClassResponse]:
+    """The patient's current ASA class, alone — for whoever books them."""
+    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    rows = await PatientsClinicalService.list_asa_assessments(db, ctx.clinic_id, patient_id)
+    current = rows[0] if rows else None
+    return ApiResponse(
+        data=AsaClassResponse(
+            asa_class=current.asa_class if current else None,
+            label=current.label if current else None,
+            is_emergency=current.is_emergency if current else False,
+        )
+    )
+
+
+@router.post(
+    "/patients/{patient_id}/asa",
+    response_model=ApiResponse[AsaAssessmentResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_asa_assessment(
+    patient_id: UUID,
+    data: AsaAssessmentCreate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.asa.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AsaAssessmentResponse]:
+    """Assess the patient's physical status. Earlier assessments are kept."""
+    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    try:
+        assessment = await PatientsClinicalService.create_asa_assessment(
+            db, ctx.clinic_id, patient_id, data.model_dump(), ctx.user_id
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    event_bus.publish_after_commit(
+        db,
+        EventType.PATIENT_MEDICAL_UPDATED,
+        {"clinic_id": str(ctx.clinic_id), "patient_id": str(patient_id)},
+    )
+    return ApiResponse(data=(await _asa_responses(db, ctx.clinic_id, [assessment]))[0])
+
+
+@router.post(
+    "/patients/{patient_id}/asa/{assessment_id}/retract",
+    response_model=ApiResponse[AsaAssessmentResponse],
+)
+async def retract_asa_assessment(
+    patient_id: UUID,
+    assessment_id: UUID,
+    data: RetractRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("patients_clinical.asa.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[AsaAssessmentResponse]:
+    """Take back an assessment recorded by mistake. It is not deleted, and
+    the one before it becomes the current class again."""
+    assessment = await PatientsClinicalService.get_asa_assessment(
+        db, ctx.clinic_id, patient_id, assessment_id
+    )
+    if assessment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+    await PatientsClinicalService.retract_entry(
+        db, assessment, reason=data.reason, user_id=ctx.user_id
+    )
+    return ApiResponse(data=(await _asa_responses(db, ctx.clinic_id, [assessment]))[0])
 
 
 # --- Health questionnaire ------------------------------------------------

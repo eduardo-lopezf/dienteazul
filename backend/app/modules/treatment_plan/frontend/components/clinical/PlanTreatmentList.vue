@@ -44,6 +44,11 @@ const props = defineProps<{
   treatmentCollections?: Record<string, CollectionState>
   /** Per-phase money totals, keyed by phase (empty string = unphased). */
   phaseMoney?: Map<string, { planned: number, earned: number, collected: number, pending: number }>
+  /**
+   * The clinic asks for a signed informed consent for this plan and it has
+   * none: what was performed meanwhile is marked as lacking it.
+   */
+  consentMissing?: boolean
 }>()
 
 const completeEnabled = computed(() => !props.readonly || props.allowComplete)
@@ -527,6 +532,17 @@ function sessionProgress(item: PlannedTreatmentItem): { done: number, total: num
                 :professional-id="item.assigned_professional_id ?? null"
                 readonly
               />
+              <UBadge
+                v-if="consentMissing"
+                color="error"
+                variant="subtle"
+                size="xs"
+                icon="i-lucide-file-warning"
+                class="shrink-0"
+                data-testid="item-consent-missing"
+              >
+                {{ t('treatmentPlans.consentMissing.badge') }}
+              </UBadge>
               <span class="line-through flex-1 min-w-0 break-words">
                 {{ getItemName(item) }}
               </span>

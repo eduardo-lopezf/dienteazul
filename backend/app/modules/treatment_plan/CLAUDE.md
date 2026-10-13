@@ -224,6 +224,25 @@ Clinical-note created events (`clinical_notes.{administrative,diagnosis,treatmen
 > constants. ``items_reordered`` used to be a string-only literal —
 > it now lives at `EventType.TREATMENT_PLAN_ITEMS_REORDERED`.
 
+## Confirming waits for the informed consent
+
+`TreatmentPlanService.confirm` asks `provider(PlanConsents)` (ADR 0039)
+whether the clinic requires a signed informed consent for this plan and
+lacks one. If so it raises `InformedConsentRequiredError`, the route
+answers `409` with `informed_consent_required`, and the plan stays a
+draft. `None` — the Clinical record App off — means nobody asks. What
+counts as consent, and whether the clinic asks, is `consents`' business;
+do not read its tables or its setting from here.
+
+The same answer is on the plan detail as `informed_consent_missing`, and
+it is **only a hard stop at confirmation**. A plan already under way —
+confirmed before the clinic asked, or whose letter was revoked — still
+has its treatments performed: `PlanDetailView` asks for the letter first
+(`awaitingConsent`, item and session completion alike) and lets the
+clinician go on; while work is done and the letter is missing, the plan
+shows a red alert and each performed treatment a red *Sin carta* badge.
+Nothing is stored: sign the letter and both go.
+
 ## Events consumed
 
 | Event | Handler | Effect |

@@ -18,10 +18,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.models import Clinic
 from app.core.contracts import PatientDocuments, ProfessionalDirectory, provider
+from app.core.regulation import record_regulation
 
 from .models import (
     Allergy,
+    AsaAssessment,
     EmergencyContact,
     FamilyHistory,
     HealthQuestionnaire,
@@ -338,8 +341,9 @@ class PatientsClinicalService:
         """Record what the patient declared. It is never edited afterwards.
 
         Raises ``ValueError`` for an answer to a question the form does not
-        ask, a condition it does not list, an empty questionnaire, or a
-        scan that is not one of this patient's documents.
+        ask, a condition it does not list, an empty questionnaire, a scan
+        that is not one of this patient's documents, or one that carries
+        neither the patient's signature nor the scan of the signed sheet.
         """
         unknown = sorted(set(data["answers"]) - set(QUESTIONS)) + sorted(
             set(data["conditions"]) - CONDITIONS
@@ -355,10 +359,31 @@ class PatientsClinicalService:
         elif not (data["answers"] or data["conditions"] or data.get("chief_complaint")):
             raise ValueError("An empty questionnaire says nothing")
 
+        signature = data.get("signature")
+        if signature is not None and scan is not None:
+            # The sheet was signed by hand; a second signature would say
+            # the patient signed something they never saw on screen.
+            raise ValueError("A questionnaire filled in on paper is signed on the sheet")
+        if signature is None and scan is None:
+            # Either is valid; neither is not. What a patient declares is
+            # theirs once they sign it — on screen, or on the sheet.
+            raise ValueError(
+                "A questionnaire is signed by the patient on screen, or filed as the signed sheet"
+            )
+
+        now = datetime.now(UTC)
+        clinic = await db.get(Clinic, clinic_id)
+
         questionnaire = HealthQuestionnaire(
             clinic_id=clinic_id,
             patient_id=patient_id,
-            taken_at=data.get("taken_at") or datetime.now(UTC),
+            taken_at=data.get("taken_at") or now,
+            signed_at=now if signature else None,
+            signed_by_name=signature["signed_by_name"].strip() if signature else None,
+            signer_capacity=signature["signer_capacity"] if signature else None,
+            signature_data={"png": signature["png"]} if signature else None,
+            # What the form named today, kept with what was declared under it.
+            regulation=record_regulation(clinic) if clinic is not None else None,
             form_version=FORM_VERSION,
             chief_complaint=data.get("chief_complaint") or None,
             blood_type=data.get("blood_type") or None,
@@ -379,6 +404,63 @@ class PatientsClinicalService:
         db.add(questionnaire)
         await db.flush()
         return questionnaire
+
+    # --- ASA physical status --------------------------------------------
+
+    @staticmethod
+    async def list_asa_assessments(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID
+    ) -> list[AsaAssessment]:
+        """Newest first, retracted ones left out. The first is the current class."""
+        result = await db.execute(
+            select(AsaAssessment)
+            .where(
+                AsaAssessment.clinic_id == clinic_id,
+                AsaAssessment.patient_id == patient_id,
+                AsaAssessment.retracted_at.is_(None),
+            )
+            .order_by(AsaAssessment.assessed_at.desc(), AsaAssessment.created_at.desc())
+        )
+        return list(result.scalars())
+
+    @staticmethod
+    async def get_asa_assessment(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, assessment_id: UUID
+    ) -> AsaAssessment | None:
+        result = await db.execute(
+            select(AsaAssessment).where(
+                AsaAssessment.id == assessment_id,
+                AsaAssessment.clinic_id == clinic_id,
+                AsaAssessment.patient_id == patient_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_asa_assessment(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, data: dict, user_id: UUID | None
+    ) -> AsaAssessment:
+        """Append an assessment. The previous ones stay as they were.
+
+        Raises ``ValueError`` for one dated in the future: a judgement is
+        made on a day that has happened.
+        """
+        now = datetime.now(UTC)
+        assessed_at = data.get("assessed_at") or now
+        if assessed_at > now:
+            raise ValueError("An assessment cannot be dated in the future")
+        assessment = AsaAssessment(
+            clinic_id=clinic_id,
+            patient_id=patient_id,
+            assessed_at=assessed_at,
+            asa_class=data["asa_class"],
+            is_emergency=data.get("is_emergency", False),
+            rationale=(data.get("rationale") or "").strip() or None,
+            **await _attribution(db, clinic_id, user_id),
+        )
+        db.add(assessment)
+        await db.flush()
+        return assessment
 
     # --- Family history ------------------------------------------------
 
@@ -538,13 +620,28 @@ class PatientsClinicalService:
         }
 
     @staticmethod
-    async def compute_alerts(db: AsyncSession, patient_id: UUID) -> list[dict]:
+    async def compute_alerts(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> list[dict]:
         """Compute active alerts from normalized clinical rows."""
         context = await PatientsClinicalService.get_medical_context(db, patient_id)
         allergies = await PatientsClinicalService.list_allergies(db, patient_id)
         diseases = await PatientsClinicalService.list_systemic_diseases(db, patient_id)
 
         alerts: list[dict] = []
+
+        # A class of III or more changes how the patient is treated in the
+        # chair, so it is said where the allergies are said — not left in a
+        # section somebody has to open.
+        assessments = await PatientsClinicalService.list_asa_assessments(db, clinic_id, patient_id)
+        if assessments and assessments[0].asa_class >= 3:
+            current = assessments[0]
+            alerts.append(
+                {
+                    "type": "asa",
+                    "severity": "critical" if current.asa_class >= 4 else "high",
+                    "title": f"ASA {current.label}",
+                    "details": current.rationale,
+                }
+            )
 
         for allergy in allergies:
             if allergy.severity in ("high", "critical"):

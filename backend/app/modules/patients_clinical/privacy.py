@@ -23,6 +23,7 @@ from app.core.privacy import SubjectContributor, anonymize_instance
 
 from .models import (
     Allergy,
+    AsaAssessment,
     EmergencyContact,
     FamilyHistory,
     HealthQuestionnaire,
@@ -41,6 +42,7 @@ _HISTORY_MODELS: tuple[type[DeclarativeBase], ...] = (
     SurgicalHistory,
     FamilyHistory,
     HealthQuestionnaire,
+    AsaAssessment,
 )
 _CONTACT_MODELS: tuple[type[DeclarativeBase], ...] = (EmergencyContact, LegalGuardian)
 

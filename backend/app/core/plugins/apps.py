@@ -15,7 +15,7 @@ install state stay as they are, so flipping the flag back restores them.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cache
 from pathlib import Path
@@ -87,6 +87,13 @@ class AppDefinition:
     #: this App, though it is optional for the rest. Professionals is one:
     #: a clinic has several, a single professional's practice has none.
     core_for_tiers: tuple[str, ...] = ()
+    #: Apps this one is switched off with (``requires_apps`` in the file).
+    #: Off when any of them is off — the exception to "dependents keep
+    #: running", declared App by App (ADR 0053).
+    requires_apps: tuple[str, ...] = ()
+    #: The required App whose being off switched this one off. None when
+    #: the file itself says ``disabled``, or when the App runs.
+    held_back_by: str | None = None
 
     @property
     def enabled(self) -> bool:
@@ -125,6 +132,7 @@ def read_app_catalog() -> tuple[AppDefinition, ...]:
                 status=AppStatus(entry["status"]),
                 tier=AppTier(entry.get("tier", AppTier.OPTIONAL)),
                 core_for_tiers=tuple(entry.get("core_for_tiers", ())),
+                requires_apps=tuple(entry.get("requires_apps", ())),
                 apis=tuple(
                     ApiDefinition(name=api["name"], status=ApiStatus(api["status"]))
                     for api in entry.get("apis", ())
@@ -154,7 +162,37 @@ def read_app_catalog() -> tuple[AppDefinition, ...]:
             owner[module] = app.name
         apps.append(app)
 
-    return tuple(apps)
+    names = {app.name for app in apps}
+    for app in apps:
+        unknown = [other for other in app.requires_apps if other not in names or other == app.name]
+        if unknown:
+            raise AppCatalogError(
+                f"App '{app.name}' requires {unknown}, which {APPS_FILE.name} does not list"
+            )
+    return _switch_off_with_required(apps)
+
+
+def _switch_off_with_required(apps: list[AppDefinition]) -> tuple[AppDefinition, ...]:
+    """An App goes off with the Apps it declares it cannot run without.
+
+    Repeated until nothing changes, so it carries through a chain: C off
+    takes B, and B takes A. An App the file already disables is left as
+    written — nothing held it back.
+    """
+    resolved = {app.name: app for app in apps}
+    changed = True
+    while changed:
+        changed = False
+        for app in list(resolved.values()):
+            if not app.enabled:
+                continue
+            missing = next(
+                (other for other in app.requires_apps if not resolved[other].enabled), None
+            )
+            if missing is not None:
+                resolved[app.name] = replace(app, status=AppStatus.DISABLED, held_back_by=missing)
+                changed = True
+    return tuple(resolved[app.name] for app in apps)
 
 
 def statuses_on_disk() -> dict[str, AppStatus]:
@@ -167,14 +205,16 @@ def statuses_on_disk() -> dict[str, AppStatus]:
     next boot will refuse it, loudly.
     """
     try:
-        raw = json.loads(APPS_FILE.read_text(encoding="utf-8"))
-        return {entry["name"]: AppStatus(entry["status"]) for entry in raw["apps"]}
+        # Read the way the boot reads it, so an App switched off with the
+        # one it requires is not reported as an edit waiting for a restart.
+        return {app.name: app.status for app in read_app_catalog()}
     except (OSError, ValueError, KeyError, TypeError):
         return {}
 
 
 def modules_disabled_by_app() -> frozenset[str]:
-    """Modules that must not be mounted because their App is disabled."""
+    """Modules that must not be mounted because their App is disabled —
+    by the file, or with an App it requires (ADR 0053)."""
     return frozenset(
         module for app in load_app_catalog() if not app.enabled for module in app.modules
     )

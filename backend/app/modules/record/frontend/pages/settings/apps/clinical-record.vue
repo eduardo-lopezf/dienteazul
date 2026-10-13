@@ -9,8 +9,6 @@
  * deletes nothing: the data stays where it is written.
  */
 import { PERMISSIONS } from '~~/app/config/permissions'
-import type { PaginatedResponse } from '~~/app/types'
-import type { Letterhead } from '~~/app/composables/useLetterhead'
 import type { RecordFormat } from '../../../composables/useRecord'
 
 const { t, te } = useI18n()
@@ -18,15 +16,12 @@ const toast = useToast()
 const { can } = usePermissions()
 const { isActive } = useModules()
 const recordApi = useRecord()
-const letterheadApi = useLetterhead()
-const api = useApi()
 
 const canRead = computed(() => can(PERMISSIONS.record.read))
 const canWrite = computed(() => can(PERMISSIONS.record.configure))
-// The letterhead is the clinic's, shared by every printed document, so it
-// is the clinic's own permission that guards it.
+// The letterhead lives in the Workspace's settings; only who may open
+// that page is pointed to it.
 const canSeeLetterhead = computed(() => can(PERMISSIONS.admin.clinicRead))
-const canEditLetterhead = computed(() => can(PERMISSIONS.admin.clinicWrite))
 
 interface SectionRow { name: string, titleKey: string, visible: boolean }
 interface RequirementRow { key: string, checked: boolean }
@@ -70,7 +65,6 @@ function build(options: Awaited<ReturnType<typeof recordApi.getFormat>>, keepSna
 async function load() {
   try {
     build(await recordApi.getFormat())
-    if (canSeeLetterhead.value) await loadLetterheads()
   } catch {
     toast.add({ title: t('errors.loadFailed'), color: 'error' })
   } finally {
@@ -97,68 +91,6 @@ async function restoreDefaults() {
     section_order: [],
     disabled_requirements: []
   }, false)
-}
-
-// --- Letterheads: the clinic's own, and one per professional ------------
-
-interface Doctor { id: string, name: string, license: string | null }
-
-const letterheads = ref<Letterhead[]>([])
-const doctors = ref<Doctor[]>([])
-/** Professionals given a card in this visit, before their first save. */
-const drafted = ref<string[]>([])
-const adding = ref<string | undefined>(undefined)
-
-async function loadLetterheads() {
-  letterheads.value = await letterheadApi.list()
-  // Whoever has one saved no longer needs a draft card.
-  const saved = new Set(letterheads.value.map(item => item.professional_id))
-  drafted.value = drafted.value.filter(id => !saved.has(id))
-  if (isActive('professionals') && doctors.value.length === 0) {
-    try {
-      const response = await api.get<PaginatedResponse<{
-        id: string
-        first_name: string
-        last_name: string
-        license_number?: string | null
-      }>>('/api/v1/professionals?page_size=100')
-      doctors.value = response.data.map(pro => ({
-        id: pro.id,
-        name: `${pro.first_name} ${pro.last_name}`.trim(),
-        license: pro.license_number ?? null
-      }))
-    } catch {
-      doctors.value = []
-    }
-  }
-}
-
-const clinicLetterhead = computed(() => letterheads.value.find(item => item.professional_id === null) ?? null)
-
-/** One card per professional with a letterhead, saved or being drafted. */
-const doctorCards = computed(() => {
-  const saved = letterheads.value.filter(item => item.professional_id !== null)
-  const ids = [...saved.map(item => item.professional_id!), ...drafted.value]
-  return ids.map((id) => {
-    const doctor = doctors.value.find(d => d.id === id)
-    return {
-      id,
-      name: doctor?.name ?? t('letterhead.unknownProfessional'),
-      suggested: doctor ? [doctor.name, doctor.license && t('record.license', { number: doctor.license })].filter(Boolean).join(' · ') : '',
-      letterhead: saved.find(item => item.professional_id === id) ?? null
-    }
-  })
-})
-
-const addable = computed(() => {
-  const taken = new Set(doctorCards.value.map(card => card.id))
-  return doctors.value.filter(d => !taken.has(d.id)).map(d => ({ label: d.name, value: d.id }))
-})
-
-function addDoctor() {
-  if (!adding.value) return
-  drafted.value.push(adding.value)
-  adding.value = undefined
 }
 
 async function save() {
@@ -254,68 +186,30 @@ watch(canRead, (ok) => {
         v-else
         class="space-y-6"
       >
-        <UCard
+        <!-- The letterhead is the Workspace's: it heads every App's
+             documents, not only the record's. -->
+        <p
           v-if="canSeeLetterhead"
-          data-testid="record-format-letterhead"
+          class="text-caption text-muted"
+          data-testid="record-format-letterhead-link"
         >
-          <template #header>
-            <h2 class="text-h3 text-default">
-              {{ t('letterhead.title') }}
-            </h2>
-            <p class="text-caption text-muted mt-1">
-              {{ t('letterhead.intro') }}
-            </p>
-          </template>
-          <div class="space-y-4">
-            <LetterheadEditor
-              :professional-id="null"
-              :title="t('letterhead.clinic')"
-              :letterhead="clinicLetterhead"
-              :can-edit="canEditLetterhead"
-              @changed="loadLetterheads"
-            />
-            <LetterheadEditor
-              v-for="card in doctorCards"
-              :key="card.id"
-              :professional-id="card.id"
-              :title="card.name"
-              :letterhead="card.letterhead"
-              :suggested-subheading="card.suggested"
-              :can-edit="canEditLetterhead"
-              @changed="loadLetterheads"
-            />
-            <div
-              v-if="canEditLetterhead && addable.length"
-              class="flex items-end gap-2 flex-wrap"
-            >
-              <UFormField
-                :label="t('letterhead.addFor')"
-                class="min-w-56"
-              >
-                <USelect
-                  v-model="adding"
-                  :items="addable"
-                  value-key="value"
-                  :placeholder="t('letterhead.pickProfessional')"
-                  class="w-full"
-                  data-testid="letterhead-add-select"
-                />
-              </UFormField>
-              <UButton
-                icon="i-lucide-plus"
-                variant="soft"
-                :disabled="!adding"
-                data-testid="letterhead-add"
-                @click="addDoctor"
-              >
-                {{ t('letterhead.add') }}
-              </UButton>
-            </div>
-            <p class="text-caption text-subtle">
-              {{ t('letterhead.rule') }}
-            </p>
-          </div>
-        </UCard>
+          {{ t('record.settings.letterheadMoved') }}
+          <NuxtLink
+            to="/settings/general/letterheads"
+            class="text-primary-accent underline"
+          >
+            {{ t('letterhead.title') }}
+          </NuxtLink>
+          <br>
+          {{ t('regulation.moved') }}
+          <NuxtLink
+            to="/settings/general/record-regulation"
+            class="text-primary-accent underline"
+            data-testid="record-format-regulation-link"
+          >
+            {{ t('regulation.title') }}
+          </NuxtLink>
+        </p>
 
         <UCard data-testid="record-format-sections">
           <template #header>

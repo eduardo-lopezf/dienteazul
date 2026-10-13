@@ -11,10 +11,12 @@ from app.core.schemas import ApiResponse
 from app.database import get_db
 
 from .pdf import render_pdf
+from .providers import REQUIRE_FOR_PLAN, SETTINGS_KEY, requires_informed_for_plan
 from .schemas import (
     ConsentCreate,
     ConsentNote,
     ConsentResponse,
+    ConsentSettings,
     ConsentSign,
     ConsentUpdate,
     Kind,
@@ -39,6 +41,33 @@ def _refuse(error: ConsentError) -> HTTPException:
 
 
 # --- Templates ---------------------------------------------------------------
+
+
+@router.get("/settings", response_model=ApiResponse[ConsentSettings])
+async def get_settings(ctx: Ctx, _: CanRead) -> ApiResponse[ConsentSettings]:
+    """Whether a plan needs a signed informed consent to be confirmed."""
+    return ApiResponse(
+        data=ConsentSettings(require_informed_for_plan=requires_informed_for_plan(ctx.clinic))
+    )
+
+
+@router.put("/settings", response_model=ApiResponse[ConsentSettings])
+async def update_settings(
+    data: ConsentSettings, ctx: Ctx, _: CanEditTemplates, db: Db
+) -> ApiResponse[ConsentSettings]:
+    clinic = ctx.clinic
+    clinic.settings = {
+        **(clinic.settings or {}),
+        SETTINGS_KEY: {
+            **((clinic.settings or {}).get(SETTINGS_KEY) or {}),
+            REQUIRE_FOR_PLAN: data.require_informed_for_plan,
+        },
+    }
+    await db.commit()
+    await db.refresh(clinic)
+    return ApiResponse(
+        data=ConsentSettings(require_informed_for_plan=requires_informed_for_plan(clinic))
+    )
 
 
 @router.get("/templates", response_model=ApiResponse[list[TemplateResponse]])

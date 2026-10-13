@@ -149,6 +149,17 @@ async function retract(item: HealthQuestionnaire) {
             </p>
             <p class="text-caption text-muted">
               {{ when(item) }} · {{ summary(item) }}
+              <UBadge
+                v-if="item.signed_at"
+                color="success"
+                variant="subtle"
+                size="xs"
+                class="ml-1"
+                icon="i-lucide-pen-line"
+                data-testid="questionnaire-signed"
+              >
+                {{ t('healthQuestionnaire.sign.signed') }}
+              </UBadge>
             </p>
           </div>
           <div class="flex gap-2">
@@ -189,6 +200,31 @@ async function retract(item: HealthQuestionnaire) {
           v-if="expanded === item.id"
           class="mt-3 space-y-2 text-sm rounded-md border border-default p-3"
         >
+          <!-- Who signed it, and under what. -->
+          <div
+            v-if="item.signed_at"
+            class="flex items-end gap-4 flex-wrap border-b border-default pb-2"
+            data-testid="questionnaire-signature-shown"
+          >
+            <img
+              v-if="item.signature_data?.png"
+              :src="item.signature_data.png"
+              :alt="t('healthQuestionnaire.sign.title')"
+              class="h-16 rounded border border-default bg-white"
+            >
+            <p class="text-muted">
+              {{ t('healthQuestionnaire.sign.signedBy', {
+                name: item.signed_by_name,
+                capacity: t(`healthQuestionnaire.sign.capacities.${item.signer_capacity ?? 'patient'}`)
+              }) }}
+            </p>
+          </div>
+          <p
+            v-if="item.regulation"
+            class="text-caption text-subtle"
+          >
+            {{ t('regulation.label') }}: {{ item.regulation }}
+          </p>
           <p
             v-if="item.blood_type || item.declared_allergies"
             class="text-muted"
@@ -238,6 +274,7 @@ async function retract(item: HealthQuestionnaire) {
     <HealthQuestionnaireModal
       v-model:open="formOpen"
       :patient-id="ctx.patient.id"
+      :patient-name="`${ctx.patient.first_name} ${ctx.patient.last_name}`.trim()"
       @saved="load"
     />
   </UCard>

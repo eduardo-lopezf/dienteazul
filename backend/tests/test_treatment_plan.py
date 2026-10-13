@@ -27,7 +27,13 @@ async def _ensure_clinic_and_patient(
         name="Plan Clinic",
         tax_id="B11111111",
         address={"street": "a", "city": "b"},
-        settings={"slot_duration_min": 15},
+        settings={
+            "slot_duration_min": 15,
+            # These tests are about plan mechanics. The rule that a plan
+            # waits for a signed informed consent is on by default and has
+            # its own tests (`test_plan_requires_informed_consent.py`).
+            "consents": {"require_informed_for_plan": False},
+        },
         account_tier="clinic",
     )
     db_session.add(clinic)

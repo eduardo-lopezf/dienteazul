@@ -26,9 +26,7 @@ Routes mounted at `/api/v1/record/`.
 
 ## Frontend
 
-A registered settings page, *Mi membrete* (`/settings/account/my-letterhead`,
-`components/settings/MyLetterheadPage.vue`): a professional's own
-letterhead. And one page of its own: `/settings/apps/clinical-record`, the Clinical record
+One page of its own: `/settings/apps/clinical-record`, the Clinical record
 App's settings — the clinic's record format. Listed in
 `frontend/app/config/appRoutes.ts` and linked from the App's card through
 `frontend/app/config/appCatalog.ts`.
@@ -121,8 +119,9 @@ evidence now, so it is disabled, never uninstalled (ADR 0035).
   default; a section the order does not mention keeps its default place,
   so a newly enabled module's section still appears.
 
-- **Letterheads are not this module's.** The settings page edits them, but
-  they are the clinic's (`app.core.letterhead`, ADR 0046): the clinic's own
+- **Letterheads are not this module's**, and neither are their screens:
+  they are edited in the Workspace (`/settings/general/letterheads`,
+  `/settings/account/my-letterhead`, host components). They are the clinic's (`app.core.letterhead`, ADR 0046): the clinic's own
   and one per professional. `pdf.py` asks `render_letterhead` for the head
   of whoever hands the record over (`disclosed_by_professional_id`) and
   never builds or picks one. Do not add a "choose letterhead" option to a

@@ -94,7 +94,7 @@
     "onScreen": "On screen",
     "otherConditions": "Any other condition not listed?",
     "paper": "On paper",
-    "paperSteps": "Print the blank questionnaire, have the patient fill it in by hand, and upload the scan here. The reason for the visit is entered separately so it shows in the record.",
+    "paperSteps": "Print the blank questionnaire, have the patient fill it in and sign it by hand, and upload the signed file here (PDF or photo). The reason for the visit is entered separately so it shows in the record.",
     "phone": "Phone",
     "positives": "{count} affirmative answers",
     "printBlank": "Print blank form",
@@ -112,11 +112,27 @@
       "taking_medication": "Are you currently taking any medication?",
       "weight_change_10kg": "Have you gained or lost 10 kg in the last year?"
     },
+    "regulation": "Reference regulation",
     "retract": "Retract",
     "retractPrompt": "Reason for retracting (it is recorded):",
     "save": "Save questionnaire",
     "scan": "Scanned questionnaire",
     "scanHint": "PDF, JPG or PNG",
+    "sign": {
+      "capacities": {
+        "guardian": "Legal guardian",
+        "patient": "The patient",
+        "representative": "Representative"
+      },
+      "capacity": "Signs as",
+      "name": "Name of whoever signs",
+      "needsName": "Write the name of whoever signs.",
+      "required": "Sign with a finger, a stylus or the mouse. The signature is required; if the patient prefers to sign on paper, choose 'On paper' and upload the signed questionnaire.",
+      "signed": "Signed",
+      "signedBy": "Signed by {name} ({capacity})",
+      "statement": "I declare that the information I gave in this questionnaire is true.",
+      "title": "Patient's signature"
+    },
     "signature": "Name and signature of the patient or person responsible",
     "takenAt": "Date of the visit",
     "time": "Time",
@@ -220,7 +236,7 @@
     "onScreen": "En pantalla",
     "otherConditions": "¿Algún otro padecimiento no mencionado?",
     "paper": "En papel",
-    "paperSteps": "Imprime el cuestionario en blanco, que el paciente lo llene a mano, y sube aquí el escaneo. El motivo de consulta se captura aparte para que aparezca en el expediente.",
+    "paperSteps": "Imprime el cuestionario en blanco, que el paciente lo llene y lo firme a mano, y sube aquí el archivo firmado (PDF o foto). El motivo de consulta se captura aparte para que aparezca en el expediente.",
     "phone": "Teléfono",
     "positives": "{count} respuestas afirmativas",
     "printBlank": "Imprimir en blanco",
@@ -238,11 +254,27 @@
       "taking_medication": "¿Está actualmente tomando algún medicamento?",
       "weight_change_10kg": "¿Ha ganado o perdido 10 kilos de peso durante el último año?"
     },
+    "regulation": "Normativa de referencia",
     "retract": "Anular",
     "retractPrompt": "Motivo de la anulación (queda registrado):",
     "save": "Guardar cuestionario",
     "scan": "Cuestionario escaneado",
     "scanHint": "PDF, JPG o PNG",
+    "sign": {
+      "capacities": {
+        "guardian": "Tutor legal",
+        "patient": "El paciente",
+        "representative": "Representante"
+      },
+      "capacity": "Firma como",
+      "name": "Nombre de quien firma",
+      "needsName": "Escribe el nombre de quien firma.",
+      "required": "Firma con el dedo, un lápiz o el ratón. La firma es obligatoria; si el paciente prefiere firmar en papel, elige «En papel» y sube el cuestionario firmado.",
+      "signed": "Firmado",
+      "signedBy": "Firmado por {name} ({capacity})",
+      "statement": "Declaro que la información que proporcioné en este cuestionario es verdadera.",
+      "title": "Firma del paciente"
+    },
     "signature": "Nombre y firma del paciente o responsable",
     "takenAt": "Fecha de la consulta",
     "time": "Hora",

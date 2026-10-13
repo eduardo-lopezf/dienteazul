@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * A professional's own letterhead (Settings → Mi membrete).
+ * A professional's own letterhead (Settings → Cuenta → Mi membrete).
  *
  * What heads the documents that answer to them — the consents they
  * explain, the records and questionnaires they print. They set up their
  * own and nobody else's; with none, their documents carry the clinic's.
  */
-import type { OwnLetterhead } from '~~/app/composables/useLetterhead'
+import type { OwnLetterhead } from '~/composables/useLetterhead'
 
 const { t } = useI18n()
 const toast = useToast()

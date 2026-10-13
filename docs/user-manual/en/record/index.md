@@ -12,8 +12,8 @@ record** App.
 
 - [Clinical record settings](./screens/settings_apps_clinical-record.md) — which sections it carries, in what order, and which points are reviewed.
 
-- **My letterhead** (Settings → Account): each professional sets up the
-  letterhead that heads their own documents.
+- The documents' letterhead is set up in the Workspace: *Settings →
+  General → Letterheads* and *Settings → Account → My letterhead*.
 
 ## Where it is
 
@@ -31,6 +31,9 @@ record** App.
 
 Each entry carries its clinical date (when it happened, not when it was
 typed in) and, when known, the professional responsible with their licence.
+
+The tab and the printed record show the clinic's **reference regulation**,
+set up under *Settings → General → Record regulation*.
 
 ## What the record should hold
 

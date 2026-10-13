@@ -50,7 +50,7 @@ related_paths:
   - backend/app/modules/treatment_plan/prescriptions.py
   - backend/app/modules/treatment_plan/proposals.py
   - backend/app/modules/treatment_plan/router.py
-last_verified_commit: 01eb2d1
+last_verified_commit: f9ad75a
 ---
 
 # Detalle del plan de tratamiento
@@ -216,6 +216,23 @@ torcido; verde o gris, nada que hacer.
    borrador al instante.
 3. Si el presupuesto no llegó a crearse, el siguiente paso del plan es
    **Generar presupuesto**, que lo crea.
+
+**Si la clínica exige consentimiento informado** (app Expediente clínico,
+activado por defecto), el plan no se confirma hasta que el paciente firme
+una carta de consentimiento informado escrita para ese plan. Al pulsar
+*Confirmar* aparece el aviso *Falta el consentimiento informado* con el
+botón **Crear la carta**, que lleva a los consentimientos del paciente:
+la carta que se escribe ahí queda ligada al plan y, una vez firmada, se
+vuelve al plan con *Volver al plan* y se confirma. La regla se apaga en
+*Configuración → Clínica → Plantillas de consentimiento*.
+
+**Marcar un tratamiento como realizado sin carta.** En un plan ya en curso
+al que le falta la carta (se confirmó antes de exigirla, o el paciente la
+revocó), al marcar un tratamiento como realizado la pantalla pregunta
+primero: **Crear la carta** o **Marcar como realizado sin carta**. Si se
+sigue sin ella, el plan muestra en rojo *Falta la carta de consentimiento
+informado* y cada tratamiento realizado la marca *Sin carta*, hasta que la
+carta se firme.
 
 **Si la app Presupuestos no está habilitada**, el plan confirmado pasa
 directamente a *En tratamiento*: no hay presupuesto que aceptar y no se

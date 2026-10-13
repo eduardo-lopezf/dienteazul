@@ -68,6 +68,7 @@ export function usePatientAlerts(patientId: Ref<string | undefined>) {
   // Get icon for alert type
   function getAlertIcon(type: PatientAlert['type']): string {
     const icons: Record<PatientAlert['type'], string> = {
+      asa: 'i-lucide-shield-plus',
       allergy: 'i-lucide-alert-triangle',
       pregnancy: 'i-lucide-baby',
       lactating: 'i-lucide-heart',

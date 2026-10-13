@@ -50,6 +50,8 @@ from .schemas import (
     UpdateSessionRequest,
 )
 from .service import (
+    CONSENT_REQUIRED,
+    InformedConsentRequiredError,
     PlanHasCollectionsError,
     PlanLockedError,
     TreatmentPlanService,
@@ -241,6 +243,9 @@ async def get_treatment_plan(
     # to do next without a second round trip and a second set of rules.
     next_action = await TreatmentPlanService.next_action(db, ctx.clinic_id, plan)
     response.next_action = PlanNextAction(**next_action) if next_action else None
+    response.informed_consent_missing = await TreatmentPlanService.informed_consent_missing(
+        db, ctx.clinic_id, plan
+    )
     response.unbudgeted_count = len(
         await TreatmentPlanService.unbudgeted_items(db, ctx.clinic_id, plan)
     )
@@ -341,6 +346,10 @@ async def confirm_treatment_plan(
     """
     try:
         plan = await TreatmentPlanService.confirm(db, ctx.clinic_id, plan_id, ctx.user_id)
+    except InformedConsentRequiredError as e:
+        # Its own status, so the screen can say what is missing and where
+        # to get it instead of showing a generic refusal.
+        raise HTTPException(status_code=409, detail=CONSENT_REQUIRED) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))

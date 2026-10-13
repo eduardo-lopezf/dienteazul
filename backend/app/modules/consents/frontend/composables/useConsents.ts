@@ -53,7 +53,15 @@ export interface ConsentDraft {
   title?: string
   body?: string
   procedure_label?: string | null
+  /** The treatment plan the letter is written for, when it is for one. */
+  plan_id?: string | null
   explained_by_professional_id?: string | null
+}
+
+/** How the clinic uses consent letters. */
+export interface ConsentSettings {
+  /** A plan is not confirmed without a signed informed consent written for it. */
+  require_informed_for_plan: boolean
 }
 
 const BASE = '/api/v1/consents'
@@ -75,6 +83,14 @@ export function useConsents() {
 
   async function updateTemplate(id: string, data: Partial<Pick<ConsentTemplate, 'title' | 'body' | 'is_active'>>): Promise<ConsentTemplate> {
     return (await api.put<ApiResponse<ConsentTemplate>>(`${BASE}/templates/${id}`, data)).data
+  }
+
+  async function getSettings(): Promise<ConsentSettings> {
+    return (await api.get<ApiResponse<ConsentSettings>>(`${BASE}/settings`)).data
+  }
+
+  async function saveSettings(settings: ConsentSettings): Promise<ConsentSettings> {
+    return (await api.put<ApiResponse<ConsentSettings>>(`${BASE}/settings`, settings)).data
   }
 
   async function listForPatient(patientId: string): Promise<Consent[]> {
@@ -161,5 +177,8 @@ export function useConsents() {
     return (await api.post<ApiResponse<Consent>>(`${BASE}/${id}/${action}`, action === 'discard' ? undefined : { note: note || null })).data
   }
 
-  return { listTemplates, createTemplate, updateTemplate, listForPatient, create, update, sign, act, uploadScan, reserveTab, openPdf, openScan }
+  return {
+    getSettings,
+    saveSettings,
+    listTemplates, createTemplate, updateTemplate, listForPatient, create, update, sign, act, uploadScan, reserveTab, openPdf, openScan }
 }
