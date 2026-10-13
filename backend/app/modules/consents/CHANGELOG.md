@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- feat(consents): **la carta de consentimiento nombra la normativa de
+  referencia de la clínica** (`app.core.regulation`, el mismo texto que el
+  expediente y el cuestionario). Se ve sobre la firma en la ventana de
+  firma y en la hoja impresa; al firmar se guarda una copia en
+  `consents_consent.regulation` (`con_0003`), que es la que muestran el
+  detalle y el PDF de una carta firmada aunque la clínica cambie su texto
+  después. Las cartas firmadas antes no la llevan.
+
 - change(consents): la regla «exigir consentimiento informado para
   confirmar un plan» viene **apagada**. La carta no es obligatoria hasta
   que la clínica active el interruptor; con él apagado nada bloquea ni

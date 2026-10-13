@@ -82,6 +82,13 @@ page (`consent-templates`, category `clinical`). No pages of its own.
 - **Subject rights:** exported, never erased (`privacy.py` states the
   retention reason).
 
+## The regulation a letter names
+
+The clinic's line (`app.core.regulation.record_regulation`) shows above
+the signature in `ConsentSignModal` and on the printed sheet. `sign`
+snapshots it into `Consent.regulation`; a signed letter shows and prints
+that copy, a sheet still to sign prints today's line.
+
 ## A plan waits for its consent
 
 `providers.py` offers `PlanConsents.lacks_required_consent` (core contract):

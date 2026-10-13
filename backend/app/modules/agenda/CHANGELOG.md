@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- fix(agenda): el botón que abre el menú de acciones de la tarjeta se
+  anuncia como `appointments.quickActions.label` ("Acciones de la cita").
+  Llevaba fija la etiqueta de la transición `checked_in`, así que un
+  lector de pantalla leía "Marcar llegada" sobre una cita ya en
+  gabinete o finalizada, donde el menú no ofrece esa acción.
+
 - feat(agenda): **finalizar una cita pregunta antes por la carta de
   consentimiento** cuando la cita trabaja sobre un plan para el que la
   clínica exige consentimiento informado y no hay ninguno firmado.

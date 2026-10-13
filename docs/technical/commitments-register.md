@@ -135,7 +135,8 @@ record holds and lacks.
 **Added 2026-10-12.** The record names the standard it refers to: one
 line of text per clinic (`app.core.regulation`), defaulting to
 *NOM-004-SSA3-2012, Del expediente clínico* for a clinic in Mexico, shown
-on the health questionnaire, the *Expediente* tab and the printed record.
+on the health questionnaire, the consent letters (2026-10-13, kept with
+the signature), the *Expediente* tab and the printed record.
 It is a reference the clinic owns, not a claim of compliance — the
 content requirements below are unchanged by it.
 

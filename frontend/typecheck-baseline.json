@@ -1,8 +1,7 @@
 {
-  "total": 159,
+  "total": 157,
   "errors": {
     "app/composables/useLocale.ts|TS2345|Argument of type 'string' is not assignable to parameter of type '\"en\" | \"es\"'.": 1,
-    "app/composables/usePermissions.ts|TS2769|No overload matches this call.": 1,
     "app/constants/odontogram.ts|TS2322|Type '\"filling\"' is not assignable to type 'ClinicalType'.": 1,
     "app/constants/odontogram.ts|TS2322|Type '\"root_canal\"' is not assignable to type 'ClinicalType'.": 1,
     "app/constants/odontogram.ts|TS2353|Object literal may only specify known properties, and 'bridge_pontic' does not exist in type 'Record<ToothCondition, string>'.": 1,
@@ -35,7 +34,6 @@
     "backend/app/modules/catalog/frontend/composables/useTreatmentCatalog.ts|TS2532|Object is possibly 'undefined'.": 1,
     "backend/app/modules/catalog/frontend/pages/settings/catalog/index.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 2,
     "backend/app/modules/clinical_notes/frontend/components/PatientClinicalNotesByPlan.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 2,
-    "backend/app/modules/media/frontend/composables/useDocuments.ts|TS2352|Conversion of type 'Headers' to type 'Record<string, string>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.": 1,
     "backend/app/modules/migration_import/frontend/components/settings/DataMigrationPage.vue|TS2322|Type '\"blue\" | \"green\" | \"red\"' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
     "backend/app/modules/migration_import/frontend/components/settings/DataMigrationPage.vue|TS2322|Type '\"gray\" | \"green\"' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
     "backend/app/modules/migration_import/frontend/components/settings/DataMigrationPage.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,

@@ -330,6 +330,39 @@ frontend as a Nuxt layer under its own Python package.
 
 ### Changed
 
+- **Dos pestañas ya no se tiran la sesión al refrescar.** Arreglar el
+  refresco en el servidor dejó a la vista lo que tapaba: `useRequestFetch`
+  conserva las cabeceras que reenvía de la petición entrante y descarta un
+  `Headers` pasado al lado, así que `origin` y `x-csrf-token` —las dos que
+  `bffFetch` existe para añadir— nunca llegaban y nuestro propio BFF
+  respondía `403` a cada refresco en SSR; un render con el token de acceso
+  caducado se iba al login en vez de renovar la sesión. Con eso arreglado,
+  dos pestañas son dos renders, y rotar gasta el token: `sessions.rotate`
+  trata la segunda presentación como un robo y revoca la familia entera, sin
+  ventana de cortesía y a propósito. Medido con el servidor en frío, no
+  supuesto: la segunda pestaña presentó el mismo token **4,3 s después** que
+  la primera —su render había salido con la cookie que tenía al pulsar— y las
+  dos perdieron la sesión (`revoked_reason = 'reuse'`). No se solapan, así
+  que un cerrojo para llamadas simultáneas no servía de nada: la respuesta
+  tiene que sobrevivir a la primera. Ahora el BFF rota una vez por token y
+  repite esa respuesta —estado, cabeceras y cuerpo— a quien llegue con el
+  mismo durante 10 s (`refreshOnce` en
+  `frontend/server/api/v1/[...path].ts`), de modo que todas las pestañas
+  acaban con el mismo par de cookies y la familia rota una sola vez. Solo
+  recuerda las rotaciones correctas: un rechazo es la respuesta del backend a
+  quien preguntó, no necesariamente al siguiente. Lo que cuesta, dicho claro:
+  dentro de esa ventana un token robado se responde en vez de disparar la
+  revocación —diez segundos, en un solo proceso y solo para un token que ese
+  proceso acaba de rotar—; fuera de ahí, y en cualquier otra réplica
+  ([ADR 0051](docs/adr/0051-a-backend-process-is-one-of-several.md)), la
+  detección de reutilización está intacta. El backend sigue siendo la
+  autoridad. [ADR 0054](docs/adr/0054-the-bff-replays-one-rotation-per-refresh-token.md),
+  que enmienda la [0052](docs/adr/0052-sessions-use-a-same-origin-http-only-bff.md)
+  en el único punto donde decía que el BFF no guarda estado de sesión. Fijado
+  por `frontend/tests/e2e/auth-cross-tab.spec.ts:56`, que hay que correr con
+  el frontend recién reiniciado: un servidor caliente renderiza lo bastante
+  rápido para esconder el hueco.
+
 - **The usage report binds the table name where it is a value.**
   `core/ops/usage.py` sweeps every table carrying a `clinic_id`, and the
   name reached the SQL three times: as the `FROM` identifier, as the

@@ -1203,6 +1203,9 @@
       "cancelled": "Cancel appointment",
       "no_show": "Mark no show"
     },
+    "quickActions": {
+      "label": "Appointment actions"
+    },
     "timer": {
       "unit": { "minutes": "{n} min", "hours": "{n} h", "hoursMinutes": "{h} h {m} min", "days": "{n} d" },
       "startsIn": "starts in {duration}",
@@ -3497,7 +3500,7 @@
     "label": "Reference regulation",
     "title": "Record regulation",
     "description": "The standard the clinic's clinical record refers to.",
-    "intro": "It shows on the health questionnaire — on screen and on the sheet the patient fills in and signs — on the Record tab and on the printed record. It is a reference: naming the standard does not certify that the record meets it.",
+    "intro": "It shows on the health questionnaire and on consent letters — on screen and on the sheet the patient signs — on the Record tab and on the printed record. It is a reference: naming the standard does not certify that the record meets it.",
     "field": "Standard",
     "placeholder": "For example: NOM-004-SSA3-2012, Del expediente clínico",
     "usingDefault": "The one suggested for the clinic's country is in use. Write another to change it.",

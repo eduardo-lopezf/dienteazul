@@ -106,6 +106,9 @@ class Consent(Base, TimestampMixin):
     #: ``{"document_id": "…"}`` for a scan. The scan is a row of the Media
     #: module — an id, not a foreign key (ADR 0042).
     signature_data: Mapped[dict | None] = mapped_column(JSONB)
+    #: The regulation the letter named when it was signed — the clinic may
+    #: change its line afterwards, and what was signed under stays.
+    regulation: Mapped[str | None] = mapped_column(String(300))
 
     declined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

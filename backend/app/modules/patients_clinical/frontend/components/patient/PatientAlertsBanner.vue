@@ -14,6 +14,8 @@ const { t } = useI18n()
 
 function getAlertIcon(type: PatientAlert['type']): string {
   const icons: Record<PatientAlert['type'], string> = {
+    // The same icon the ASA card and the booking notice use.
+    asa: 'i-lucide-shield-plus',
     allergy: 'i-lucide-alert-triangle',
     pregnancy: 'i-lucide-baby',
     lactating: 'i-lucide-heart',

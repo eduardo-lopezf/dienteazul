@@ -108,6 +108,8 @@ class ConsentResponse(BaseModel):
     signer_capacity: str | None
     signature_method: str | None
     signature_data: dict | None
+    #: The regulation the letter named when it was signed.
+    regulation: str | None
     declined_at: datetime | None
     revoked_at: datetime | None
     status_note: str | None

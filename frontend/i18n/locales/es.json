@@ -1203,6 +1203,9 @@
       "cancelled": "Cancelar cita",
       "no_show": "Marcar no asistencia"
     },
+    "quickActions": {
+      "label": "Acciones de la cita"
+    },
     "timer": {
       "unit": { "minutes": "{n} min", "hours": "{n} h", "hoursMinutes": "{h} h {m} min", "days": "{n} d" },
       "startsIn": "empieza en {duration}",
@@ -3391,7 +3394,7 @@
     "label": "Normativa de referencia",
     "title": "Normativa del expediente",
     "description": "La norma a la que hace referencia el expediente clínico de la clínica.",
-    "intro": "Se muestra en el cuestionario de salud —en pantalla y en la hoja que el paciente llena y firma—, en la pestaña Expediente y en el expediente impreso. Es una referencia: indicar la norma no certifica que el expediente la cumpla.",
+    "intro": "Se muestra en el cuestionario de salud y en las cartas de consentimiento —en pantalla y en la hoja que el paciente firma—, en la pestaña Expediente y en el expediente impreso. Es una referencia: indicar la norma no certifica que el expediente la cumpla.",
     "field": "Norma",
     "placeholder": "Por ejemplo: NOM-004-SSA3-2012, Del expediente clínico",
     "usingDefault": "Se usa la sugerida para el país de la clínica. Escribe otra para cambiarla.",

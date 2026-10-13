@@ -45,8 +45,8 @@
     vigente, su fecha y quién la valoró; desde ahí se valora de nuevo y
     se lee el historial.
   - Una clase III aparece entre las alertas del paciente como *alta*; IV,
-    como *crítica*. Las clases V y VI de la escala no se ofrecen: no son
-    pacientes de consultorio.
+    como *crítica*, con el mismo icono que la tarjeta. Las clases V y VI de
+    la escala no se ofrecen: no son pacientes de consultorio.
   - Permiso propio `patients_clinical.asa.write` (dentista y
     administrador), distinto del que edita el historial médico.
   - API: `GET/POST /patients/{id}/asa`, `POST …/asa/{aid}/retract`.

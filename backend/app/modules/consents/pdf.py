@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic
 from app.core.letterhead import LETTERHEAD_CSS, render_letterhead
+from app.core.regulation import record_regulation
 from app.modules.patients.models import Patient
 
 from .models import Consent
@@ -49,6 +50,7 @@ _LABELS = {
         "professional_signature": "Nombre y firma de quien informó",
         "witness": "Nombre y firma del testigo",
         "folio": "Folio",
+        "regulation": "Normativa de referencia",
         "version": "plantilla v",
         "revoked": "Revocado el",
         "declined": "No aceptado el",
@@ -74,6 +76,7 @@ _LABELS = {
         "professional_signature": "Name and signature of who informed",
         "witness": "Name and signature of the witness",
         "folio": "Ref.",
+        "regulation": "Reference regulation",
         "version": "template v",
         "revoked": "Revoked on",
         "declined": "Declined on",
@@ -248,6 +251,18 @@ def _render_html(
         f" · {labels['version']}{consent.template_version}" if consent.template_version else ""
     )
 
+    # --- The regulation the record is kept under. A signed letter keeps the
+    #     one it named that day; a sheet still to sign names today's.
+    if consent.signed_at is not None:
+        regulation = consent.regulation
+    else:
+        regulation = record_regulation(clinic) if clinic is not None else None
+    regulation_line = (
+        f"<p class='regulation'>{labels['regulation']}: {escape(regulation)}</p>"
+        if regulation
+        else ""
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="{escape(locale)}">
 <head>
@@ -287,6 +302,7 @@ def _render_html(
   .cap {{ text-align: center; font-weight: 700; font-style: italic; font-size: 9.5pt;
           padding-top: 2px; }}
   .outcome {{ margin-top: 10px; font-weight: 700; text-align: right; }}
+  .regulation {{ margin: 10px 0 0; font-size: 8.5pt; color: #333; }}
 </style>
 </head>
 <body>
@@ -301,6 +317,7 @@ def _render_html(
     {_field(labels["place_date"], f"{place}{', ' + date_text if date_text else ''}", 60)}
     <td style="width:25%"></td>
   </tr></table>
+  {regulation_line}
   {"".join(rows)}
   {outcome}
 </body>

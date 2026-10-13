@@ -38,6 +38,14 @@ The patient's consent letters. Part of the **Clinical record** App.
   the letter becomes **Signed**, marked *Signed on paper*; the *Scan*
   button opens it.
 
+## Reference regulation
+
+The letter names the regulation of the clinic's record (*Settings →
+Workspace → Record regulation*): it shows above the signature, on screen
+and on the printed sheet. Signing keeps a copy with the letter; if the
+clinic changes the line later, the signed letter keeps its own. Letters
+signed before this change carry none.
+
 ## Consent before confirming a plan
 
 The letter is not mandatory: the rule comes switched off. Once the

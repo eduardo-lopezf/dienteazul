@@ -8,12 +8,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.models import Clinic
 from app.core.contracts import (
     PatientDirectory,
     PatientDocuments,
     ProfessionalDirectory,
     provider,
 )
+from app.core.regulation import record_regulation
 
 from .models import Consent, ConsentTemplate
 
@@ -218,6 +220,8 @@ class ConsentService:
         consent.signer_capacity = data["signer_capacity"]
         consent.signature_method = method
         consent.signature_data = signature
+        clinic = await db.get(Clinic, consent.clinic_id)
+        consent.regulation = record_regulation(clinic) if clinic is not None else None
         consent.recorded_by_user_id = user_id
         await db.flush()
         return consent

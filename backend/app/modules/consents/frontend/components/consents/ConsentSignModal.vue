@@ -23,6 +23,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const { regulation, load: loadRegulation } = useRecordRegulation()
 const toast = useToast()
 const { can } = usePermissions()
 const { isActive } = useModules()
@@ -60,6 +61,7 @@ const canSign = computed(() =>
 
 watch(() => props.open, (opened) => {
   if (!opened) return
+  void loadRegulation()
   signerName.value = props.patientName
   capacity.value = 'patient'
   signature.value = null
@@ -191,6 +193,15 @@ function decline() {
               data-testid="consent-sign-method"
             />
           </UFormField>
+
+          <!-- What the record is kept under, said where the patient signs. -->
+          <p
+            v-if="regulation?.text"
+            class="text-caption text-subtle"
+            data-testid="consent-regulation"
+          >
+            {{ t('regulation.label') }}: {{ regulation.text }}
+          </p>
 
           <div v-if="method === 'screen'">
             <p class="text-xs text-muted mb-2">

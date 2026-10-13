@@ -28,7 +28,9 @@ validity.**
 - The BFF proxies only `/api/v1/**` to its private, fixed backend origin.
   It sets `HttpOnly`, `SameSite=Lax` auth cookies, strips token fields from
   login/setup/refresh responses, and injects the access bearer only on the
-  server. It does not keep process-local session state.
+  server. It keeps no process-local session state — amended by
+  [ADR 0054](0054-the-bff-replays-one-rotation-per-refresh-token.md): it
+  holds one rotation answer per refresh token, for ten seconds.
 - Unsafe requests require an exact same-origin `Origin` and a matching
   readable CSRF cookie/header. Logout still requires the exact origin; it
   does not require the CSRF token so server-rendered idle termination can

@@ -330,6 +330,13 @@ async function act(consent: Consent, action: 'revoke' | 'discard') {
                 {{ t('consents.signedBy', { name: selected.signed_by_name }) }}
                 · {{ t(`consents.capacity.${selected.signer_capacity || 'patient'}`) }} · {{ when(selected) }}
               </p>
+              <p
+                v-if="selected.regulation"
+                class="text-caption text-subtle"
+                data-testid="consent-signed-regulation"
+              >
+                {{ t('regulation.label') }}: {{ selected.regulation }}
+              </p>
               <img
                 v-if="selected.signature_data?.png"
                 :src="selected.signature_data.png"

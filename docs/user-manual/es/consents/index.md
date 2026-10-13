@@ -39,6 +39,14 @@ clínico**.
   pasa a **Firmado**, marcada como *Firmado en papel*; el botón *Escaneo*
   la abre.
 
+## Normativa de referencia
+
+La carta nombra la normativa del expediente de la clínica (*Configuración →
+Espacio de trabajo → Normativa del expediente*): se ve sobre la firma, en
+pantalla y en la hoja impresa. Al firmar se guarda una copia con la carta;
+si la clínica cambia el texto después, la carta firmada conserva la suya.
+Las cartas firmadas antes de este cambio no la llevan.
+
 ## Consentimiento antes de confirmar un plan
 
 La carta no es obligatoria: la regla viene apagada. Si la clínica la

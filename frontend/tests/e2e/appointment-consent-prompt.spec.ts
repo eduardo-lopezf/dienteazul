@@ -95,9 +95,20 @@ test.describe('agenda · consent before completing a visit', () => {
       const card = page.locator(`[data-appointment-id="${appointmentId}"]`).first()
       await expect(card).toBeVisible({ timeout: 60_000 })
       const finish = async () => {
-        // The menu stays open behind the question, so backing out returns to it.
         const entry = page.getByRole('menuitem', { name: 'Finalizar cita' })
-        if (!(await entry.isVisible())) await card.getByRole('button', { name: 'Marcar llegada' }).click()
+        // From a known state, every time. The menu stays open behind the
+        // question, and while it is open the rest of the page is
+        // `aria-hidden`, so the trigger does not exist for a lookup by role
+        // (measured: one match with the menu closed, none with it open).
+        // Checking the item once and falling back to the trigger therefore
+        // raced the menu settling after the modal closed: the item not
+        // visible yet, the trigger already unreachable, and the click spent
+        // its timeout waiting for a button nothing would match.
+        await page.keyboard.press('Escape')
+        await expect(entry).toBeHidden()
+        // The menu's own button, named after the menu and not after any
+        // one transition, so the lookup holds at every status.
+        await card.getByRole('button', { name: 'Acciones de la cita' }).click()
         await entry.click()
       }
 

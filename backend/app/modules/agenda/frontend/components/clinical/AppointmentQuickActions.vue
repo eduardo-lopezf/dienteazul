@@ -100,7 +100,7 @@ const confirmMessage = computed(() => {
       :size="props.dense ? 'xs' : 'sm'"
       color="neutral"
       variant="ghost"
-      :aria-label="t('appointments.transitions.checked_in')"
+      :aria-label="t('appointments.quickActions.label')"
       :loading="isBusy"
       :disabled="isBusy"
       @click.stop

@@ -41,6 +41,8 @@ export interface Consent {
   signature_method: SignatureMethod | null
   /** `png` when drawn on screen; `document_id` — the scan — when signed on paper. */
   signature_data: { png?: string, document_id?: string } | null
+  /** The regulation the letter named when it was signed. */
+  regulation: string | null
   declined_at: string | null
   revoked_at: string | null
   status_note: string | null
