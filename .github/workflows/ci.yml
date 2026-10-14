@@ -75,7 +75,11 @@ jobs:
       - name: Run tests (default set)
         working-directory: backend
         run: |
-          python -m pytest -v --tb=short
+          # The default set collects `tests/test_module_docs.py`, which
+          # requires each module's CLAUDE.md and CHANGELOG.md — not synced
+          # to GitHub any more (see `.gitignore`). The file stays in the
+          # tree and runs on a developer's checkout; only CI skips it.
+          python -m pytest -v --tb=short --ignore=tests/test_module_docs.py
 
       - name: Alembic round-trip (base → head → base → head)
         working-directory: backend
@@ -126,95 +130,114 @@ jobs:
           ENVIRONMENT: test
           TESTING: "true"
         run: |
+          # `tests/test_module_docs.py` reads every module's CLAUDE.md and
+          # CHANGELOG.md, and those are no longer synced to GitHub (see
+          # `.gitignore`), so a fresh checkout has none of them. Left here
+          # commented — one line to put back — and it still runs locally,
+          # where the files are:
+          #                  tests/test_module_docs.py \
           python -m pytest tests/test_module_manifest.py \
                            tests/test_module_manifests_consistency.py \
                            tests/test_manifest_validator.py \
                            tests/test_module_loader.py \
-                           tests/test_module_docs.py \
                            -v --tb=short
 
-  catalog-freshness:
-    # Verifies docs/modules-catalog.md and docs/events-catalog.md are
-    # in sync with the manifests + EventType enum + event_bus.publish
-    # callsites. Authors regenerate locally with:
-    #   python backend/scripts/generate_catalogs.py
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        working-directory: backend
-        run: |
-          pip install -e ".[dev]"
-
-      - name: Check catalogs are fresh
-        working-directory: backend
-        env:
-          DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub
-          SECRET_KEY: ci-stub
-          ENVIRONMENT: test
-          TESTING: "true"
-        run: |
-          python scripts/generate_catalogs.py --check
-
-      - name: Check docs coverage (--strict)
-        # ADR 0009 / issue #75. Every module must ship technical docs and,
-        # if it has Nuxt pages, screen MDs in both locales. Backfilled in
-        # fase 6 (commit that introduced this --strict flip).
-        working-directory: backend
-        env:
-          DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub
-          SECRET_KEY: ci-stub
-          ENVIRONMENT: test
-          TESTING: "true"
-        run: |
-          python scripts/check_docs_coverage.py --strict
-
-  docs-layout:
-    # Enforces the docs/ taxonomy from root CLAUDE.md "Documentation policy".
-    # Fails if a new markdown file is dropped at docs/ root, an unknown
-    # folder is added under docs/, or an image is placed outside
-    # docs/screenshots or docs/diagrams.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Check docs layout
-        run: python scripts/check_docs_layout.py
-
-  docs-portal-build:
-    # Smoke test: the VitePress documentation portal (ADR 0009) builds
-    # cleanly. Runs on every PR — fast (under a minute) and surfaces
-    # broken markdown / sidebar config before deploy.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-
-      - name: Install portal dependencies
-        working-directory: docs/portal
-        run: npm install --no-audit --no-fund
-
-      - name: Build portal
-        working-directory: docs/portal
-        run: npm run build
-
-      - name: Verify dist/ output
-        run: test -f docs/portal/.vitepress/dist/index.html
+  # ----------------------------------------------------------------
+  # Documentation jobs, switched off with the documentation itself.
+  #
+  # `docs/` is no longer synced to GitHub (see `.gitignore`), so a
+  # fresh checkout has nothing for these three to read: the catalogs
+  # they compare against, the taxonomy they enforce and the portal
+  # they build all live there. They are kept verbatim, commented, so
+  # they come back by uncommenting if the documentation returns.
+  # Meanwhile the same checks still run by hand from `backend/`:
+  #   python scripts/generate_catalogs.py --check
+  #   python scripts/check_docs_coverage.py --strict
+  #   python ../scripts/check_docs_layout.py
+  #   (cd ../docs/portal && npm run build)
+  # ----------------------------------------------------------------
+#   catalog-freshness:
+#     # Verifies docs/modules-catalog.md and docs/events-catalog.md are
+#     # in sync with the manifests + EventType enum + event_bus.publish
+#     # callsites. Authors regenerate locally with:
+#     #   python backend/scripts/generate_catalogs.py
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v5
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v6
+#         with:
+#           python-version: "3.11"
+#
+#       - name: Install dependencies
+#         working-directory: backend
+#         run: |
+#           pip install -e ".[dev]"
+#
+#       - name: Check catalogs are fresh
+#         working-directory: backend
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub
+#           SECRET_KEY: ci-stub
+#           ENVIRONMENT: test
+#           TESTING: "true"
+#         run: |
+#           python scripts/generate_catalogs.py --check
+#
+#       - name: Check docs coverage (--strict)
+#         # ADR 0009 / issue #75. Every module must ship technical docs and,
+#         # if it has Nuxt pages, screen MDs in both locales. Backfilled in
+#         # fase 6 (commit that introduced this --strict flip).
+#         working-directory: backend
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://dental:testpass@localhost:5432/stub
+#           SECRET_KEY: ci-stub
+#           ENVIRONMENT: test
+#           TESTING: "true"
+#         run: |
+#           python scripts/check_docs_coverage.py --strict
+#
+#   docs-layout:
+#     # Enforces the docs/ taxonomy from root CLAUDE.md "Documentation policy".
+#     # Fails if a new markdown file is dropped at docs/ root, an unknown
+#     # folder is added under docs/, or an image is placed outside
+#     # docs/screenshots or docs/diagrams.
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v5
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v6
+#         with:
+#           python-version: "3.11"
+#
+#       - name: Check docs layout
+#         run: python scripts/check_docs_layout.py
+#
+#   docs-portal-build:
+#     # Smoke test: the VitePress documentation portal (ADR 0009) builds
+#     # cleanly. Runs on every PR — fast (under a minute) and surfaces
+#     # broken markdown / sidebar config before deploy.
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v5
+#
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v5
+#         with:
+#           node-version: "24"
+#
+#       - name: Install portal dependencies
+#         working-directory: docs/portal
+#         run: npm install --no-audit --no-fund
+#
+#       - name: Build portal
+#         working-directory: docs/portal
+#         run: npm run build
+#
+#       - name: Verify dist/ output
+#         run: test -f docs/portal/.vitepress/dist/index.html
 
   frontend-lint:
     runs-on: ubuntu-latest

@@ -67,3 +67,26 @@ proyecto_open_source_dental.docx
 *.dpmf
 test-results/
 backend/app/modules/node_modules
+
+# Documentation stays local — it is not synced to GitHub.
+# The files below remain on disk and keep being read by the checklists,
+# the portal and the agents; they are simply no longer tracked. What is
+# already in the repository's history is still there: this stops future
+# commits from carrying them, it does not unpublish what was pushed.
+# `scripts/check_docs_layout.py`, `check_docs_coverage.py` and
+# `generate_catalogs.py --check` still run by hand; their CI jobs are
+# commented out in `.github/workflows/ci.yml` because a fresh checkout
+# has no `docs/` for them to read.
+/docs/
+/CHANGELOG.md
+/CLAUDE.md
+/frontend/CHANGELOG.md
+backend/app/modules/*/CLAUDE.md
+backend/app/modules/*/CHANGELOG.md
+backend/app/modules/*/README.md
+backend/app/modules/catalog/reference/README.md
+backend/app/core/plugins/README.md
+# `frontend/README.md` is not here on purpose: it is the Nuxt starter's
+# boilerplate, not documentation of ours. `backend/pyproject.toml`
+# declares `readme = "README.md"`, so do not add a rule that would catch
+# a `backend/README.md` someone writes for it.

@@ -485,6 +485,19 @@ async function safeAssign(aptId: string, cabinetId: string | null) {
   }
 }
 
+// The spinner is for a board with nothing on it yet. `isLoading` is
+// shared state that every appointment fetch flips — this poll included —
+// and swapping the columns for it emptied the board every thirty seconds:
+// cards gone, menus and drags interrupted, scroll position lost, for as
+// long as the request took. Measured 2 cabinet blocks before a refresh
+// and 0 during it. After the first load a refresh is silent: the columns
+// redraw when the data lands.
+const everLoaded = ref(false)
+watch(() => props.isLoading, (loading) => {
+  if (!loading) everLoaded.value = true
+}, { immediate: true })
+const showSpinner = computed(() => props.isLoading && !everLoaded.value)
+
 // ---------------------------------------------------------------------
 // Live refresh. Polling is suspended when the tab is hidden — no point
 // hammering the API when nobody's looking. Comes back instantly on focus.
@@ -617,7 +630,7 @@ function isInvalidHint(col: ColumnDef): boolean {
 
     <!-- Loading -->
     <div
-      v-if="isLoading"
+      v-if="showSpinner"
       class="flex items-center justify-center py-12"
     >
       <UIcon

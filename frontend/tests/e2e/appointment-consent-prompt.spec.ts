@@ -107,8 +107,13 @@ test.describe('agenda · consent before completing a visit', () => {
         await page.keyboard.press('Escape')
         await expect(entry).toBeHidden()
         // The menu's own button, named after the menu and not after any
-        // one transition, so the lookup holds at every status.
-        await card.getByRole('button', { name: 'Acciones de la cita' }).click()
+        // one transition, so the lookup holds at every status. Waited for
+        // on this spec's terms, not on the 8 s action timeout's: the board
+        // redraws itself while it polls, and on a loaded dev server that
+        // takes longer than one action is given.
+        const trigger = card.getByRole('button', { name: 'Acciones de la cita' })
+        await expect(trigger).toBeVisible({ timeout: 60_000 })
+        await trigger.click()
         await entry.click()
       }
 
