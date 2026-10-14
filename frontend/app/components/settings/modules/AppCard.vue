@@ -22,6 +22,10 @@ const title = computed(() => {
 // one. A disabled App offers no page: its routes are turned away.
 const presentation = computed(() => appPresentation(props.app.name))
 const settingsPath = computed(() => props.app.enabled ? presentation.value.settingsPath : undefined)
+const actions = computed(() => props.app.enabled
+  ? (presentation.value.actions ?? []).filter(action => !action.permission || can(action.permission))
+  : []
+)
 
 const summary = computed(() => {
   const key = `settings.apps.catalog.${props.app.name}.summary`
@@ -74,6 +78,22 @@ const summary = computed(() => {
     >
       {{ summary }}
     </p>
+
+    <div
+      v-if="actions.length"
+      class="mt-3 flex flex-wrap gap-2"
+    >
+      <UButton
+        v-for="action in actions"
+        :key="action.to"
+        :to="action.to"
+        :icon="action.icon"
+        size="sm"
+        :data-testid="`app-action-${app.name}-${action.to.split('=').pop()}`"
+      >
+        {{ t(action.labelKey) }}
+      </UButton>
+    </div>
 
     <div class="mt-3 flex items-center gap-3 flex-wrap">
       <StatusBadge

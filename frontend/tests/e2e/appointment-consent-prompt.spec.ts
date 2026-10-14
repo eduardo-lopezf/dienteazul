@@ -96,23 +96,24 @@ test.describe('agenda · consent before completing a visit', () => {
       await expect(card).toBeVisible({ timeout: 60_000 })
       const finish = async () => {
         const entry = page.getByRole('menuitem', { name: 'Finalizar cita' })
-        // From a known state, every time. The menu stays open behind the
-        // question, and while it is open the rest of the page is
-        // `aria-hidden`, so the trigger does not exist for a lookup by role
-        // (measured: one match with the menu closed, none with it open).
-        // Checking the item once and falling back to the trigger therefore
-        // raced the menu settling after the modal closed: the item not
-        // visible yet, the trigger already unreachable, and the click spent
-        // its timeout waiting for a button nothing would match.
+        // Safety, not ritual: picking an action now closes the menu, so
+        // nothing should be open here. While one is, the rest of the page
+        // is `aria-hidden` and the card's own button stops existing for a
+        // lookup by role.
         await page.keyboard.press('Escape')
         await expect(entry).toBeHidden()
-        // The menu's own button, named after the menu and not after any
-        // one transition, so the lookup holds at every status. Waited for
-        // on this spec's terms, not on the 8 s action timeout's: the board
-        // redraws itself while it polls, and on a loaded dev server that
-        // takes longer than one action is given.
-        const trigger = card.getByRole('button', { name: 'Acciones de la cita' })
-        await expect(trigger).toBeVisible({ timeout: 60_000 })
+        // The two are asserted apart because from here they fail the same
+        // way, and which one it is matters: the board no longer showing
+        // this appointment is a different bug from the card showing
+        // without its menu.
+        await expect(card, 'the appointment left the board').toBeVisible({ timeout: 60_000 })
+        // By test id, not by role: a lookup by role skips an
+        // `aria-hidden` subtree even while the button sits plainly on
+        // screen, which is one of the two ways this went missing in CI.
+        // Waited for on this spec's terms rather than the 8 s action
+        // timeout's — the board redraws itself as it polls.
+        const trigger = card.getByTestId('appointment-quick-actions')
+        await expect(trigger, 'the card is on the board without its menu').toBeVisible({ timeout: 60_000 })
         await trigger.click()
         await entry.click()
       }

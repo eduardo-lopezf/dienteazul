@@ -44,7 +44,7 @@ from app.modules.treatment_plan.models import PlannedTreatmentItem, TreatmentPla
 
 from ..models import ImportWarning
 from ._gesden_catalog import clinical_type_for_tipo_odg
-from .base import MapperContext
+from .base import MapperContext, running
 
 # Gesdén ``TtosMed.StaTto`` codes that mean "treatment was performed".
 # 5 dominates (~99 % of finished work) and 6 is a low-volume variant
@@ -318,6 +318,10 @@ class AppliedTreatmentMapper:
             # Short-circuit re-runs.
             if await ctx.resolver.was_skipped("applied_treatment", canonical_uuid):
                 return None
+            # Its only home is a note. With notes off it waits, unmarked,
+            # for a re-run once they are on.
+            if not running("clinical_notes"):
+                return None
             await _warn(
                 ctx,
                 source_id,
@@ -554,7 +558,7 @@ class AppliedTreatmentMapper:
         # sidebar look empty for migrated patients even though the
         # original PMS had decades of clinical narrative.
         note_body = (payload.get("notes") or "").strip()
-        if note_body:
+        if note_body and running("clinical_notes"):
             note_at = end_dt or start_dt
             ctx.db.add(
                 ClinicalNote(

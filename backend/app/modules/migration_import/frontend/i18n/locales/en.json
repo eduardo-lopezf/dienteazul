@@ -1,5 +1,169 @@
 {
   "migrationImport": {
+    "source": {
+      "label": "Where does the data come from?",
+      "dpm": ".dpm file (dental-bridge or a Diente Azul export)",
+      "sheet": "Excel or CSV (patients, appointments or balances)"
+    },
+    "sheet": {
+      "kind": "What does the sheet hold?",
+      "kinds": {
+        "patients": "Patients",
+        "appointments": "Appointments",
+        "balances": "Balances"
+      },
+      "kindHelp": {
+        "patients": "Creates the patients.",
+        "appointments": "For patients already in the clinic.",
+        "balances": "What each patient owed or had in favour in the previous system."
+      },
+      "intros": {
+        "patients": "Upload a spreadsheet with one patient per row and the column names in the first row. You can start from the template.",
+        "appointments": "One appointment per row. The patient must already be in the clinic (import them first): found by ID document, email, phone, previous patient number or full name; if none or several match, the row is left out with a warning.",
+        "balances": "One row per patient with their balance: positive if they owe, negative if they have credit, or two columns Owes and In favour. What they owe goes on their account as “Previous balance”; their credit, as a payment on account. The patient must already be in the clinic."
+      },
+      "templateNames": {
+        "patients": "patients-template.xlsx",
+        "appointments": "appointments-template.xlsx",
+        "balances": "balances-template.xlsx"
+      },
+      "defaultProfessional": "Professional for appointments without one",
+      "defaultProfessionalHelp": "Also used when the sheet's name matches no professional.",
+      "needsWho": "Assign at least one column that identifies the patient (name, ID document, email, phone or patient number).",
+      "needsDate": "Assign the column with the appointment date.",
+      "needsAmount": "Assign the balance column, or the Owes or In favour ones.",
+      "template": "Download template",
+      "templateFailed": "The template could not be downloaded",
+      "file": ".xlsx or .csv file",
+      "upload": "Upload and read columns",
+      "uploadFailed": "The file could not be read",
+      "found": "{rows} rows and {columns} columns. Say what each column holds; the suggestions come from their names.",
+      "column": "Column",
+      "samples": "Examples",
+      "field": "Imported as",
+      "ignore": "Do not import",
+      "dateOrder": "Dates are written as",
+      "dateOrderHelp": "So 03/04 is not mistaken (3 April or 4 March).",
+      "dateOrders": {
+        "dmy": "Day/month/year (31/12/1980)",
+        "mdy": "Month/day/year (12/31/1980)",
+        "ymd": "Year-month-day (1980-12-31)"
+      },
+      "needsName": "Assign at least the first name or the full name.",
+      "repeated": "A field is on more than one column: {fields}",
+      "convert": "Convert and review",
+      "convertFailed": "The file could not be converted",
+      "other": "Use another file",
+      "fields": {
+        "appointment_date": "Appointment date",
+        "appointment_time": "Time",
+        "duration_minutes": "Duration (minutes)",
+        "end_time": "End time",
+        "professional": "Professional",
+        "cabinet": "Cabinet",
+        "status": "Status",
+        "notes": "Notes",
+        "balance": "Balance (+ owes, − in favour)",
+        "owed": "Owes",
+        "credit": "In favour",
+        "balance_date": "Balance date",
+        "concept": "Concept",
+        "given_name": "First name",
+        "family_name": "Last name",
+        "second_family_name": "Second surname",
+        "full_name": "Full name",
+        "date_of_birth": "Date of birth",
+        "sex": "Sex",
+        "national_id": "ID document",
+        "phone": "Phone",
+        "mobile_phone": "Mobile",
+        "email": "Email",
+        "address_street": "Address",
+        "address_postal_code": "Postal code",
+        "patient_number": "Patient number in the previous system",
+        "medical_notes": "Medical notes (allergies, medication…)"
+      }
+    },
+    "tabs": {
+      "import": "Import",
+      "export": "Export"
+    },
+    "export": {
+      "includeDocuments": "Include documents (radiographs, photos and scans)",
+      "includeDocumentsHelp": "The files travel inside the .dpm. If the clinic has many (over 500 MB), export it without them.",
+      "title": "Export the clinic",
+      "subtitle": "Builds a .dpm file with this clinic's data, in the same format imported here: a copy, and the way to move the clinic to another Diente Azul installation.",
+      "sensitiveTitle": "The file holds patients' data",
+      "sensitive": "It is always encrypted with the passphrase you choose here, which the server does not keep: without it the file cannot be opened. Keep it somewhere safe and remove the file from the server once downloaded.",
+      "passphrase": "File passphrase",
+      "passphraseHelp": "At least {n} characters.",
+      "repeat": "Repeat the passphrase",
+      "tooShort": "It must be at least {n} characters.",
+      "mismatch": "The passphrases do not match.",
+      "start": "Build file",
+      "failed": "The export could not be started",
+      "history": "Exports",
+      "none": "This clinic has not been exported yet.",
+      "download": "Download",
+      "remove": "Remove from server",
+      "status": {
+        "pending": "Queued",
+        "running": "Building",
+        "completed": "Ready",
+        "failed": "Failed",
+        "deleted": "File removed"
+      },
+      "types": {
+        "document_attachment": "Attachments",
+        "budget_change": "Budget history",
+        "invoice_change": "Invoice history",
+        "plan_change": "Plan history",
+        "prescription_record": "Prescriptions",
+        "payment_schedule": "Payment plans",
+        "collection_contact": "Collection contacts",
+        "stored_document": "Documents",
+        "health_questionnaire": "Health questionnaires",
+        "clinical_note": "Clinical notes",
+        "consent_template": "Consent templates",
+        "patient_consent": "Consents",
+        "treatment_plan": "Treatment plans",
+        "patient_invoice": "Invoices",
+        "treatment_budget": "Budgets",
+        "patient_payment": "Payments",
+        "earned_entry": "Account charges",
+        "allergy": "Allergies",
+        "medication": "Medication",
+        "systemic_disease": "Diseases",
+        "surgical_history": "Surgeries",
+        "family_history": "Family history",
+        "asa_assessment": "ASA class",
+        "medical_context": "Medical context",
+        "tooth_record": "Odontogram (teeth)",
+        "clinical_treatment": "Treatments",
+        "professional": "Professionals",
+        "catalog_item": "Cabinets",
+        "treatment_catalog_item": "Catalogue",
+        "patient": "Patients",
+        "appointment": "Appointments",
+        "recall": "Recalls"
+      }
+    },
+    "modules": {
+      "patients": "Patients",
+      "patients_clinical": "Medical history",
+      "catalog": "Catalogue",
+      "odontogram": "Odontogram",
+      "treatment_plan": "Treatment plans",
+      "media": "Documents",
+      "clinical_notes": "Clinical notes",
+      "agenda": "Agenda",
+      "schedules": "Schedules",
+      "recalls": "Recalls",
+      "professionals": "Professionals",
+      "budget": "Budgets",
+      "payments": "Payments",
+      "billing": "Billing"
+    },
     "settingsCard": {
       "title": "Data migration (dental-bridge)",
       "description": "Import a DPMF file produced by dental-bridge (patients, appointments, budgets, payments, documents)."
@@ -22,6 +186,10 @@
       "failed": "Validation failed"
     },
     "preview": {
+      "skipped": "Not imported: {modules} missing",
+      "partial": "Without {modules}",
+      "skippedTitle": "Part of the file will not be imported",
+      "skippedDescription": "That data belongs to Apps that are not enabled. Enable the App in Settings → Apps and run the import again to bring it in; what was already imported is not duplicated.",
       "title": "Preview",
       "entities": "Entities",
       "samples": "Samples",
@@ -78,6 +246,7 @@
       "ignoreRow": "Ignore"
     },
     "status": {
+      "mapping": "Assigning columns",
       "uploaded": "Uploaded",
       "validating": "Validating",
       "validated": "Validated",

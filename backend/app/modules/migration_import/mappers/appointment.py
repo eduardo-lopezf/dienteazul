@@ -33,11 +33,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from app.core.auth.models import User
 from app.modules.agenda.service import AppointmentService
 from app.modules.clinical_notes.models import ClinicalNote
 
 from ..models import ImportWarning
-from .base import MapperContext
+from .base import MapperContext, running
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,9 @@ async def _maybe_record_appointment_note(
     """
     body = (payload.get("notes") or "").strip()
     note_canonical = f"{canonical_uuid}:note"
+    # With notes off the memo waits, unmarked, for a re-run.
+    if not running("clinical_notes"):
+        return
 
     if not body:
         await ctx.resolver.mark_skipped("appointment_note", note_canonical, source_system)
@@ -199,6 +203,12 @@ async def _maybe_record_appointment_note(
     if await ctx.resolver.get("appointment_note", note_canonical) is not None:
         return
 
+    # A note is written by an account. The professional is one only when
+    # the file mapped professionals to accounts (dental-bridge does); a
+    # directory profile is not, and the note is then the importer's.
+    author_id = ctx.created_by
+    if professional_id is not None and await ctx.db.get(User, professional_id) is not None:
+        author_id = professional_id
     note = ClinicalNote(
         clinic_id=ctx.clinic_id,
         note_type="appointment_administrative",
@@ -206,7 +216,7 @@ async def _maybe_record_appointment_note(
         owner_id=appointment_id,
         tooth_number=None,
         body=body,
-        author_id=professional_id or ctx.created_by,
+        author_id=author_id,
         created_at=appointment_created_at,
         updated_at=appointment_created_at,
     )

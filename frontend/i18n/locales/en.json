@@ -1708,6 +1708,10 @@
       "integrates": "Integrates with",
       "alwaysOn": "Always enabled",
       "configure": "Configure",
+        "actions": {
+          "importData": "Import data",
+          "exportData": "Export data"
+        },
       "heldBackBy": "Disabled together with {name}",
       "pendingEnable": "Will be enabled on restart",
       "pendingDisable": "Will be disabled on restart",
@@ -1744,7 +1748,7 @@
           },
           "data_migration": {
             "title": "Data migration",
-            "summary": "Imports patients, appointments, budgets, payments and documents from another program."
+            "summary": "Imports data from another program or from Excel and CSV, and exports the clinic to an encrypted .dpm file."
           },
           "communications": {
             "title": "Communications",

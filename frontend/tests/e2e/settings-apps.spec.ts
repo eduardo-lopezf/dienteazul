@@ -31,6 +31,13 @@ test.describe('admin sees the apps screen', () => {
     await expect(loggedIn.getByTestId('app-tier-workspace')).toHaveText(/App principal|Main app/)
     await expect(workspace).toContainText(/Siempre habilitada|Always enabled/)
     await expect(loggedIn.getByTestId('app-configure-workspace')).toHaveAttribute('href', '/settings/apps/workspace')
+    // Data migration is configured — and run — from its own card.
+    if (await loggedIn.getByTestId('app-card-data_migration').count()) {
+      await expect(loggedIn.getByTestId('app-configure-data_migration')).toHaveAttribute('href', '/settings/apps/data-migration')
+      // …and its two procedures have a button each, straight to their tab.
+      await expect(loggedIn.getByTestId('app-action-data_migration-import')).toHaveAttribute('href', '/settings/apps/data-migration?tab=import')
+      await expect(loggedIn.getByTestId('app-action-data_migration-export')).toHaveAttribute('href', '/settings/apps/data-migration?tab=export')
+    }
     await expect(loggedIn.locator('[data-testid^="app-card-"]').first()).toHaveAttribute(
       'data-testid',
       'app-card-workspace'

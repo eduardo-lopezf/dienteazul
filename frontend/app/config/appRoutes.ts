@@ -39,6 +39,7 @@ export const APP_ROUTES: AppRoute[] = [
   { prefix: '/reports/payments', module: 'payments', app: 'budgets_payments' },
   { prefix: '/settings/apps/treatments', module: 'catalog', app: 'treatments' },
   { prefix: '/settings/apps/clinical-record', module: 'record', app: 'clinical_record' },
+  { prefix: '/settings/apps/data-migration', module: 'migration_import', app: 'data_migration' },
   { prefix: '/reports', module: 'reports', app: 'reports' },
   { prefix: '/copilot', module: 'copilot', app: 'ai' }
 ]

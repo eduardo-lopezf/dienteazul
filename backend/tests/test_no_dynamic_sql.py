@@ -51,6 +51,11 @@ ALLOWED: dict[str, str] = {
     "modules/migration_import/dpmf/integrity.py::compute_logical_hash": (
         "SQLite identifier cannot be bound; validated by is_safe_identifier first"
     ),
+    # The export's writer names a table after the entity type it holds —
+    # a constant of `export.py`, checked by is_safe_identifier all the same.
+    "modules/migration_import/dpmf/writer.py::add": (
+        "SQLite identifier cannot be bound; validated by is_safe_identifier first"
+    ),
     # The usage report sweeps every table that carries a `clinic_id`,
     # so the table name is the query. It comes from `information_schema`
     # of the current schema — never from a request — and reaches the SQL

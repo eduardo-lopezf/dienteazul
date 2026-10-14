@@ -30,8 +30,8 @@ async def _ensure_clinic_and_patient(
         settings={
             "slot_duration_min": 15,
             # These tests are about plan mechanics. The rule that a plan
-            # waits for a signed informed consent is on by default and has
-            # its own tests (`test_plan_requires_informed_consent.py`).
+            # waits for a signed informed consent (off by default) has its
+            # own tests (`test_plan_requires_informed_consent.py`).
             "consents": {"require_informed_for_plan": False},
         },
         account_tier="clinic",

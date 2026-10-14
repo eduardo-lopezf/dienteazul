@@ -1,4 +1,4 @@
-"""DPME envelope reader — AES-256-GCM with scrypt-derived key.
+"""DPME envelope — AES-256-GCM with scrypt-derived key, read and written.
 
 Mirrors the layout produced by ``dental_bridge.core.dpmf.crypto``. The
 key is derived on every decrypt — we never persist or cache it.
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import json
+import secrets
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -107,3 +108,40 @@ def decrypt_to(encrypted: Path, destination: Path, *, passphrase: str) -> Envelo
 
     destination.write_bytes(plaintext)
     return header
+
+
+def encrypt_to(
+    plain: Path, destination: Path, *, passphrase: str, inner_layout: str = "zstd"
+) -> None:
+    """Wrap ``plain`` in a DPME envelope that :func:`decrypt_to` opens.
+
+    Same parameters the reader insists on: scrypt (N=2^17, r=8, p=1) for
+    the key, AES-256-GCM with the JSON header as associated data, so the
+    header cannot be altered without the decryption failing.
+    """
+    if inner_layout not in ("raw", "zstd"):
+        raise DpmeError(f"invalid inner_layout: {inner_layout!r}")
+    salt = secrets.token_bytes(16)
+    iv = secrets.token_bytes(12)
+    header_blob = json.dumps(
+        {
+            "v": _HEADER_VERSION,
+            "cipher": "AES-256-GCM",
+            "kdf": "scrypt",
+            "kdf_params": {
+                "salt": base64.b64encode(salt).decode("ascii"),
+                "n": _SCRYPT_N,
+                "r": _SCRYPT_R,
+                "p": _SCRYPT_P,
+            },
+            "iv": base64.b64encode(iv).decode("ascii"),
+            "inner_layout": inner_layout,
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    ciphertext = AESGCM(_derive_key(passphrase, salt)).encrypt(iv, plain.read_bytes(), header_blob)
+    with destination.open("wb") as out:
+        out.write(DPME_MAGIC)
+        out.write(struct.pack("<I", len(header_blob)))
+        out.write(header_blob)
+        out.write(ciphertext)

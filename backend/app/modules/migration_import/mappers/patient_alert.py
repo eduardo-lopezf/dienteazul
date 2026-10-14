@@ -49,7 +49,7 @@ from app.modules.patients_clinical.models import (
 
 from ..models import ImportWarning
 from ._alert_classifier import AlertClassification, classify_alert
-from .base import MapperContext
+from .base import MapperContext, running
 
 
 class PatientAlertMapper:
@@ -297,7 +297,9 @@ class PatientAlertMapper:
         # polymorphic ``clinical_notes`` store with the
         # ``administrative`` discriminator. The UI surfaces them in
         # the reception-friendly notes panel without polluting the
-        # clinical history tab.
+        # clinical history tab. With notes off it is left for a re-run.
+        if not running("clinical_notes"):
+            return None
         note = ClinicalNote(
             clinic_id=ctx.clinic_id,
             note_type=NOTE_TYPE_ADMINISTRATIVE,

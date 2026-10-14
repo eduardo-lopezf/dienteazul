@@ -7,7 +7,9 @@ import { computed, onUnmounted, ref } from 'vue'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorMessage } from '~~/app/utils/error'
 
-const { t } = useI18n()
+import SheetMappingStep from './SheetMappingStep.vue'
+
+const { t, te } = useI18n()
 const api = useApi()
 const { can } = usePermissions()
 
@@ -46,15 +48,26 @@ interface EntityPreview {
   declared_count: number
   samples: Array<{ canonical_uuid: string, source_id: string, payload: Record<string, unknown> }>
   professional_breakdown?: ProfessionalPreviewBreakdown | null
+  /** Modules it is written into that are off: it will not be imported. */
+  missing_modules?: string[]
+  /** Modules that only add to it and are off: imported without that part. */
+  partial_modules?: string[]
 }
 
 interface PreviewResponse {
   job: ImportJob
   entities: EntityPreview[]
-  warnings: Array<{ severity: string, code: string, message: string, entity_type: string | null }>
+  warnings: Array<{ severity: string, code: string, message: string, entity_type: string | null, source_id?: string | null }>
   files: { total: number, with_sha256: number, without_sha256: number }
   verifactu_data_detected: boolean
   verifactu_module_installed: boolean
+}
+
+/** A module's name as the people running the migration know it. */
+function moduleList(modules: string[]): string {
+  return modules
+    .map(name => te(`migrationImport.modules.${name}`) ? t(`migrationImport.modules.${name}`) : name)
+    .join(', ')
 }
 
 interface ProposalSummary {
@@ -84,7 +97,26 @@ const uploading = ref(false)
 const uploadError = ref('')
 
 const job = ref<ImportJob | null>(null)
+/** Where the data comes from: a dental-bridge file, or a spreadsheet. */
+const source = ref<'dpm' | 'sheet'>('dpm')
+const sourceItems = computed(() => [
+  { label: t('migrationImport.source.dpm'), value: 'dpm' },
+  { label: t('migrationImport.source.sheet'), value: 'sheet' }
+])
+
+/** A spreadsheet turned into a `.dpm`: it goes on as any other file. */
+async function onSheetReady(converted: ImportJob) {
+  job.value = converted
+  passphrase.value = ''
+  await runValidate()
+}
 const preview = ref<PreviewResponse | null>(null)
+const hasCatalog = computed(() =>
+  (preview.value?.entities ?? []).some(ent => ent.entity_type === 'treatment_catalog_item')
+)
+const skippedEntities = computed(() =>
+  (preview.value?.entities ?? []).filter(ent => ent.missing_modules?.length)
+)
 const importFiscal = ref(false)
 const minActivityMonths = ref(24)
 const excludeAgendaOrphans = ref(true)
@@ -275,6 +307,23 @@ onUnmounted(() => {
     <!-- Upload step -->
     <UCard v-if="!job">
       <div class="space-y-4">
+        <URadioGroup
+          v-model="source"
+          :items="sourceItems"
+          value-key="value"
+          orientation="horizontal"
+          :legend="t('migrationImport.source.label')"
+          data-testid="migration-source"
+        />
+        <SheetMappingStep
+          v-if="source === 'sheet'"
+          @ready="onSheetReady"
+        />
+      </div>
+      <div
+        v-if="source === 'dpm'"
+        class="mt-4 space-y-4"
+      >
         <UFormField :label="t('migrationImport.upload.dropFile')">
           <UInput
             type="file"
@@ -344,12 +393,44 @@ onUnmounted(() => {
             <li
               v-for="ent in preview.entities"
               :key="ent.entity_type"
-              class="flex justify-between border-b py-1"
+              class="flex flex-wrap items-center justify-between gap-2 border-b py-1"
+              :data-testid="`migration-entity-${ent.entity_type}`"
             >
-              <span>{{ ent.entity_type }}</span>
+              <span class="flex flex-wrap items-center gap-2">
+                {{ ent.entity_type }}
+                <UBadge
+                  v-if="ent.missing_modules?.length"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  data-testid="migration-entity-skipped"
+                >
+                  {{ t('migrationImport.preview.skipped', { modules: moduleList(ent.missing_modules) }) }}
+                </UBadge>
+                <UBadge
+                  v-else-if="ent.partial_modules?.length"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                >
+                  {{ t('migrationImport.preview.partial', { modules: moduleList(ent.partial_modules) }) }}
+                </UBadge>
+              </span>
               <span class="font-mono">{{ ent.declared_count }}</span>
             </li>
           </ul>
+          <!-- The App runs on its own: what belongs to an App that is off
+               is left out, and said so before anything is written. -->
+          <UAlert
+            v-if="skippedEntities.length"
+            class="mt-3"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-info"
+            :title="t('migrationImport.preview.skippedTitle')"
+            :description="t('migrationImport.preview.skippedDescription')"
+            data-testid="migration-skipped-notice"
+          />
         </div>
 
         <div>
@@ -373,13 +454,18 @@ onUnmounted(() => {
               :key="i"
               class="border-b py-1"
             >
-              [{{ w.severity }}] {{ w.code }} — {{ w.message }}
+              [{{ w.severity }}] <template v-if="w.source_id">
+                {{ w.source_id }} ·
+              </template>{{ w.code }} — {{ w.message }}
             </li>
           </ul>
         </div>
 
-        <!-- Catalog mapping proposals -->
-        <div class="mt-2 rounded border border-amber-200 bg-amber-50 p-4">
+        <!-- Catalog mapping proposals: only when the file brings a catalogue. -->
+        <div
+          v-if="hasCatalog"
+          class="mt-2 rounded border border-amber-200 bg-amber-50 p-4"
+        >
           <h3 class="font-semibold">
             {{ t('migrationImport.proposals.title') }}
           </h3>

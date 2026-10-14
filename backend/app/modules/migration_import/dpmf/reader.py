@@ -84,6 +84,16 @@ class DpmfHandle:
     def recompute_integrity_hash(self) -> str:
         return compute_logical_hash(self._conn)
 
+    def blob(self, canonical_uuid: str) -> bytes | None:
+        """An embedded file's bytes (a Diente Azul export), or ``None``."""
+        try:
+            row = self._conn.execute(
+                "SELECT data FROM _blobs WHERE canonical_uuid = ?", (canonical_uuid,)
+            ).fetchone()
+        except sqlite3.OperationalError:  # no _blobs table: files travel apart
+            return None
+        return bytes(row[0]) if row else None
+
     def entity_counts(self) -> dict[str, int]:
         rows = self._conn.execute(
             "SELECT entity_type, row_count FROM _entities ORDER BY entity_type"

@@ -1708,6 +1708,10 @@
       "integrates": "Se integra con",
       "alwaysOn": "Siempre habilitada",
       "configure": "Configurar",
+        "actions": {
+          "importData": "Importar datos",
+          "exportData": "Exportar datos"
+        },
       "heldBackBy": "Deshabilitada junto con {name}",
       "pendingEnable": "Se habilitará al reiniciar",
       "pendingDisable": "Se deshabilitará al reiniciar",
@@ -1744,7 +1748,7 @@
           },
           "data_migration": {
             "title": "Migración de datos",
-            "summary": "Importa pacientes, citas, presupuestos, pagos y documentos desde otro programa."
+            "summary": "Importa datos desde otro programa o desde Excel y CSV, y exporta la clínica a un archivo .dpm cifrado."
           },
           "communications": {
             "title": "Comunicaciones",

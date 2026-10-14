@@ -42,7 +42,17 @@ IMPORTS: dict[str, set[str]] = {
     "clinical_record": {"patients"},
     "reports": {"patients", "agenda", "treatments", "budgets_payments", "professionals"},
     "ai": set(),
-    "data_migration": {"patients", "agenda", "recalls", "treatments", "budgets_payments"},
+    "data_migration": {
+        "patients",
+        "agenda",
+        "recalls",
+        "treatments",
+        "budgets_payments",
+        # The export reads the professionals it writes out.
+        "professionals",
+        # ...and consent letters, which belong to the Clinical record.
+        "clinical_record",
+    },
 }
 
 #: App → the other Apps its manifests ``depends`` on. What it merely
@@ -55,6 +65,9 @@ REQUIRES: dict[str, set[str]] = {
     # `record` declares Professionals and reaches it through
     # `ProfessionalDirectory`, without importing it.
     "clinical_record": {"patients", "professionals"},
+    # Data migration writes into every App it finds running and requires
+    # none: whatever belongs to an App that is off is left out.
+    "data_migration": set(),
 }
 
 _IMPORT = re.compile(r"\s*(?:from|import)\s+app\.modules\.([a-z_]+)")

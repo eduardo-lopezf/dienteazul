@@ -8,10 +8,22 @@
  * App without a row here falls back to a generic icon and offers no
  * "Configure" link.
  */
+export interface AppAction {
+  /** i18n key of the button's label. */
+  labelKey: string
+  icon: string
+  to: string
+  /** Shown only to who holds it (`config/permissions.ts`). */
+  permission?: string
+}
+
 export interface AppPresentation {
   icon: string
   /** The App's own settings page. Offered only while the App is enabled. */
   settingsPath?: string
+  /** What the App is used for, one button each on its card. Offered only
+   *  while the App is enabled, like its settings page. */
+  actions?: AppAction[]
 }
 
 export const APP_CATALOG: Record<string, AppPresentation> = {
@@ -27,7 +39,24 @@ export const APP_CATALOG: Record<string, AppPresentation> = {
   clinical_record: { icon: 'i-lucide-book-open-text', settingsPath: '/settings/apps/clinical-record' },
   reports: { icon: 'i-lucide-bar-chart-3' },
   ai: { icon: 'i-lucide-sparkles' },
-  data_migration: { icon: 'i-lucide-database-backup' }
+  data_migration: {
+    icon: 'i-lucide-database-backup',
+    settingsPath: '/settings/apps/data-migration',
+    actions: [
+      {
+        labelKey: 'settings.apps.actions.importData',
+        icon: 'i-lucide-database-zap',
+        to: '/settings/apps/data-migration?tab=import',
+        permission: 'migration_import.job.read'
+      },
+      {
+        labelKey: 'settings.apps.actions.exportData',
+        icon: 'i-lucide-hard-drive-download',
+        to: '/settings/apps/data-migration?tab=export',
+        permission: 'migration_import.export.run'
+      }
+    ]
+  }
 }
 
 export const DEFAULT_APP_ICON = 'i-lucide-box'

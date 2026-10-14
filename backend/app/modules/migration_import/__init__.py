@@ -29,6 +29,7 @@ from app.core.plugins import BaseModule
 from .lifecycle import install, uninstall
 from .models import (
     EntityMapping,
+    ExportJob,
     FileStaging,
     ImportJob,
     ImportWarning,
@@ -50,24 +51,29 @@ class MigrationImportModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        # Hard module deps — every mapper below calls a service in one
-        # of these. ``verifactu`` is intentionally OFF this list: the
-        # fiscal-document mapper detects it at runtime so PT/FR clinics
-        # without Spanish compliance can still import.
-        "depends": [
+        # Nothing is required (ADR 0037): the App runs on its own and
+        # writes into whichever of these is running. A kind of record
+        # whose App is off is skipped with a warning, and shows as such
+        # in the preview (``mappers.ENTITY_REQUIRES``). ``verifactu`` is
+        # detected at runtime the same way.
+        "depends": [],
+        "integrates": [
             "patients",
             "patients_clinical",
+            "catalog",
+            "odontogram",
+            "treatment_plan",
+            "media",
             "clinical_notes",
             "agenda",
             "schedules",
             "recalls",
-            "catalog",
+            "professionals",
             "budget",
-            "odontogram",
-            "treatment_plan",
-            "billing",
             "payments",
-            "media",
+            "billing",
+            # Consent letters and their templates (Clinical record App).
+            "consents",
         ],
         # Project convention: optional modules ship off; admin activates.
         "installable": True,
@@ -85,7 +91,7 @@ class MigrationImportModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [ImportJob, EntityMapping, FileStaging, ImportWarning, RawEntity]
+        return [ImportJob, EntityMapping, FileStaging, ImportWarning, RawEntity, ExportJob]
 
     def get_router(self) -> APIRouter:
         return router
@@ -101,6 +107,7 @@ class MigrationImportModule(BaseModule):
             "job.write",
             "job.execute",
             "binary.write",
+            "export.run",
         ]
 
     def get_event_handlers(self) -> dict:

@@ -13,7 +13,15 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.plugins.registry import module_registry
+
 from ..models import EntityMapping
+
+
+def running(*modules: str) -> bool:
+    """Whether every one of ``modules`` is running here (ADR 0037)."""
+    return all(module_registry.is_installed(module) for module in modules)
+
 
 if TYPE_CHECKING:
     from ..dpmf import DpmfHandle

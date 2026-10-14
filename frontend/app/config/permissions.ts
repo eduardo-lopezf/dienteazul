@@ -118,7 +118,8 @@ export const PERMISSIONS = {
     jobRead: 'migration_import.job.read',
     jobWrite: 'migration_import.job.write',
     jobExecute: 'migration_import.job.execute',
-    binaryWrite: 'migration_import.binary.write'
+    binaryWrite: 'migration_import.binary.write',
+    exportRun: 'migration_import.export.run'
   },
   payments: {
     recordRead: 'payments.record.read',

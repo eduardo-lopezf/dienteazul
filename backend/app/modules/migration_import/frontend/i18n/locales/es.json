@@ -1,5 +1,169 @@
 {
   "migrationImport": {
+    "source": {
+      "label": "¿De dónde vienen los datos?",
+      "dpm": "Archivo .dpm (dental-bridge o exportación de Diente Azul)",
+      "sheet": "Excel o CSV (pacientes, citas o saldos)"
+    },
+    "sheet": {
+      "kind": "¿Qué contiene la hoja?",
+      "kinds": {
+        "patients": "Pacientes",
+        "appointments": "Citas",
+        "balances": "Saldos"
+      },
+      "kindHelp": {
+        "patients": "Crea los pacientes.",
+        "appointments": "Para pacientes que ya están en la clínica.",
+        "balances": "Lo que cada paciente debía o tenía a favor en el sistema anterior."
+      },
+      "intros": {
+        "patients": "Sube una hoja de cálculo con un paciente por fila y la primera fila con los nombres de las columnas. Puedes partir de la plantilla.",
+        "appointments": "Una cita por fila. El paciente ya debe estar en la clínica (impórtalos antes): se busca por documento, correo, teléfono, nº de paciente anterior o nombre completo; si no se encuentra, o hay varios iguales, la fila se descarta y se avisa.",
+        "balances": "Una fila por paciente con su saldo: positivo si debe, negativo si tiene a favor, o dos columnas Debe y A favor. Lo que debe entra a su cuenta como «Saldo anterior»; lo que tiene a favor, como un pago a cuenta. El paciente ya debe estar en la clínica."
+      },
+      "templateNames": {
+        "patients": "plantilla-pacientes.xlsx",
+        "appointments": "plantilla-citas.xlsx",
+        "balances": "plantilla-saldos.xlsx"
+      },
+      "defaultProfessional": "Profesional para las citas sin profesional",
+      "defaultProfessionalHelp": "También se usa cuando el nombre de la hoja no coincide con ningún profesional.",
+      "needsWho": "Asigna al menos una columna que identifique al paciente (nombre, documento, correo, teléfono o nº de paciente).",
+      "needsDate": "Asigna la columna con la fecha de la cita.",
+      "needsAmount": "Asigna la columna del saldo, o las de Debe o A favor.",
+      "template": "Descargar plantilla",
+      "templateFailed": "No se pudo descargar la plantilla",
+      "file": "Archivo .xlsx o .csv",
+      "upload": "Subir y leer columnas",
+      "uploadFailed": "No se pudo leer el archivo",
+      "found": "{rows} filas y {columns} columnas. Indica qué contiene cada columna; las sugerencias se basan en sus nombres.",
+      "column": "Columna",
+      "samples": "Ejemplos",
+      "field": "Se importa como",
+      "ignore": "No importar",
+      "dateOrder": "Las fechas están escritas como",
+      "dateOrderHelp": "Así no se confunde 03/04 (3 de abril o 4 de marzo).",
+      "dateOrders": {
+        "dmy": "Día/mes/año (31/12/1980)",
+        "mdy": "Mes/día/año (12/31/1980)",
+        "ymd": "Año-mes-día (1980-12-31)"
+      },
+      "needsName": "Asigna al menos el nombre o el nombre completo.",
+      "repeated": "Un campo está en más de una columna: {fields}",
+      "convert": "Convertir y revisar",
+      "convertFailed": "No se pudo convertir el archivo",
+      "other": "Usar otro archivo",
+      "fields": {
+        "appointment_date": "Fecha de la cita",
+        "appointment_time": "Hora",
+        "duration_minutes": "Duración (minutos)",
+        "end_time": "Hora de fin",
+        "professional": "Profesional",
+        "cabinet": "Gabinete",
+        "status": "Estado",
+        "notes": "Notas",
+        "balance": "Saldo (+ debe, − a favor)",
+        "owed": "Debe",
+        "credit": "A favor",
+        "balance_date": "Fecha del saldo",
+        "concept": "Concepto",
+        "given_name": "Nombre",
+        "family_name": "Apellidos",
+        "second_family_name": "Segundo apellido",
+        "full_name": "Nombre completo",
+        "date_of_birth": "Fecha de nacimiento",
+        "sex": "Sexo",
+        "national_id": "Documento de identidad (CURP, DNI…)",
+        "phone": "Teléfono",
+        "mobile_phone": "Celular",
+        "email": "Correo electrónico",
+        "address_street": "Domicilio",
+        "address_postal_code": "Código postal",
+        "patient_number": "Nº de paciente en el sistema anterior",
+        "medical_notes": "Notas médicas (alergias, medicación…)"
+      }
+    },
+    "tabs": {
+      "import": "Importar",
+      "export": "Exportar"
+    },
+    "export": {
+      "includeDocuments": "Incluir documentos (radiografías, fotos y escaneos)",
+      "includeDocumentsHelp": "Los archivos viajan dentro del .dpm. Si la clínica tiene muchos (más de 500 MB), expórtala sin ellos.",
+      "title": "Exportar la clínica",
+      "subtitle": "Genera un archivo .dpm con los datos de esta clínica, en el mismo formato que se importa aquí: sirve de copia y para llevar la clínica a otra instalación de Diente Azul.",
+      "sensitiveTitle": "El archivo contiene datos de pacientes",
+      "sensitive": "Se cifra siempre con la contraseña que elijas aquí y no se guarda en el servidor: sin ella el archivo no se puede abrir. Guárdala en un lugar seguro y elimina el archivo del servidor cuando lo hayas descargado.",
+      "passphrase": "Contraseña del archivo",
+      "passphraseHelp": "Al menos {n} caracteres.",
+      "repeat": "Repite la contraseña",
+      "tooShort": "Debe tener al menos {n} caracteres.",
+      "mismatch": "Las contraseñas no coinciden.",
+      "start": "Generar archivo",
+      "failed": "No se pudo iniciar la exportación",
+      "history": "Exportaciones",
+      "none": "Aún no se ha exportado esta clínica.",
+      "download": "Descargar",
+      "remove": "Eliminar del servidor",
+      "status": {
+        "pending": "En cola",
+        "running": "Generando",
+        "completed": "Listo",
+        "failed": "Falló",
+        "deleted": "Archivo eliminado"
+      },
+      "types": {
+        "document_attachment": "Adjuntos",
+        "budget_change": "Historial de presupuestos",
+        "invoice_change": "Historial de facturas",
+        "plan_change": "Historial de planes",
+        "prescription_record": "Recetas",
+        "payment_schedule": "Planes de pago",
+        "collection_contact": "Contactos de cobro",
+        "stored_document": "Documentos",
+        "health_questionnaire": "Cuestionarios de salud",
+        "clinical_note": "Notas clínicas",
+        "consent_template": "Plantillas de consentimiento",
+        "patient_consent": "Consentimientos",
+        "treatment_plan": "Planes de tratamiento",
+        "patient_invoice": "Facturas",
+        "treatment_budget": "Presupuestos",
+        "patient_payment": "Pagos",
+        "earned_entry": "Cargos de cuenta",
+        "allergy": "Alergias",
+        "medication": "Medicación",
+        "systemic_disease": "Enfermedades",
+        "surgical_history": "Cirugías",
+        "family_history": "Antecedentes familiares",
+        "asa_assessment": "Clasificación ASA",
+        "medical_context": "Contexto médico",
+        "tooth_record": "Odontograma (dientes)",
+        "clinical_treatment": "Tratamientos",
+        "professional": "Profesionales",
+        "catalog_item": "Gabinetes",
+        "treatment_catalog_item": "Catálogo",
+        "patient": "Pacientes",
+        "appointment": "Citas",
+        "recall": "Recordatorios"
+      }
+    },
+    "modules": {
+      "patients": "Pacientes",
+      "patients_clinical": "Historial médico",
+      "catalog": "Catálogo",
+      "odontogram": "Odontograma",
+      "treatment_plan": "Planes de tratamiento",
+      "media": "Documentos",
+      "clinical_notes": "Notas clínicas",
+      "agenda": "Agenda",
+      "schedules": "Horarios",
+      "recalls": "Recordatorios",
+      "professionals": "Profesionales",
+      "budget": "Presupuestos",
+      "payments": "Pagos",
+      "billing": "Facturación"
+    },
     "settingsCard": {
       "title": "Migración de datos (dental-bridge)",
       "description": "Importa un archivo DPMF generado por dental-bridge (pacientes, citas, presupuestos, pagos, documentos)."
@@ -22,6 +186,10 @@
       "failed": "Validación fallida"
     },
     "preview": {
+      "skipped": "No se importará: falta {modules}",
+      "partial": "Sin {modules}",
+      "skippedTitle": "Parte del archivo no se importará",
+      "skippedDescription": "Esos datos pertenecen a apps que no están activas. Activa la app en Configuración → Apps y vuelve a ejecutar la importación para traerlos; lo ya importado no se duplica.",
       "title": "Vista previa",
       "entities": "Entidades",
       "samples": "Muestras",
@@ -78,6 +246,7 @@
       "ignoreRow": "Ignorar"
     },
     "status": {
+      "mapping": "Asignando columnas",
       "uploaded": "Subido",
       "validating": "Validando",
       "validated": "Validado",

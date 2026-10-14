@@ -44,6 +44,9 @@ from .mappers import (
     MapperContext,
     MappingResolver,
     ProfessionalFilterOptions,
+    missing_for,
+    partial_for,
+    running,
 )
 from .models import EntityMapping, FileStaging, ImportJob, ImportWarning
 from .schemas import (
@@ -253,6 +256,8 @@ class ImportJobService:
                     declared_count=count,
                     samples=samples,
                     professional_breakdown=breakdown,
+                    missing_modules=missing_for(entity_type),
+                    partial_modules=partial_for(entity_type),
                 )
             )
         return previews
@@ -419,7 +424,38 @@ class ImportJobService:
             ctx.handle = handle
             entity_types = ordered_entity_types(list(handle.entity_counts().keys()))
 
+            counts = handle.entity_counts()
             for entity_type in entity_types:
+                # Rows whose App is off are not written anywhere: one
+                # warning for the type, and they count as gone through.
+                missing = missing_for(entity_type)
+                if missing:
+                    await ImportJobService._record_warning(
+                        db,
+                        job.id,
+                        entity_type,
+                        None,
+                        severity="warn",
+                        code="app.disabled",
+                        message=(
+                            f"{counts.get(entity_type, 0)} registros sin importar: "
+                            f"no está activo {', '.join(missing)}."
+                        ),
+                    )
+                    job.processed_entities = job.processed_entities + counts.get(entity_type, 0)
+                    await db.commit()
+                    continue
+                partial = partial_for(entity_type)
+                if partial:
+                    await ImportJobService._record_warning(
+                        db,
+                        job.id,
+                        entity_type,
+                        None,
+                        severity="info",
+                        code="app.partial",
+                        message=f"Importado sin la parte de {', '.join(partial)}, que no está activo.",
+                    )
                 mapper = MAPPERS.get(entity_type, FALLBACK_MAPPER)
                 processed_in_batch = 0
                 for row in handle.entity_iter(entity_type):
@@ -525,7 +561,8 @@ class ImportJobService:
             # of lines instead of N times during ingest (O(N²) per
             # budget). Same idea would apply to other aggregates if
             # they get added.
-            await ImportJobService._finalise_migrated_budgets(db, job)
+            if running("budget"):
+                await ImportJobService._finalise_migrated_budgets(db, job)
             # Roles for migrated professionals are best-effort at
             # ingest time: Gesdén's ``IdTipoColab`` is often blank, so
             # everyone lands as ``assistant`` — which the agenda
@@ -625,7 +662,7 @@ class ImportJobService:
         # pairs during budget_line ingest and resolve them here once
         # the applied_treatment mappings exist.
         pending_links: list = getattr(line_mapper, "_pending_treatment_links", [])
-        if pending_links:
+        if pending_links and running("odontogram", "treatment_plan"):
             from app.modules.odontogram.models import Treatment as _Treatment
             from app.modules.treatment_plan.models import PlannedTreatmentItem
 
@@ -755,29 +792,37 @@ class ImportJobService:
 
         # Users that actually appear as the responsible clinician on
         # something post-import.
-        appt_users = {
-            row[0]
-            for row in (
-                await db.execute(
-                    select(Appointment.professional_id).where(
-                        Appointment.clinic_id == job.clinic_id,
-                        Appointment.professional_id.in_(user_ids),
+        appt_users = (
+            {
+                row[0]
+                for row in (
+                    await db.execute(
+                        select(Appointment.professional_id).where(
+                            Appointment.clinic_id == job.clinic_id,
+                            Appointment.professional_id.in_(user_ids),
+                        )
                     )
-                )
-            ).all()
-        }
-        treat_users = {
-            row[0]
-            for row in (
-                await db.execute(
-                    select(Treatment.performed_by).where(
-                        Treatment.clinic_id == job.clinic_id,
-                        Treatment.performed_by.is_not(None),
-                        Treatment.performed_by.in_(user_ids),
+                ).all()
+            }
+            if running("agenda")
+            else set()
+        )
+        treat_users = (
+            {
+                row[0]
+                for row in (
+                    await db.execute(
+                        select(Treatment.performed_by).where(
+                            Treatment.clinic_id == job.clinic_id,
+                            Treatment.performed_by.is_not(None),
+                            Treatment.performed_by.in_(user_ids),
+                        )
                     )
-                )
-            ).all()
-        }
+                ).all()
+            }
+            if running("odontogram")
+            else set()
+        )
         clinical_users = appt_users | treat_users
         if not clinical_users:
             return
@@ -936,16 +981,21 @@ def _build_filter_options(execute_options: dict[str, Any] | None) -> Professiona
 
 
 def _detect_verifactu_data(handle: DpmfHandle) -> bool:
-    """Scan fiscal_document payloads for Spanish legal hash fields."""
-    if "fiscal_document" not in handle.entity_counts():
-        return False
-    for row in handle.entity_iter("fiscal_document"):
-        _uuid, _src, _sys, payload_json, _raw, _ts = row
-        try:
-            payload = json.loads(payload_json)
-        except json.JSONDecodeError:
+    """Scan invoice payloads for Spanish legal hash fields — Gesdén's
+    ``fiscal_document`` and Diente Azul's own ``patient_invoice``."""
+    counts = handle.entity_counts()
+    for entity_type, keys in (
+        ("fiscal_document", ("legal_hash", "hash", "hash_control", "atcud", "qr_code")),
+        ("patient_invoice", ("document_hash", "previous_hash", "compliance_data")),
+    ):
+        if entity_type not in counts:
             continue
-        for key in ("legal_hash", "hash", "hash_control", "atcud", "qr_code"):
-            if payload.get(key):
+        for row in handle.entity_iter(entity_type):
+            _uuid, _src, _sys, payload_json, _raw, _ts = row
+            try:
+                payload = json.loads(payload_json)
+            except json.JSONDecodeError:
+                continue
+            if any(payload.get(key) for key in keys):
                 return True
     return False

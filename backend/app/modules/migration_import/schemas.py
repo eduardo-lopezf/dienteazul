@@ -3,10 +3,31 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ExportCreate(BaseModel):
+    """The passphrase that seals the file. Never stored."""
+
+    passphrase: str = Field(min_length=12, max_length=256)
+    #: Embed every file (radiographs, photos, scans) in the ``.dpm``.
+    include_documents: bool = True
+
+
+class ExportJobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_by: UUID
+    status: str
+    error: str | None
+    file_size: int
+    entity_counts: dict[str, int]
+    created_at: datetime
+    completed_at: datetime | None
 
 
 class ImportJobResponse(BaseModel):
@@ -80,6 +101,12 @@ class EntityPreview(BaseModel):
     declared_count: int
     samples: list[PreviewSample] = Field(default_factory=list)
     professional_breakdown: ProfessionalPreviewBreakdown | None = None
+    #: Modules this type is written into that are not running: it will
+    #: not be imported.
+    missing_modules: list[str] = Field(default_factory=list)
+    #: Modules that only add to it and are not running: it is imported
+    #: without that part.
+    partial_modules: list[str] = Field(default_factory=list)
 
 
 class WarningView(BaseModel):
@@ -216,3 +243,36 @@ class BulkAcceptRequest(BaseModel):
 
 class BulkAcceptResponse(BaseModel):
     accepted: int
+
+
+class SheetColumn(BaseModel):
+    index: int
+    name: str
+    #: The first values under it, as written.
+    samples: list[str]
+    #: The field its name suggests; ``None`` when nothing fits.
+    suggested_field: str | None
+
+
+class SheetProfessional(BaseModel):
+    id: UUID
+    name: str
+
+
+class SheetUploadResponse(BaseModel):
+    job: ImportJobResponse
+    kind: str
+    columns: list[SheetColumn]
+    row_count: int
+    #: Every field a column can be imported as.
+    fields: list[str]
+    #: Appointments only: who a row without a professional can go to.
+    professionals: list[SheetProfessional] = Field(default_factory=list)
+
+
+class SheetConvertRequest(BaseModel):
+    #: Column index (as a string, JSON keys are) → field.
+    mapping: dict[str, str]
+    date_order: Literal["dmy", "mdy", "ymd"] = "dmy"
+    #: Appointments: the professional for rows that name none.
+    default_professional_id: UUID | None = None

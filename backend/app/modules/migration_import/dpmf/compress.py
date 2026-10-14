@@ -1,4 +1,4 @@
-"""zstd unwrap layer.
+"""zstd layer: unwrap on import, wrap on export.
 
 zstd is mandatory for ``.dpm.zst`` and ``.dpm.zst.enc`` layerings.
 We stream-decompress into the destination path to keep peak memory
@@ -22,3 +22,10 @@ def decompress_to(compressed: Path, destination: Path) -> None:
         # copy_stream handles the framing + checksum verification; raises
         # on truncation or bad payload.
         dctx.copy_stream(src, dst, read_size=_READ_CHUNK, write_size=_READ_CHUNK)
+
+
+def compress_to(plain: Path, destination: Path, *, level: int = 10) -> None:
+    """Stream-compress ``plain`` (zstd, with checksum) into ``destination``."""
+    cctx = zstandard.ZstdCompressor(level=level, write_checksum=True)
+    with plain.open("rb") as src, destination.open("wb") as dst:
+        cctx.copy_stream(src, dst, read_size=_READ_CHUNK, write_size=_READ_CHUNK)

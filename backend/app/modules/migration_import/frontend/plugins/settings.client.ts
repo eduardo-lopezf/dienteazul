@@ -1,5 +1,6 @@
 /**
- * Registers the DPMF migration page under /settings/workspace.
+ * Lists the Data migration App's page (Settings → Apps → Migración de
+ * datos) among the settings, so search finds it.
  *
  * Gated on `migration_import.job.read`. The Execute button inside the
  * page checks `migration_import.job.execute` separately so view-only
@@ -10,12 +11,12 @@ import { registerSettingsPage } from '~~/app/composables/useSettingsRegistry'
 export default defineNuxtPlugin(() => {
   registerSettingsPage({
     path: 'data-migration',
-    category: 'workspace',
+    category: 'modules',
     labelKey: 'migrationImport.settingsCard.title',
     descriptionKey: 'migrationImport.settingsCard.description',
     icon: 'i-lucide-database-zap',
     permission: 'migration_import.job.read',
-    component: () => import('../components/settings/DataMigrationPage.vue'),
+    to: '/settings/apps/data-migration',
     searchKeywords: ['migracion', 'importar', 'gesden', 'dpmf', 'dental-bridge', 'migration', 'import'],
     order: 90
   })

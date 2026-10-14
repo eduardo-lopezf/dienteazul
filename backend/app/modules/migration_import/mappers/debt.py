@@ -192,7 +192,9 @@ class DebtMapper:
             bits.append(f"NumTto {treatment_number}")
         if phase_number is not None:
             bits.append(f"fase {phase_number}")
-        description = " · ".join(bits)[:160]
+        # A sheet of opening balances says what the amount is; a Gesdén
+        # receivable is described by the treatment it bills.
+        description = (payload.get("description") or " · ".join(bits))[:160]
 
         # The earned-entries table enforces ``(treatment_id,
         # source_session_id)`` uniqueness. One treatment commonly

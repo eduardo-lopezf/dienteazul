@@ -36,8 +36,15 @@ function dropdownItems() {
     label: t(tr.labelKey),
     icon: tr.icon,
     color: tr.destructive ? ('error' as const) : undefined,
-    onSelect: (e?: Event) => {
-      e?.preventDefault?.()
+    // The menu closes when an action is picked. It used to
+    // `preventDefault()` here, which kept it open underneath whatever the
+    // action opened — the cancel confirmation, the consent question — and
+    // left two overlays trapping focus at once: while the menu is open it
+    // marks the rest of the page `aria-hidden`, so the card and its own
+    // button stop existing for anything that reads the page by role, a
+    // screen reader included. Picking an action and seeing the menu go is
+    // also what a menu is expected to do.
+    onSelect: () => {
       if (tr.destructive) {
         pendingDescriptor.value = tr
         pendingNote.value = ''
@@ -101,6 +108,7 @@ const confirmMessage = computed(() => {
       color="neutral"
       variant="ghost"
       :aria-label="t('appointments.quickActions.label')"
+      data-testid="appointment-quick-actions"
       :loading="isBusy"
       :disabled="isBusy"
       @click.stop

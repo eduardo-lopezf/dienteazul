@@ -47,6 +47,43 @@ ENTITY_ORDER: tuple[str, ...] = (
     "recall",
     "consent",
     "pharmacological_history",
+    # Diente Azul's own records (its export). Documents first: a
+    # questionnaire or consent signed on paper points at its scan.
+    "stored_document",
+    "health_questionnaire",
+    "allergy",
+    "medication",
+    "systemic_disease",
+    "surgical_history",
+    "family_history",
+    "asa_assessment",
+    "medical_context",
+    "tooth_record",
+    "clinical_treatment",
+    # After treatments: a budget line points at its treatment, a payment
+    # at its budget.
+    "treatment_budget",
+    "earned_entry",
+    "patient_payment",
+    # A plan names its treatments and budget; an invoice its budget,
+    # budget lines and the payments applied to it.
+    "treatment_plan",
+    "patient_invoice",
+    # A note hangs from a patient, treatment, plan or appointment; a
+    # consent names its template and plan.
+    "clinical_note",
+    "consent_template",
+    "patient_consent",
+    # A prescription names its plan line; a payment plan its budget.
+    "prescription_record",
+    "payment_schedule",
+    "collection_contact",
+    # Last: an attachment joins a document to a note, treatment, plan…;
+    # a history entry belongs to its budget, invoice or plan.
+    "document_attachment",
+    "budget_change",
+    "invoice_change",
+    "plan_change",
     "prescription",
     "prescription_item",
     "communication",

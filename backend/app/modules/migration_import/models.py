@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -47,6 +48,15 @@ class ImportJob(Base, TimestampMixin):
     """
 
     __tablename__ = "migration_import_jobs"
+    # Declared here too, so a schema built from the models (the tests')
+    # refuses what the migrated one refuses.
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('mapping','uploaded','validating','validated','previewing',"
+            "'executing','completed','failed')",
+            name="ck_migration_import_job_status",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     clinic_id: Mapped[UUID] = mapped_column(
@@ -330,3 +340,27 @@ class RawEntity(Base, TimestampMixin):
         UniqueConstraint("job_id", "entity_type", "canonical_uuid", name="uq_migration_raw_entity"),
         Index("ix_migration_raw_entity_clinic_type", "clinic_id", "entity_type"),
     )
+
+
+class ExportJob(Base, TimestampMixin):
+    """One clinic export to a ``.dpm`` file: who asked, when, and the file.
+
+    State machine: ``pending`` → ``running`` → ``completed`` / ``failed``;
+    ``deleted`` once its file is removed. The row stays as the record that
+    the clinic's data left in a file; the passphrase is never stored.
+    """
+
+    __tablename__ = "migration_import_export_jobs"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    clinic_id: Mapped[UUID] = mapped_column(
+        ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    error: Mapped[str | None] = mapped_column(Text)
+    file_path: Mapped[str | None] = mapped_column(String(500))
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    #: Rows written per entity type.
+    entity_counts: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
