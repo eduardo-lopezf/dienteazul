@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     CheckConstraint,
@@ -19,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -65,7 +65,7 @@ class ProfessionalCommission(Base, TimestampMixin):
         CheckConstraint("percent >= 0 AND percent <= 100", name="ck_commission_percent_range"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     # FK allowed: `professionals` is in `manifest.depends`.
     professional_id: Mapped[UUID] = mapped_column(
@@ -106,7 +106,7 @@ class Liquidation(Base, TimestampMixin):
         Index("idx_liquidation_professional", "clinic_id", "professional_id"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     professional_id: Mapped[UUID] = mapped_column(
         ForeignKey("professionals.id", ondelete="RESTRICT"), index=True

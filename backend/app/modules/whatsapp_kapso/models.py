@@ -7,12 +7,12 @@ own Alembic branch so uninstall drops them cleanly.
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -25,7 +25,7 @@ class WhatsappKapsoSettings(Base, TimestampMixin):
 
     __tablename__ = "whatsapp_kapso_settings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), unique=True, index=True)
 
     api_key_encrypted: Mapped[str] = mapped_column(Text)
@@ -57,7 +57,7 @@ class WhatsappKapsoTemplate(Base, TimestampMixin):
 
     __tablename__ = "whatsapp_kapso_templates"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     name: Mapped[str] = mapped_column(String(200))

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -28,6 +27,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -143,7 +143,7 @@ class Allergy(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_allergy"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -164,7 +164,7 @@ class Medication(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_medication"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -184,7 +184,7 @@ class SystemicDisease(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_systemic_disease"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -206,7 +206,7 @@ class SurgicalHistory(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_surgical_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -232,7 +232,7 @@ class FamilyHistory(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_family_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -261,7 +261,7 @@ class HealthQuestionnaire(Base, TimestampMixin, ClinicalEntryMixin):
 
     __tablename__ = "patients_clinical_health_questionnaire"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -318,7 +318,7 @@ class AsaAssessment(Base, TimestampMixin, ClinicalEntryMixin):
     __tablename__ = "patients_clinical_asa_assessment"
     __table_args__ = (CheckConstraint("asa_class BETWEEN 1 AND 4", name="ck_asa_assessment_class"),)
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     patient_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("patients.id", ondelete="CASCADE"),

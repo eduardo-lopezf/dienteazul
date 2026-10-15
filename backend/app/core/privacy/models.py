@@ -13,13 +13,14 @@ not what the data said. So it survives the erasure it documents.
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import uuid7
 from app.database import Base
 
 ACTIONS = ("export", "erasure")
@@ -30,7 +31,7 @@ class SubjectRequest(Base):
 
     __tablename__ = "core_subject_request"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     # No FK: the patient row is archived rather than deleted, but an id
     # kept here must outlive whatever happens to the row it points at.

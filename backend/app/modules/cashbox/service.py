@@ -104,7 +104,7 @@ class MovementService:
             **data,
         )
         db.add(movement)
-        # `id` is a Python-side `default=uuid4`, filled on flush and not
+        # `id` is a Python-side `default=uuid7`, filled on flush and not
         # before; returning the row unflushed hands the response model an
         # id of None and Pydantic refuses it with a 500.
         await db.flush()

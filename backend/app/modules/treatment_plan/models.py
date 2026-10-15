@@ -8,7 +8,6 @@ remain in the database, but ownership of the schema/migrations moved.
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -25,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -44,7 +44,7 @@ class TreatmentPlan(Base, TimestampMixin):
 
     __tablename__ = "treatment_plans"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -128,7 +128,7 @@ class PlannedTreatmentItem(Base, TimestampMixin):
 
     __tablename__ = "planned_treatment_items"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     treatment_plan_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatment_plans.id", ondelete="CASCADE"), index=True
@@ -201,7 +201,7 @@ class PlannedTreatmentItemSession(Base, TimestampMixin):
 
     __tablename__ = "planned_treatment_item_sessions"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     plan_item_id: Mapped[UUID] = mapped_column(
         ForeignKey("planned_treatment_items.id", ondelete="CASCADE"), index=True
     )
@@ -247,7 +247,7 @@ class PlanTemplate(Base, TimestampMixin):
 
     __tablename__ = "plan_templates"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Stable identifier for the shipped starter set; NULL for clinic-authored
@@ -287,7 +287,7 @@ class PlanTemplateItem(Base, TimestampMixin):
 
     __tablename__ = "plan_template_items"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     template_id: Mapped[UUID] = mapped_column(
         ForeignKey("plan_templates.id", ondelete="CASCADE"), index=True
@@ -336,7 +336,7 @@ class TreatmentPlanHistory(Base):
 
     __tablename__ = "treatment_plan_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     treatment_plan_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatment_plans.id", ondelete="CASCADE"), nullable=False, index=True
@@ -380,7 +380,7 @@ class PlanDismissedFinding(Base, TimestampMixin):
 
     __tablename__ = "plan_dismissed_findings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     treatment_plan_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatment_plans.id", ondelete="CASCADE"), nullable=False, index=True
@@ -413,7 +413,7 @@ class TreatmentPrescription(Base, TimestampMixin):
 
     __tablename__ = "treatment_prescriptions"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
     plan_item_id: Mapped[UUID | None] = mapped_column(

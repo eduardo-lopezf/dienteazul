@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -32,6 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class PeriodontogramSnapshot(Base, TimestampMixin):
 
     __tablename__ = "periodontogram_snapshots"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
     )
@@ -105,7 +105,7 @@ class PeriodontogramTooth(Base, TimestampMixin):
 
     __tablename__ = "periodontogram_teeth"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     snapshot_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("periodontogram_snapshots.id", ondelete="CASCADE"),
@@ -169,7 +169,7 @@ class PeriodontogramSite(Base, TimestampMixin):
 
     __tablename__ = "periodontogram_sites"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     snapshot_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("periodontogram_snapshots.id", ondelete="CASCADE"),

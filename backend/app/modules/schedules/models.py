@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import date, time
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -27,6 +26,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ class ClinicWeeklySchedule(Base, TimestampMixin):
 
     __tablename__ = "clinic_weekly_schedules"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -59,7 +59,7 @@ class ClinicOverride(Base, TimestampMixin):
 
     __tablename__ = "clinic_overrides"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -92,7 +92,7 @@ class ProfessionalWeeklySchedule(Base, TimestampMixin):
 
     __tablename__ = "professional_weekly_schedules"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -129,7 +129,7 @@ class ProfessionalOverride(Base, TimestampMixin):
 
     __tablename__ = "professional_overrides"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -183,7 +183,7 @@ class ScheduleShift(Base):
 
     __tablename__ = "schedule_shifts"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_weekly_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("clinic_weekly_schedules.id", ondelete="CASCADE")
     )

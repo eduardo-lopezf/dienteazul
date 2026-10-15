@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import (
     CheckConstraint,
@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ class Document(Base, TimestampMixin):
 
     __tablename__ = "documents"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -127,7 +128,7 @@ class MediaAttachment(Base, TimestampMixin):
 
     __tablename__ = "media_attachments"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     document_id: Mapped[UUID] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), index=True

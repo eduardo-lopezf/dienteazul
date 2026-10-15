@@ -12,7 +12,6 @@ Three tables:
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import uuid4
 
 from sqlalchemy import (
     BigInteger,
@@ -28,6 +27,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import uuid7
 from app.database import Base
 
 
@@ -90,7 +90,7 @@ class ExternalId(Base):
 
     __tablename__ = "core_external_id"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     module_name: Mapped[str] = mapped_column(String(100), nullable=False)
     xml_id: Mapped[str] = mapped_column(String(255), nullable=False)
     table_name: Mapped[str] = mapped_column(String(100), nullable=False)

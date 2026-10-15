@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -22,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import DataClass, PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -42,7 +42,7 @@ class InvoiceSeries(Base, TimestampMixin):
 
     __tablename__ = "invoice_series"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Series configuration
@@ -79,7 +79,7 @@ class Invoice(Base, TimestampMixin):
 
     __tablename__ = "invoices"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -228,7 +228,7 @@ class InvoiceItem(Base, TimestampMixin):
 
     __tablename__ = "invoice_items"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     invoice_id: Mapped[UUID] = mapped_column(
         ForeignKey("invoices.id", ondelete="CASCADE"), index=True
@@ -308,7 +308,7 @@ class InvoicePayment(Base, TimestampMixin):
 
     __tablename__ = "invoice_payments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     invoice_id: Mapped[UUID] = mapped_column(
         ForeignKey("invoices.id", ondelete="CASCADE"), index=True
@@ -338,7 +338,7 @@ class InvoiceHistory(Base):
 
     __tablename__ = "invoice_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     invoice_id: Mapped[UUID] = mapped_column(
         ForeignKey("invoices.id", ondelete="CASCADE"), index=True
@@ -380,7 +380,7 @@ class InvoiceSeriesHistory(Base):
 
     __tablename__ = "invoice_series_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     series_id: Mapped[UUID] = mapped_column(
         ForeignKey("invoice_series.id", ondelete="CASCADE"), index=True

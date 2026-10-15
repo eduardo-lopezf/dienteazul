@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
@@ -30,6 +30,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -59,7 +60,7 @@ class ImportJob(Base, TimestampMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -139,7 +140,7 @@ class EntityMapping(Base, TimestampMixin):
 
     __tablename__ = "migration_import_entity_mappings"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -183,7 +184,7 @@ class FileStaging(Base, TimestampMixin):
 
     __tablename__ = "migration_import_file_stagings"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -222,7 +223,7 @@ class ImportWarning(Base, TimestampMixin):
 
     __tablename__ = "migration_import_warnings"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     job_id: Mapped[UUID] = mapped_column(
         ForeignKey("migration_import_jobs.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -260,7 +261,7 @@ class MappingDecision(Base, TimestampMixin):
 
     __tablename__ = "migration_import_mapping_decisions"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     job_id: Mapped[UUID] = mapped_column(
         ForeignKey("migration_import_jobs.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -327,7 +328,7 @@ class RawEntity(Base, TimestampMixin):
 
     __tablename__ = "migration_import_raw_entities"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -361,7 +362,7 @@ class ExportJob(Base, TimestampMixin):
 
     __tablename__ = "migration_import_export_jobs"
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True, nullable=False
     )

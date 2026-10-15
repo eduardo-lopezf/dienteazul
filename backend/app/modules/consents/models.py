@@ -22,13 +22,14 @@ template can change afterwards without rewriting what anybody signed.
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -51,7 +52,7 @@ class ConsentTemplate(Base, TimestampMixin):
 
     __tablename__ = "consents_template"
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
 
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -69,7 +70,7 @@ class Consent(Base, TimestampMixin):
     __tablename__ = "consents_consent"
     __table_args__ = (Index("ix_consents_consent_patient", "clinic_id", "patient_id"),)
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), nullable=False)
 

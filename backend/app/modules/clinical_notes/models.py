@@ -29,7 +29,6 @@ its owner_types (``patient``, ``treatment``, ``plan``,
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     CheckConstraint,
@@ -44,6 +43,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 # Note types — discriminator surfaced to the UI for filtering + color-coding.
@@ -90,7 +90,7 @@ class ClinicalNote(Base, TimestampMixin):
 
     __tablename__ = "clinical_notes"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     note_type: Mapped[str] = mapped_column(String(40))
@@ -201,7 +201,7 @@ class ClinicalNoteVersion(Base, TimestampMixin):
 
     __tablename__ = "clinical_note_versions"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     note_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),

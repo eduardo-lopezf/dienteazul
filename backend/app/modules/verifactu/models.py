@@ -16,7 +16,6 @@ Tables:
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -34,6 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import DataClass, PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -61,7 +61,7 @@ class VerifactuSettings(Base, TimestampMixin):
 
     __tablename__ = "verifactu_settings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), unique=True, index=True
     )
@@ -122,7 +122,7 @@ class VerifactuVatClassification(Base, TimestampMixin):
 
     __tablename__ = "verifactu_vat_classifications"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), index=True
     )
@@ -155,7 +155,7 @@ class VerifactuCertificate(Base, TimestampMixin):
 
     __tablename__ = "verifactu_certificates"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), index=True
     )
@@ -199,7 +199,7 @@ class VerifactuRecord(Base):
 
     __tablename__ = "verifactu_records"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="RESTRICT"), index=True
     )
@@ -270,7 +270,7 @@ class VerifactuRecordAttempt(Base):
 
     __tablename__ = "verifactu_record_attempts"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     record_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("verifactu_records.id", ondelete="CASCADE"),

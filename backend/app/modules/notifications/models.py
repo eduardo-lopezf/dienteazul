@@ -13,7 +13,6 @@ Generalized from email-only to a channel-agnostic gateway:
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -29,6 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import DataClass, PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -48,7 +48,7 @@ class NotificationTemplate(Base, TimestampMixin):
 
     __tablename__ = "notification_templates"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("clinics.id"), index=True, default=None
     )  # NULL = system template
@@ -101,7 +101,7 @@ class NotificationPreference(Base, TimestampMixin):
 
     __tablename__ = "notification_preferences"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Subject - either patient or user
@@ -159,7 +159,7 @@ class ClinicNotificationSettings(Base, TimestampMixin):
 
     __tablename__ = "clinic_notification_settings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), unique=True, index=True)
 
     settings: Mapped[dict] = mapped_column(
@@ -197,7 +197,7 @@ class ClinicChannelSettings(Base, TimestampMixin):
 
     __tablename__ = "clinic_channel_settings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     channel: Mapped[str] = mapped_column(String(20))  # email, whatsapp, ...
@@ -219,7 +219,7 @@ class ClinicSmtpSettings(Base, TimestampMixin):
 
     __tablename__ = "clinic_smtp_settings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), unique=True, index=True)
 
     provider: Mapped[str] = mapped_column(String(20), default="smtp")  # smtp, console, disabled
@@ -259,7 +259,7 @@ class CommunicationMessage(Base, TimestampMixin):
 
     __tablename__ = "communication_messages"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Routing

@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from datetime import date
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import Boolean, Date, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import DataClass, PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -29,7 +29,7 @@ class Patient(Base, TimestampMixin):
 
     __tablename__ = "patients"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     first_name: Mapped[str] = mapped_column(String(100), info=pii(PiiKind.NAME))
     last_name: Mapped[str] = mapped_column(String(100), info=pii(PiiKind.NAME))

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -20,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 # Canonical status set. Mirrored in the frontend composable
@@ -47,7 +47,7 @@ class Cabinet(Base, TimestampMixin):
 
     __tablename__ = "cabinets"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinics.id", ondelete="CASCADE"), index=True
     )
@@ -73,7 +73,7 @@ class Appointment(Base, TimestampMixin):
 
     __tablename__ = "appointments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID | None] = mapped_column(ForeignKey("patients.id"))
     # Nullable: a clinic without the Professionals App still books
@@ -158,7 +158,7 @@ class AppointmentTreatment(Base):
 
     __tablename__ = "appointment_treatments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     appointment_id: Mapped[UUID] = mapped_column(
         ForeignKey("appointments.id", ondelete="CASCADE"), index=True
     )
@@ -187,7 +187,7 @@ class AppointmentStatusEvent(Base):
 
     __tablename__ = "appointment_status_events"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     appointment_id: Mapped[UUID] = mapped_column(
         ForeignKey("appointments.id", ondelete="CASCADE"), index=True
@@ -221,7 +221,7 @@ class AppointmentCabinetEvent(Base):
 
     __tablename__ = "appointment_cabinet_events"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     appointment_id: Mapped[UUID] = mapped_column(
         ForeignKey("appointments.id", ondelete="CASCADE"), index=True

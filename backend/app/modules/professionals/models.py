@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Table, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -48,7 +48,7 @@ class Professional(Base, TimestampMixin):
 
     __tablename__ = "professionals"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False, info=pii(PiiKind.NAME))
     last_name: Mapped[str] = mapped_column(String(100), nullable=False, info=pii(PiiKind.NAME))

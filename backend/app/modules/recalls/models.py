@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -33,6 +32,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -80,7 +80,7 @@ class Recall(Base, TimestampMixin):
 
     __tablename__ = "recalls"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("clinics.id"), nullable=False, index=True
     )
@@ -145,7 +145,7 @@ class RecallContactAttempt(Base):
 
     __tablename__ = "recall_contact_attempts"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     recall_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("recalls.id", ondelete="CASCADE"),

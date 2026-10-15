@@ -3,7 +3,6 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -23,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 # Supported pricing strategies. See app.modules.catalog.pricing for the computation.
@@ -66,7 +66,7 @@ class VatType(Base, TimestampMixin):
 
     __tablename__ = "vat_types"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Localized names (JSONB for multi-language support)
@@ -131,7 +131,7 @@ class Specialty(Base, TimestampMixin):
 
     __tablename__ = "specialties"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Stable identifier for seeded specialties, mirroring TreatmentCategory.key.
@@ -174,7 +174,7 @@ class TreatmentCategory(Base, TimestampMixin):
 
     __tablename__ = "treatment_categories"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # Hierarchy
@@ -228,7 +228,7 @@ class TreatmentCatalogItem(Base, TimestampMixin):
 
     __tablename__ = "treatment_catalog_items"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     category_id: Mapped[UUID] = mapped_column(ForeignKey("treatment_categories.id"), index=True)
 
@@ -341,7 +341,7 @@ class CatalogItemSession(Base, TimestampMixin):
 
     __tablename__ = "catalog_item_sessions"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     catalog_item_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatment_catalog_items.id", ondelete="CASCADE"), index=True
     )
@@ -369,7 +369,7 @@ class TreatmentOdontogramMapping(Base, TimestampMixin):
 
     __tablename__ = "treatment_odontogram_mappings"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     catalog_item_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatment_catalog_items.id", ondelete="CASCADE"), unique=True

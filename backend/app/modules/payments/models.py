@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     CheckConstraint,
@@ -20,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -58,7 +58,7 @@ class Payment(Base, TimestampMixin):
 
     __tablename__ = "payments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -109,7 +109,7 @@ class PaymentAllocation(Base, TimestampMixin):
 
     __tablename__ = "payment_allocations"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     payment_id: Mapped[UUID] = mapped_column(
         ForeignKey("payments.id", ondelete="CASCADE"), index=True
@@ -163,7 +163,7 @@ class Refund(Base, TimestampMixin):
 
     __tablename__ = "refunds"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     payment_id: Mapped[UUID] = mapped_column(
         ForeignKey("payments.id", ondelete="RESTRICT"), index=True
@@ -205,7 +205,7 @@ class PatientEarnedEntry(Base, TimestampMixin):
 
     __tablename__ = "patient_earned_entries"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -246,7 +246,7 @@ class PaymentHistory(Base):
 
     __tablename__ = "payment_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     payment_id: Mapped[UUID] = mapped_column(
         ForeignKey("payments.id", ondelete="CASCADE"), index=True
@@ -291,7 +291,7 @@ class PaymentSchedule(Base, TimestampMixin):
 
     __tablename__ = "payment_schedules"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
     budget_id: Mapped[UUID | None] = mapped_column(
@@ -331,7 +331,7 @@ class PaymentScheduleInstalment(Base, TimestampMixin):
 
     __tablename__ = "payment_schedule_instalments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     schedule_id: Mapped[UUID] = mapped_column(
         ForeignKey("payment_schedules.id", ondelete="CASCADE"), index=True
@@ -376,7 +376,7 @@ class CollectionContact(Base, TimestampMixin):
 
     __tablename__ = "collection_contacts"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 

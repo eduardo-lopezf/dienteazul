@@ -10,7 +10,6 @@ Core entities:
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -27,6 +26,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class ToothRecord(Base, TimestampMixin):
 
     __tablename__ = "tooth_records"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
     tooth_number: Mapped[int] = mapped_column(Integer)  # FDI notation: 11-48, 51-85
@@ -81,7 +81,7 @@ class Treatment(Base, TimestampMixin):
 
     __tablename__ = "treatments"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
 
@@ -169,7 +169,7 @@ class TreatmentTooth(Base, TimestampMixin):
 
     __tablename__ = "treatment_teeth"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     treatment_id: Mapped[UUID] = mapped_column(
         ForeignKey("treatments.id", ondelete="CASCADE"), index=True
     )
@@ -198,7 +198,7 @@ class OdontogramHistory(Base):
 
     __tablename__ = "odontogram_history"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), index=True)
     tooth_number: Mapped[int] = mapped_column(Integer)

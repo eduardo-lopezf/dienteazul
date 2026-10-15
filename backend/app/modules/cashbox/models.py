@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from sqlalchemy import (
     CheckConstraint,
@@ -20,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.database import Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -87,7 +87,7 @@ class CashMovement(Base, TimestampMixin):
         Index("idx_cash_movement_closing", "closing_id"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     # The clinic's calendar day this belongs to, not an instant: the till is
@@ -185,7 +185,7 @@ class CashClosing(Base, TimestampMixin):
         Index("idx_cash_closing_clinic_date", "clinic_id", "business_date"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     business_date: Mapped[date] = mapped_column(Date)
@@ -261,7 +261,7 @@ class LateEntryAck(Base, TimestampMixin):
         Index("idx_cash_late_ack_clinic_date", "clinic_id", "business_date"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
 
     entry_kind: Mapped[str] = mapped_column(String(10))

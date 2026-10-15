@@ -1716,7 +1716,7 @@ class TreatmentPlanService:
                 status="pending",
             )
         )
-        # `id` is a Python-side `default=uuid4`, so it is filled on flush and
+        # `id` is a Python-side `default=uuid7`, so it is filled on flush and
         # not before. Returning the item unflushed handed the response model a
         # session whose id was still None, and Pydantic refused it with a 500 —
         # the row rolled back and adding a session by hand never once worked.

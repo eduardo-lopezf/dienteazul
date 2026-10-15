@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Final
-from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -18,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
+from app.core.ids import uuid7
 from app.core.privacy import AccountTier, DataClass, PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -40,7 +40,7 @@ class Clinic(Base, TimestampMixin):
 
     __tablename__ = "clinics"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     name: Mapped[str] = mapped_column(String(200), info=pii(PiiKind.NAME))
     # RFC in Mexico, CIF/NIF in Spain — the column is the tax identifier
     # of the clinic whatever the jurisdiction calls it.
@@ -161,7 +161,7 @@ class AuthSession(Base, TimestampMixin):
 
     # The refresh token's ``jti``. Not a surrogate key: the token names
     # the row it depends on.
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     user_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -190,7 +190,7 @@ class User(Base, TimestampMixin):
 
     __tablename__ = "users"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     email: Mapped[str] = mapped_column(
         String(255), unique=True, index=True, info=pii(PiiKind.EMAIL)
     )
@@ -253,7 +253,7 @@ class ClinicLetterhead(Base, TimestampMixin):
         UniqueConstraint("clinic_id", "owner_key", name="uq_clinic_letterhead_owner"),
     )
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     owner_key: Mapped[str] = mapped_column(String(36), nullable=False)
 
@@ -274,7 +274,7 @@ class ClinicMembership(Base, TimestampMixin):
 
     __tablename__ = "clinic_memberships"
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), index=True)
     role: Mapped[str] = mapped_column(

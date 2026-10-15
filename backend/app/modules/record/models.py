@@ -8,13 +8,14 @@ received it, why, on what evidence, what exactly it contained
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import Boolean, ForeignKey, Index, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, deferred, mapped_column
 
+from app.core.ids import uuid7
 from app.core.privacy import PiiKind, pii
 from app.database import Base, TimestampMixin
 
@@ -28,7 +29,7 @@ class Disclosure(Base, TimestampMixin):
     __tablename__ = "record_disclosure"
     __table_args__ = (Index("ix_record_disclosure_patient", "clinic_id", "patient_id"),)
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
     patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), nullable=False)
 
