@@ -22,9 +22,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      SERVICE_FQDN_BACKEND_8000: ${BACKEND_FQDN}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dental_clinic}
       SECRET_KEY: ${SECRET_KEY}
+      BUDGET_PUBLIC_SECRET_KEY: ${BUDGET_PUBLIC_SECRET_KEY}
       ENVIRONMENT: production
       ALLOWED_ORIGINS: ${FRONTEND_URL}
       STORAGE_BACKEND: local
@@ -54,7 +54,6 @@ services:
       context: .
       dockerfile: frontend/Dockerfile.prod
     environment:
-      SERVICE_FQDN_FRONTEND_3000: ${FRONTEND_FQDN}
       NUXT_API_BASE_URL_SERVER: http://backend:8000
       NUXT_PUBLIC_APP_ORIGIN: ${FRONTEND_URL}
     depends_on:
