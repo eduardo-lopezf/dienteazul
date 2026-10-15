@@ -303,10 +303,19 @@ jobs:
   e2e:
     # Browser E2E smoke. Boots db + backend via docker compose, runs
     # Nuxt on the host (simpler than juggling the container's bind
-    # mount + host npm), drives it with Playwright on the host. Slow
-    # (~6 min). Required on main + PRs.
+    # mount + host npm), drives it with Playwright on the host.
+    # Required on main + PRs.
+    #
+    # The ceiling was 20 minutes, from when the suite took ~6. It now
+    # takes ~15 on its own — 151 tests against the Nuxt **dev** server,
+    # which compiles each route on its first visit — and the job spends
+    # several more booting the stack, installing browsers and building
+    # Nitro. The run of 208918d died on that ceiling mid-suite, with no
+    # failure to show for it: "The operation was canceled" is this
+    # number, not a test. Raised with room to grow; it is here to catch a
+    # hang, and a hang still dies well before 40 minutes.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       POSTGRES_PASSWORD: testpass
       SECRET_KEY: ci-secret-key-for-e2e-not-a-real-secret

@@ -69,7 +69,7 @@ async function start() {
     passphrase.value = ''
     repeated.value = ''
     await load()
-  } catch {
+  } catch (err) {
     toast.add({ title: t('migrationImport.export.failed'), description: said(err), color: 'error' })
   } finally {
     starting.value = false
