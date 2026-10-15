@@ -174,8 +174,39 @@ async function tokenResponse(
   })
 }
 
+/**
+ * The control plane's endpoint (`/api/v1/ops`, ADR 0049 rule 4), relayed
+ * as it came. It is authorised by a short-lived token the operator's panel
+ * signs with the secret it shares with the backend, never by a browser
+ * session: its `Authorization` header is kept, no session cookie is
+ * attached, and there is no CSRF check — that guards the cookies, which
+ * this path does not read. It lets a deployment that publishes only the
+ * frontend be administered at that same address.
+ */
+async function relayOps(event: Parameters<typeof getRouterParam>[0], backend: string) {
+  const apiPath = safePath(event)
+  const url = new URL(`${backend.replace(/\/$/, '')}/api/v1/${apiPath}${getRequestURL(event).search}`)
+  const headers = new Headers()
+  for (const [name, value] of Object.entries(getRequestHeaders(event))) {
+    const lower = name.toLowerCase()
+    if (HOP_BY_HOP.has(lower) || lower === 'cookie' || lower === 'x-csrf-token') continue
+    if (value !== undefined) headers.set(name, value)
+  }
+  const method = event.method.toUpperCase()
+  const body = ['GET', 'HEAD'].includes(method) ? undefined : await readRawBody(event, false) as Buffer | undefined
+  const response = await fetch(url, { method, headers, body: body as BodyInit | undefined, redirect: 'manual' })
+  setResponseStatus(event, response.status, response.statusText)
+  copyResponseHeaders(event, response)
+  if (method === 'HEAD' || response.status === 204 || response.status === 304) return null
+  if (response.body) return sendStream(event, response.body)
+  return null
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
+  if ((getRouterParam(event, 'path') ?? '').startsWith('ops/')) {
+    return relayOps(event, String(config.apiBaseUrlServer || ''))
+  }
   const secure = process.env.NODE_ENV === 'production'
   let csrf = getCookie(event, 'csrf_token')
   if (!csrf) {

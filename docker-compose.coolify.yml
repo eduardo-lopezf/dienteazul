@@ -36,6 +36,9 @@ services:
       # leave it unset so seed never runs.
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-0}
       SEED_LANG: ${SEED_LANG:-es}
+      # The secret the control panel shares with this backend to reach
+      # /api/v1/ops (ADR 0049 rule 4). Unset, that endpoint does not exist.
+      CONTROL_PLANE_SECRET: ${CONTROL_PLANE_SECRET:-}
     volumes:
       - storage_data:/app/storage
     depends_on:
