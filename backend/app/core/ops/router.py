@@ -12,6 +12,8 @@ answers to nobody (ADR 0028).
 
 from __future__ import annotations
 
+import asyncio
+import tempfile
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,13 +21,15 @@ from typing import Annotated
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
 
 from app.config import settings
 from app.core.auth.models import Clinic, ClinicMembership, TierLimit, User
@@ -47,8 +51,10 @@ from app.core.privacy.tiers import AccountTier, TierCustodyError, validate_tier_
 from app.core.schemas import ApiResponse
 from app.core.tenancy import TenantContext
 from app.core.tenancy.dependencies import get_tenant
+from app.core.tenancy.usage import BACKUPS_FOLDER
 from app.database import get_db
 
+from . import snapshot
 from .purge import purge_clinic
 from .usage import ClinicState, cached_measure, clinic_log, clinic_states
 
@@ -893,3 +899,127 @@ async def set_clinic_apps(
     clinic.available_apps = _offered_apps(data.available_apps, clinic.apps)
     await db.flush()
     return ApiResponse(data=await _detail(db, clinic))
+
+
+# --- A whole copy of the deployment -----------------------------------------
+
+
+def _copy_allowed(tenant: TenantContext) -> None:
+    # A copy carries every record. Under ``byok`` the operator holds no key
+    # to the clinics' data, so it does not leave through the operator.
+    if tenant.privacy.custody_mode is not CustodyMode.MANAGED:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Whole copies are taken only under managed custody"
+        )
+
+
+async def _revisions(db: AsyncSession) -> list[str]:
+    # A schema made without Alembic (the test suite's) has no revisions.
+    if await db.scalar(text("SELECT to_regclass('alembic_version')")) is None:
+        return []
+    rows = await db.execute(text("SELECT version_num FROM alembic_version ORDER BY 1"))
+    return list(rows.scalars())
+
+
+def _manifest(revisions: list[str]) -> dict:
+    return {
+        "format": snapshot.FORMAT,
+        "environment": settings.ENVIRONMENT,
+        "taken_at": datetime.now(UTC).isoformat(),
+        "revisions": revisions,
+    }
+
+
+def _dsn(db: AsyncSession) -> str:
+    # The database this very session is bound to — never the one the
+    # settings name, which a test run does not use.
+    return snapshot.libpq_dsn(db.get_bind().url.render_as_string(hide_password=False))
+
+
+@router.get("/snapshot")
+async def export_snapshot(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tenant: Annotated[TenantContext, Depends(get_tenant)],
+) -> FileResponse:
+    """The whole deployment as one ``tar.gz``: its database and its files.
+    **Every record of every clinic leaves in it** (ADR 0049 rule 4,
+    amended) — it is how the control plane copies one environment into
+    another."""
+    _copy_allowed(tenant)
+    manifest = _manifest(await _revisions(db))
+    root = Path(settings.STORAGE_LOCAL_PATH) / tenant.storage_prefix
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as handle:
+        path = Path(handle.name)
+    await asyncio.to_thread(snapshot.build, _dsn(db), root, path, manifest)
+    return FileResponse(
+        path,
+        media_type="application/gzip",
+        filename=f"dienteazul-{settings.ENVIRONMENT}.tar.gz",
+        background=BackgroundTask(path.unlink, missing_ok=True),
+    )
+
+
+class SnapshotRestoredResponse(BaseModel):
+    #: The copy of what this deployment held before, in its backups folder.
+    backup: str
+    clinics: int
+    files: int
+    #: Where the copy came from and when it was taken.
+    source: str
+    taken_at: str
+
+
+@router.put("/snapshot", response_model=ApiResponse[SnapshotRestoredResponse])
+async def import_snapshot(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    tenant: Annotated[TenantContext, Depends(get_tenant)],
+    confirm: str = Query(default=""),
+) -> ApiResponse[SnapshotRestoredResponse]:
+    """**Replace this whole deployment** with a copy another one exported:
+    every clinic, account, record and file it holds is gone afterwards.
+
+    ``confirm=replace`` is required. A copy of what it held is kept first
+    in its backups folder; the database is then replaced in one
+    transaction, and only then the files. A copy taken at other schema
+    revisions is refused (``409``): both sides must run the same version.
+    """
+    _copy_allowed(tenant)
+    if confirm != "replace":
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Replacing the deployment needs confirm=replace"
+        )
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as handle:
+        upload = Path(handle.name)
+        async for chunk in request.stream():
+            handle.write(chunk)
+    try:
+        try:
+            manifest = await asyncio.to_thread(snapshot.read_manifest, upload)
+            revisions = await _revisions(db)
+            snapshot.check_versions(manifest, revisions)
+        except snapshot.SnapshotRefusedError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        # Nothing of this request may hold the schema the restore empties.
+        await db.commit()
+
+        dsn = _dsn(db)
+        root = Path(settings.STORAGE_LOCAL_PATH) / tenant.storage_prefix
+        backups = root / BACKUPS_FOLDER
+        backups.mkdir(parents=True, exist_ok=True)
+        backup = backups / f"before-copy-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.tar.gz"
+        await asyncio.to_thread(snapshot.build, dsn, root, backup, _manifest(revisions))
+        files = await asyncio.to_thread(snapshot.restore, dsn, root, upload)
+    finally:
+        upload.unlink(missing_ok=True)
+
+    clinics = await db.scalar(select(func.count()).select_from(Clinic))
+    return ApiResponse(
+        data=SnapshotRestoredResponse(
+            backup=backup.name,
+            clinics=clinics,
+            files=files,
+            source=str(manifest.get("environment", "")),
+            taken_at=str(manifest.get("taken_at", "")),
+        )
+    )

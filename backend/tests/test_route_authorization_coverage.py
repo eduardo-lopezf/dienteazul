@@ -65,6 +65,12 @@ UNAUTHENTICATED: dict[str, str] = {
     "PUT /api/v1/ops/clinics/{clinic_id}/tier": (
         "control plane only, by signed token; moves a clinic to another account tier"
     ),
+    "GET /api/v1/ops/snapshot": (
+        "control plane only, by signed token; the whole deployment, managed custody only"
+    ),
+    "PUT /api/v1/ops/snapshot": (
+        "control plane only, by signed token; replaces the whole deployment, confirm required"
+    ),
     "GET /api/v1/ops/limits": "control plane only, by signed token; what each tier is allowed",
     "PUT /api/v1/ops/limits": "control plane only, by signed token; sets what each tier is allowed",
     "GET /api/v1/ops/apps": "control plane only, by signed token; the App catalog",

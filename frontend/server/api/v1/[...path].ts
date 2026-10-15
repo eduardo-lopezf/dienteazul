@@ -193,8 +193,15 @@ async function relayOps(event: Parameters<typeof getRouterParam>[0], backend: st
     if (value !== undefined) headers.set(name, value)
   }
   const method = event.method.toUpperCase()
-  const body = ['GET', 'HEAD'].includes(method) ? undefined : await readRawBody(event, false) as Buffer | undefined
-  const response = await fetch(url, { method, headers, body: body as BodyInit | undefined, redirect: 'manual' })
+  // Streamed, not read whole: a copy of a deployment travels this way.
+  const body = ['GET', 'HEAD'].includes(method) ? undefined : Readable.toWeb(event.node.req) as ReadableStream<Uint8Array>
+  const response = await fetch(url, {
+    method,
+    headers,
+    body,
+    redirect: 'manual',
+    ...(body ? { duplex: 'half' } : {})
+  } as RequestInit & { duplex?: 'half' })
   setResponseStatus(event, response.status, response.statusText)
   copyResponseHeaders(event, response)
   if (method === 'HEAD' || response.status === 204 || response.status === 304) return null
