@@ -25,6 +25,9 @@ class Kind:
     example: dict[str, str] | None = None
     notes: tuple[str, ...] = ()
     title: str = ""
+    #: What a column whose name says nothing can be, by what its values
+    #: are (``common.value_kind``), in preference order.
+    by_kind: dict[str, tuple[str, ...]] | None = None
 
 
 _WHO = frozenset(PATIENT_KEYS) - {"date_of_birth"}
@@ -33,6 +36,12 @@ KINDS: dict[str, Kind] = {
     "patients": Kind(
         fields=patients.FIELDS,
         required=(frozenset({"given_name", "full_name"}),),
+        by_kind={
+            "email": ("email",),
+            "id_document": ("national_id",),
+            "date": ("date_of_birth",),
+            "phone": ("mobile_phone", "phone"),
+        },
     ),
     "appointments": Kind(
         fields=appointments.FIELDS,
@@ -41,6 +50,13 @@ KINDS: dict[str, Kind] = {
         example=appointments.EXAMPLE,
         notes=appointments.NOTES,
         title="Citas",
+        by_kind={
+            "date": ("appointment_date",),
+            "time": ("appointment_time", "end_time"),
+            "email": ("email",),
+            "id_document": ("national_id",),
+            "phone": ("phone",),
+        },
     ),
     "balances": Kind(
         fields=balances.FIELDS,
@@ -49,6 +65,13 @@ KINDS: dict[str, Kind] = {
         example=balances.EXAMPLE,
         notes=balances.NOTES,
         title="Saldos",
+        by_kind={
+            "amount": ("balance",),
+            "date": ("balance_date",),
+            "email": ("email",),
+            "id_document": ("national_id",),
+            "phone": ("phone",),
+        },
     ),
 }
 

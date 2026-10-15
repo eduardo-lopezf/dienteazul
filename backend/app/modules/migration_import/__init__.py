@@ -25,12 +25,14 @@ Key invariants:
 from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
+from app.core.scheduling import ScheduledJob
 
 from .lifecycle import install, uninstall
 from .models import (
     EntityMapping,
     ExportJob,
     FileStaging,
+    ImportCreatedRow,
     ImportJob,
     ImportWarning,
     RawEntity,
@@ -91,7 +93,15 @@ class MigrationImportModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [ImportJob, EntityMapping, FileStaging, ImportWarning, RawEntity, ExportJob]
+        return [
+            ImportJob,
+            EntityMapping,
+            FileStaging,
+            ImportWarning,
+            RawEntity,
+            ExportJob,
+            ImportCreatedRow,
+        ]
 
     def get_router(self) -> APIRouter:
         return router
@@ -100,6 +110,19 @@ class MigrationImportModule(BaseModule):
         from . import privacy
 
         return privacy.get_subject_contributors()
+
+    def get_scheduled_jobs(self) -> list[ScheduledJob]:
+        from .tasks import expire_exports
+
+        return [
+            ScheduledJob(
+                id="migration_import_expire_exports",
+                func=expire_exports,
+                trigger="interval",
+                trigger_args={"hours": 1},
+                name="Remove export files past their retention (hourly)",
+            ),
+        ]
 
     def get_permissions(self) -> list[str]:
         return [

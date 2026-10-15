@@ -7,33 +7,14 @@ import { computed, onUnmounted, ref } from 'vue'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorMessage } from '~~/app/utils/error'
 
+import type { ImportJob } from '../../types'
+import ImportHistory from './ImportHistory.vue'
 import SheetMappingStep from './SheetMappingStep.vue'
 
 const { t, te } = useI18n()
+const toast = useToast()
 const api = useApi()
 const { can } = usePermissions()
-
-type JobStatus
-  = | 'uploaded'
-    | 'validating'
-    | 'validated'
-    | 'previewing'
-    | 'executing'
-    | 'completed'
-    | 'failed'
-
-interface ImportJob {
-  id: string
-  status: JobStatus
-  error: string | null
-  original_filename: string
-  file_size: number
-  source_system: string | null
-  format_version: string | null
-  tenant_label: string | null
-  total_entities: number
-  processed_entities: number
-}
 
 interface ProfessionalPreviewBreakdown {
   deactivated_count: number
@@ -61,6 +42,9 @@ interface PreviewResponse {
   files: { total: number, with_sha256: number, without_sha256: number }
   verifactu_data_detected: boolean
   verifactu_module_installed: boolean
+  /** What the file's documents will take, and what is left (null: no limit). */
+  storage_needed_bytes?: number
+  storage_free_bytes?: number | null
 }
 
 /** A module's name as the people running the migration know it. */
@@ -105,6 +89,23 @@ const sourceItems = computed(() => [
 ])
 
 /** A spreadsheet turned into a `.dpm`: it goes on as any other file. */
+async function downloadProblems() {
+  if (!job.value) return
+  try {
+    const blob = await api.$api<Blob>(`/api/v1/migration_import/sheets/${job.value.id}/problems`, { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = t('migrationImport.sheet.problemsName')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    toast.add({ title: t('migrationImport.sheet.problemsNone'), color: 'neutral' })
+  }
+}
+
 async function onSheetReady(converted: ImportJob) {
   job.value = converted
   passphrase.value = ''
@@ -114,6 +115,14 @@ const preview = ref<PreviewResponse | null>(null)
 const hasCatalog = computed(() =>
   (preview.value?.entities ?? []).some(ent => ent.entity_type === 'treatment_catalog_item')
 )
+/** The documents do not fit in what is left of the clinic's storage. */
+const noRoom = computed(() => {
+  const free = preview.value?.storage_free_bytes
+  return free !== null && free !== undefined && (preview.value?.storage_needed_bytes ?? 0) > free
+})
+function megabytes(size: number): string {
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
 const skippedEntities = computed(() =>
   (preview.value?.entities ?? []).filter(ent => ent.missing_modules?.length)
 )
@@ -459,6 +468,19 @@ onUnmounted(() => {
               </template>{{ w.code }} — {{ w.message }}
             </li>
           </ul>
+          <!-- A spreadsheet's rows that did not go in whole, as a sheet to
+               fix and upload again. -->
+          <UButton
+            v-if="job?.source_system === 'spreadsheet'"
+            class="mt-2"
+            size="sm"
+            variant="soft"
+            icon="i-lucide-file-spreadsheet"
+            data-testid="sheet-problems-download"
+            @click="downloadProblems"
+          >
+            {{ t('migrationImport.sheet.problemsDownload') }}
+          </UButton>
         </div>
 
         <!-- Catalog mapping proposals: only when the file brings a catalogue. -->
@@ -692,9 +714,22 @@ onUnmounted(() => {
           :description="t('migrationImport.preview.warning')"
         />
 
+        <!-- The documents land in the clinic's storage: said before, and
+             refused by the server too when they do not fit. -->
+        <UAlert
+          v-if="preview && (preview.storage_needed_bytes ?? 0) > 0"
+          :color="noRoom ? 'error' : 'neutral'"
+          variant="subtle"
+          icon="i-lucide-hard-drive"
+          :title="noRoom ? t('migrationImport.space.noRoom') : t('migrationImport.space.needed')"
+          :description="preview.storage_free_bytes === null || preview.storage_free_bytes === undefined
+            ? t('migrationImport.space.unlimited', { needed: megabytes(preview.storage_needed_bytes ?? 0) })
+            : t('migrationImport.space.detail', { needed: megabytes(preview.storage_needed_bytes ?? 0), free: megabytes(preview.storage_free_bytes) })"
+          data-testid="migration-space"
+        />
         <UButton
           color="primary"
-          :disabled="!canExecute || job.status === 'executing'"
+          :disabled="!canExecute || job.status === 'executing' || noRoom"
           @click="execute"
         >
           {{ t('migrationImport.preview.confirm') }}
@@ -711,5 +746,7 @@ onUnmounted(() => {
         </p>
       </div>
     </UCard>
+
+    <ImportHistory />
   </div>
 </template>

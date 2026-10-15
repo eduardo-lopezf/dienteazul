@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import tempfile
 from collections.abc import Iterable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -1173,8 +1173,41 @@ async def write_clinic_export(
     return counts
 
 
+#: How long an export's file stays on the server. It holds every patient's
+#: data: it is there to be downloaded, not kept. Past this the file is
+#: removed (``expire_exports``, hourly) and the record stays, ``expired``.
+RETENTION = timedelta(days=int(getattr(settings, "MIGRATION_EXPORT_RETENTION_DAYS", 7)))
+
+
+def expires_at(job: ExportJob) -> datetime | None:
+    """When a ready export's file goes; ``None`` when it has no file."""
+    if job.status != "completed" or job.completed_at is None:
+        return None
+    return job.completed_at + RETENTION
+
+
 class ExportJobService:
     """The export jobs of a clinic: started, run in the background, fetched."""
+
+    @staticmethod
+    async def expire_old(db: AsyncSession, now: datetime | None = None) -> int:
+        """Remove every file past its retention, across clinics. Returns how many."""
+        cutoff = (now or datetime.now(UTC)) - RETENTION
+        result = await db.execute(
+            select(ExportJob).where(
+                ExportJob.status == "completed", ExportJob.completed_at < cutoff
+            )
+        )
+        expired = 0
+        for job in result.scalars():
+            if job.file_path:
+                Path(job.file_path).unlink(missing_ok=True)
+            job.file_path = None
+            job.file_size = 0
+            job.status = "expired"
+            expired += 1
+        await db.flush()
+        return expired
 
     @staticmethod
     def file_for(job_id: UUID, clinic_id: UUID) -> Path:
@@ -1183,6 +1216,28 @@ class ExportJobService:
         folder = _staging_root() / "exports" / str(clinic_id)
         folder.mkdir(parents=True, exist_ok=True)
         return folder / f"{job_id}.dpm"
+
+    @staticmethod
+    async def expected_bytes(db: AsyncSession, clinic_id: UUID, include_documents: bool) -> int:
+        """What a new export will take on the server, plus what the clinic's
+        kept exports already do: the documents dominate; records are small."""
+        from sqlalchemy import func
+
+        kept = await db.scalar(
+            select(func.coalesce(func.sum(ExportJob.file_size), 0)).where(
+                ExportJob.clinic_id == clinic_id, ExportJob.status == "completed"
+            )
+        )
+        documents = 0
+        if include_documents and running("media"):
+            from app.modules.media.models import Document
+
+            documents = await db.scalar(
+                select(func.coalesce(func.sum(Document.file_size), 0)).where(
+                    Document.clinic_id == clinic_id
+                )
+            )
+        return int(kept or 0) + int(documents or 0)
 
     @staticmethod
     async def create(db: AsyncSession, clinic_id: UUID, user_id: UUID) -> ExportJob:

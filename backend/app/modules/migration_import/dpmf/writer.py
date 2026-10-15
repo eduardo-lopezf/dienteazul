@@ -38,6 +38,9 @@ class DpmfWriter:
         self._source_system = source_system
         self._counts: dict[str, int] = {}
         self._blobs = 0
+        #: ``(source_id, message)`` of every warning, for whoever converted
+        #: a sheet and reports its rows back.
+        self.problems: list[tuple[str | None, str]] = []
         self._conn.executescript(
             """
             CREATE TABLE _meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -117,6 +120,7 @@ class DpmfWriter:
             "VALUES (?, ?, 'warn', ?, ?, NULL)",
             (entity_type, source_id, code, message),
         )
+        self.problems.append((source_id, message))
 
     @property
     def counts(self) -> dict[str, int]:

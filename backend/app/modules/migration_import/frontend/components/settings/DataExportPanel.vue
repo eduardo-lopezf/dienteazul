@@ -10,12 +10,14 @@ import { PERMISSIONS } from '~~/app/config/permissions'
 
 interface ExportJob {
   id: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'deleted'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'deleted' | 'expired'
   error: string | null
   file_size: number
   entity_counts: Record<string, number>
   created_at: string
   completed_at: string | null
+  /** When its file is removed from the server. */
+  expires_at?: string | null
 }
 
 const MIN_PASSPHRASE = 12
@@ -68,10 +70,16 @@ async function start() {
     repeated.value = ''
     await load()
   } catch {
-    toast.add({ title: t('migrationImport.export.failed'), color: 'error' })
+    toast.add({ title: t('migrationImport.export.failed'), description: said(err), color: 'error' })
   } finally {
     starting.value = false
   }
+}
+
+/** What the server said — e.g. that the export does not fit in the space left. */
+function said(err: unknown): string | undefined {
+  const data = (err as { data?: { message?: unknown } })?.data
+  return typeof data?.message === 'string' ? data.message : undefined
 }
 
 async function download(job: ExportJob) {
@@ -110,7 +118,8 @@ const statusColor = {
   running: 'info',
   completed: 'success',
   failed: 'error',
-  deleted: 'neutral'
+  deleted: 'neutral',
+  expired: 'neutral'
 } as const
 
 onMounted(load)
@@ -135,7 +144,7 @@ onBeforeUnmount(() => {
       variant="subtle"
       icon="i-lucide-shield-alert"
       :title="t('migrationImport.export.sensitiveTitle')"
-      :description="t('migrationImport.export.sensitive')"
+      :description="`${t('migrationImport.export.sensitive')} ${t('migrationImport.export.retention')}`"
     />
 
     <UCard v-if="canExport">
@@ -216,10 +225,17 @@ onBeforeUnmount(() => {
               >{{ size(job.file_size) }}</span>
             </div>
             <p
-              v-if="job.status === 'completed' || job.status === 'deleted'"
+              v-if="job.status === 'completed' || job.status === 'deleted' || job.status === 'expired'"
               class="text-muted"
             >
               {{ contents(job) }}
+            </p>
+            <p
+              v-if="job.expires_at"
+              class="text-caption text-subtle"
+              data-testid="export-expires"
+            >
+              {{ t('migrationImport.export.expires', { when: when(job.expires_at) }) }}
             </p>
             <p
               v-if="job.error"

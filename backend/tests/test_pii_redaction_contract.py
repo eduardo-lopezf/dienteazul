@@ -60,6 +60,8 @@ _NOT_PERSONAL: frozenset[tuple[str, str]] = frozenset(
         ("core_module_operation_log", "module_name"),
         ("core_external_id", "module_name"),
         ("core_external_id", "table_name"),
+        # The import ledger names a table and a row id, never a person.
+        ("migration_import_created_rows", "table_name"),
         ("clinic_channel_settings", "adapter_name"),
         # ``national_id_type`` is the *kind* of document (curp / ine /
         # passport), never the number itself.

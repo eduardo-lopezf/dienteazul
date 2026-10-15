@@ -10,19 +10,15 @@
  * then turns the sheet into a `.dpm` and the import goes on as any other:
  * validate, preview, import. Emits `ready` with that job.
  */
-interface ImportJob {
-  id: string
-  status: string
-  original_filename: string
-  file_size: number
-  [key: string]: unknown
-}
+import type { ImportJob } from '../../types'
 
 interface SheetColumn {
   index: number
   name: string
   samples: string[]
   suggested_field: string | null
+  /** `name` (its header) or `content` (what its values are). */
+  suggested_from?: 'name' | 'content' | null
 }
 
 type SheetKind = 'patients' | 'appointments' | 'balances'
@@ -33,6 +29,10 @@ interface SheetUpload {
   columns: SheetColumn[]
   row_count: number
   fields: string[]
+  /** The order of the dates when the values give it away. */
+  date_order?: 'dmy' | 'mdy' | 'ymd' | null
+  /** The first row looked like data: columns are "Columna N". */
+  headerless?: boolean
   professionals: Array<{ id: string, name: string }>
 }
 
@@ -67,6 +67,12 @@ const kindItems = computed(() => (['patients', 'appointments', 'balances'] as co
   value
 })))
 const defaultProfessional = ref<string | undefined>()
+/** A row that is a patient the clinic already has: left out, or imported anyway. */
+const onDuplicate = ref<'skip' | 'import'>('skip')
+const duplicateItems = computed(() => [
+  { label: t('migrationImport.sheet.duplicates.skip'), value: 'skip' },
+  { label: t('migrationImport.sheet.duplicates.import'), value: 'import' }
+])
 const file = ref<File | null>(null)
 const uploading = ref(false)
 const converting = ref(false)
@@ -138,6 +144,7 @@ async function upload() {
     mapping.value = Object.fromEntries(
       sheet.value.columns.map(column => [column.index, column.suggested_field ?? IGNORE])
     )
+    if (sheet.value.date_order) dateOrder.value = sheet.value.date_order
   } catch (err) {
     error.value = failure(err, t('migrationImport.sheet.uploadFailed'))
   } finally {
@@ -156,7 +163,8 @@ async function convert() {
     const job = (await api.post<{ data: ImportJob }>(`${BASE}/${sheet.value.job.id}/convert`, {
       mapping: chosen,
       date_order: dateOrder.value,
-      default_professional_id: sheet.value.kind === 'appointments' ? defaultProfessional.value ?? null : null
+      default_professional_id: sheet.value.kind === 'appointments' ? defaultProfessional.value ?? null : null,
+      on_duplicate: onDuplicate.value
     })).data
     emit('ready', job)
   } catch (err) {
@@ -210,6 +218,14 @@ async function convert() {
       <p class="text-sm">
         {{ t('migrationImport.sheet.found', { rows: sheet.row_count, columns: sheet.columns.length }) }}
       </p>
+      <UAlert
+        v-if="sheet.headerless"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :title="t('migrationImport.sheet.headerless')"
+        data-testid="sheet-headerless"
+      />
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -245,6 +261,13 @@ async function convert() {
                   value-key="value"
                   class="w-full"
                 />
+                <p
+                  v-if="column.suggested_from === 'content' && mapping[column.index] === column.suggested_field"
+                  class="mt-1 text-caption text-subtle"
+                  data-testid="sheet-by-content"
+                >
+                  {{ t('migrationImport.sheet.byContent') }}
+                </p>
               </td>
             </tr>
           </tbody>
@@ -253,13 +276,26 @@ async function convert() {
 
       <UFormField
         :label="t('migrationImport.sheet.dateOrder')"
-        :help="t('migrationImport.sheet.dateOrderHelp')"
+        :help="sheet.date_order ? t('migrationImport.sheet.dateOrderFound') : t('migrationImport.sheet.dateOrderHelp')"
       >
         <USelect
           v-model="dateOrder"
           :items="dateItems"
           value-key="value"
           class="w-full max-w-xs"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="sheet.kind === 'patients'"
+        :label="t('migrationImport.sheet.duplicates.label')"
+        :help="t('migrationImport.sheet.duplicates.help')"
+      >
+        <URadioGroup
+          v-model="onDuplicate"
+          :items="duplicateItems"
+          value-key="value"
+          data-testid="sheet-on-duplicate"
         />
       </UFormField>
 

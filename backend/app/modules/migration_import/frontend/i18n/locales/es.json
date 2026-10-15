@@ -1,11 +1,40 @@
 {
   "migrationImport": {
+    "history": {
+      "title": "Importaciones anteriores",
+      "records": "{n} registros",
+      "undo": "Deshacer",
+      "undoConfirm": "Deshacer la importación",
+      "confirmTitle": "¿Deshacer esta importación?",
+      "confirmBody": "Se borrará todo lo que creó «{file}»: pacientes, citas, tratamientos, documentos… Lo que ya existía en la clínica y la importación solo enlazó no se toca. Si desde entonces se registró algo nuevo sobre lo importado, no se deshará y te dirá qué encontró. No se puede revertir.",
+      "undoStarted": "Deshaciendo la importación…",
+      "undoRefused": "No se puede deshacer",
+      "undoFailed": "No se pudo deshacer la importación"
+    },
+    "space": {
+      "needed": "Espacio que ocuparán los documentos",
+      "noRoom": "No hay espacio suficiente para los documentos",
+      "detail": "Hacen falta {needed} y quedan {free} en el espacio de la clínica.",
+      "unlimited": "Ocuparán {needed}; la clínica no tiene límite de espacio."
+    },
     "source": {
       "label": "¿De dónde vienen los datos?",
       "dpm": "Archivo .dpm (dental-bridge o exportación de Diente Azul)",
       "sheet": "Excel o CSV (pacientes, citas o saldos)"
     },
     "sheet": {
+      "duplicates": {
+        "label": "Si el paciente ya existe en la clínica",
+        "help": "Se considera el mismo si coincide el documento, o el nombre completo y además la fecha de nacimiento, el correo o el teléfono. Si solo coincide el nombre se importa y se avisa para que lo revises. Un paciente repetido dentro del archivo se importa una vez.",
+        "skip": "No importarlo (recomendado)",
+        "import": "Importarlo igualmente"
+      },
+      "headerless": "La primera fila parecía un paciente y no nombres de columnas, así que se importa también y las columnas se llaman Columna 1, 2…",
+      "byContent": "Sugerido por sus valores",
+      "dateOrderFound": "Deducido de las fechas del archivo; cámbialo si no es así.",
+      "problemsDownload": "Descargar filas con problemas (Excel)",
+      "problemsName": "filas-con-problemas.xlsx",
+      "problemsNone": "Ninguna fila de la hoja tuvo problemas.",
       "kind": "¿Qué contiene la hoja?",
       "kinds": {
         "patients": "Pacientes",
@@ -89,6 +118,8 @@
       "export": "Exportar"
     },
     "export": {
+      "expires": "El archivo se borra del servidor el {when}.",
+      "retention": "Cada archivo se borra del servidor a los 7 días: descárgalo antes.",
       "includeDocuments": "Incluir documentos (radiografías, fotos y escaneos)",
       "includeDocumentsHelp": "Los archivos viajan dentro del .dpm. Si la clínica tiene muchos (más de 500 MB), expórtala sin ellos.",
       "title": "Exportar la clínica",
@@ -107,6 +138,7 @@
       "download": "Descargar",
       "remove": "Eliminar del servidor",
       "status": {
+        "expired": "Caducado",
         "pending": "En cola",
         "running": "Generando",
         "completed": "Listo",
@@ -246,6 +278,8 @@
       "ignoreRow": "Ignorar"
     },
     "status": {
+      "undoing": "Deshaciendo",
+      "undone": "Deshecha",
       "mapping": "Asignando columnas",
       "uploaded": "Subido",
       "validating": "Validando",

@@ -1,11 +1,40 @@
 {
   "migrationImport": {
+    "history": {
+      "title": "Previous imports",
+      "records": "{n} records",
+      "undo": "Undo",
+      "undoConfirm": "Undo the import",
+      "confirmTitle": "Undo this import?",
+      "confirmBody": "Everything “{file}” created will be deleted: patients, appointments, treatments, documents… What already existed in the clinic and the import only linked to is not touched. If anything new was recorded on the imported data since, it will not be undone and you will be told what was found. This cannot be reversed.",
+      "undoStarted": "Undoing the import…",
+      "undoRefused": "It cannot be undone",
+      "undoFailed": "The import could not be undone"
+    },
+    "space": {
+      "needed": "Space the documents will take",
+      "noRoom": "Not enough space for the documents",
+      "detail": "{needed} are needed and {free} are left in the clinic's storage.",
+      "unlimited": "They will take {needed}; the clinic has no storage limit."
+    },
     "source": {
       "label": "Where does the data come from?",
       "dpm": ".dpm file (dental-bridge or a Diente Azul export)",
       "sheet": "Excel or CSV (patients, appointments or balances)"
     },
     "sheet": {
+      "duplicates": {
+        "label": "If the patient already exists in the clinic",
+        "help": "It is taken as the same one when the ID document matches, or the full name together with the date of birth, email or phone. A name alone is imported and flagged for you to review. A patient twice in the file is imported once.",
+        "skip": "Do not import it (recommended)",
+        "import": "Import it anyway"
+      },
+      "headerless": "The first row looked like a patient rather than column names, so it is imported too and the columns are called Column 1, 2…",
+      "byContent": "Suggested from its values",
+      "dateOrderFound": "Worked out from the file's dates; change it if it is wrong.",
+      "problemsDownload": "Download rows with problems (Excel)",
+      "problemsName": "rows-with-problems.xlsx",
+      "problemsNone": "No row of the sheet had a problem.",
       "kind": "What does the sheet hold?",
       "kinds": {
         "patients": "Patients",
@@ -89,6 +118,8 @@
       "export": "Export"
     },
     "export": {
+      "expires": "The file is removed from the server on {when}.",
+      "retention": "Each file is removed from the server after 7 days: download it before.",
       "includeDocuments": "Include documents (radiographs, photos and scans)",
       "includeDocumentsHelp": "The files travel inside the .dpm. If the clinic has many (over 500 MB), export it without them.",
       "title": "Export the clinic",
@@ -107,6 +138,7 @@
       "download": "Download",
       "remove": "Remove from server",
       "status": {
+        "expired": "Expired",
         "pending": "Queued",
         "running": "Building",
         "completed": "Ready",
@@ -246,6 +278,8 @@
       "ignoreRow": "Ignore"
     },
     "status": {
+      "undoing": "Undoing",
+      "undone": "Undone",
       "mapping": "Assigning columns",
       "uploaded": "Uploaded",
       "validating": "Validating",

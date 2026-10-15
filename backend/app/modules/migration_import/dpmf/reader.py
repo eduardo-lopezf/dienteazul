@@ -94,6 +94,25 @@ class DpmfHandle:
             return None
         return bytes(row[0]) if row else None
 
+    def storage_bytes(self) -> int:
+        """What the file's documents will take once imported: the files it
+        embeds (a Diente Azul export) and those its manifest announces (a
+        dental-bridge file, whose files the sync agent uploads)."""
+        total = 0
+        try:
+            total += self._conn.execute(
+                "SELECT COALESCE(SUM(LENGTH(data)), 0) FROM _blobs"
+            ).fetchone()[0]
+        except sqlite3.OperationalError:
+            pass
+        try:
+            total += self._conn.execute(
+                "SELECT COALESCE(SUM(declared_size_bytes), 0) FROM _files"
+            ).fetchone()[0]
+        except sqlite3.OperationalError:
+            pass
+        return int(total)
+
     def entity_counts(self) -> dict[str, int]:
         rows = self._conn.execute(
             "SELECT entity_type, row_count FROM _entities ORDER BY entity_type"

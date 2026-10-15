@@ -66,6 +66,8 @@ class PatientMatcher:
     by_number: dict[str, set[UUID]] = field(default_factory=lambda: defaultdict(set))
     by_name: dict[str, set[UUID]] = field(default_factory=lambda: defaultdict(set))
     born: dict[UUID, date | None] = field(default_factory=dict)
+    #: How each patient is called, for messages.
+    names: dict[UUID, str] = field(default_factory=dict)
 
     @classmethod
     async def load(cls, db: AsyncSession, clinic_id: UUID, region: str | None) -> PatientMatcher:
@@ -76,6 +78,7 @@ class PatientMatcher:
         for patient in rows.scalars():
             pid = patient.id
             matcher.born[pid] = patient.date_of_birth
+            matcher.names[pid] = f"{patient.first_name} {patient.last_name}".strip()
             if patient.national_id:
                 matcher.by_id[_id_doc(patient.national_id)].add(pid)
             if patient.email:
@@ -169,3 +172,54 @@ async def cabinets_by_name(db: AsyncSession, clinic_id: UUID) -> dict[str, UUID]
 
     rows = await db.execute(select(Cabinet).where(Cabinet.clinic_id == clinic_id))
     return {plain(cabinet.name): cabinet.id for cabinet in rows.scalars()}
+
+
+@dataclass
+class Duplicate:
+    patient_id: UUID
+    name: str
+    #: ``sure`` — an ID document, or the full name and something else
+    #: that is the person's; ``maybe`` — the full name alone.
+    certainty: str
+
+
+def duplicate_of(matcher: PatientMatcher, payload: dict, region: str | None) -> Duplicate | None:
+    """The clinic's patient this new one already is, if any.
+
+    ``payload`` is the patient row being written (``given_name``,
+    ``family_name``, ``national_id``, ``email``, ``mobile_phone``/``phone``,
+    ``date_of_birth`` as ISO). A shared phone or email alone is not enough —
+    families share them — so they count only with the same name."""
+
+    def found(ids: set[UUID], certainty: str) -> Duplicate | None:
+        if len(ids) != 1:
+            return None
+        pid = next(iter(ids))
+        return Duplicate(pid, matcher.names.get(pid, ""), certainty)
+
+    if payload.get("national_id"):
+        hit = found(matcher.by_id.get(_id_doc(payload["national_id"]), set()), "sure")
+        if hit:
+            return hit
+    same_name = matcher.by_name.get(
+        _name(payload.get("given_name"), payload.get("family_name")), set()
+    )
+    if not same_name:
+        return None
+    born = payload.get("date_of_birth")
+    if born:
+        hit = found({pid for pid in same_name if str(matcher.born.get(pid)) == born}, "sure")
+        if hit:
+            return hit
+    email = (payload.get("email") or "").lower()
+    if email:
+        hit = found(same_name & matcher.by_email.get(email, set()), "sure")
+        if hit:
+            return hit
+    for key in ("mobile_phone", "phone"):
+        phone = payload.get(key)
+        if phone:
+            hit = found(same_name & matcher.by_phone.get(phone, set()), "sure")
+            if hit:
+                return hit
+    return found(same_name, "maybe")

@@ -23,6 +23,7 @@ from typing import Any
 
 from ..dpmf.writer import DpmfWriter
 from .common import SOURCE_SYSTEM, parse_date, parse_phone, plain, row_uuid, suggest
+from .identify import PatientMatcher, duplicate_of
 from .reader import Sheet
 
 #: Field → the column names it is recognised by (compared without
@@ -130,9 +131,19 @@ def convert_patients(
     digest: str,
     destination: Path,
     label: str,
+    problems: list[tuple[str | None, str]] | None = None,
+    existing: PatientMatcher | None = None,
+    on_duplicate: str = "skip",
 ) -> dict[str, int]:
-    """Write ``sheet`` as a plain ``.dpm`` at ``destination``. Returns counts."""
+    """Write ``sheet`` as a plain ``.dpm`` at ``destination``. Returns counts.
+
+    ``existing`` is the clinic's patients: a row that surely is one of them
+    is left out (``on_duplicate="skip"``) or imported all the same
+    (``"import"``), and says so either way; a row that only shares a name
+    with one is imported and flagged. A person twice in the file comes once.
+    """
     out = DpmfWriter(destination, source_system=SOURCE_SYSTEM)
+    seen: dict[tuple[str, ...], int] = {}
     for cells, line in zip(sheet.rows, sheet.lines, strict=True):
         source_id = f"fila {line}"
         values = {field: cells[index].strip() for index, field in mapping.items()}
@@ -189,6 +200,39 @@ def convert_patients(
             # files each line where it belongs (allergies, medication…).
             payload["notes"] = values["medical_notes"]
 
+        repeated = _repeated(seen, payload, line)
+        if repeated is not None:
+            out.warn(
+                "patient",
+                source_id,
+                "sheet.repeated_in_file",
+                f"Paciente repetido en el archivo (igual que la fila {repeated}): no se importa.",
+            )
+            continue
+        twin = duplicate_of(existing, payload, region) if existing is not None else None
+        if twin is not None and twin.certainty == "sure":
+            if on_duplicate == "skip":
+                out.warn(
+                    "patient",
+                    source_id,
+                    "sheet.duplicate",
+                    f"Ya existe en la clínica como «{twin.name}»: no se importa.",
+                )
+                continue
+            out.warn(
+                "patient",
+                source_id,
+                "sheet.duplicate_imported",
+                f"Ya existía en la clínica como «{twin.name}»: se importó igualmente.",
+            )
+        elif twin is not None:
+            out.warn(
+                "patient",
+                source_id,
+                "sheet.possible_duplicate",
+                f"Posible duplicado de «{twin.name}» (mismo nombre): se importó; revísalo.",
+            )
+
         out.add(
             "patient",
             canonical_uuid=row_uuid(digest, line),
@@ -197,6 +241,8 @@ def convert_patients(
             raw=dict(zip(sheet.headers, cells, strict=True)),
         )
     counts = out.counts
+    if problems is not None:
+        problems.extend(out.problems)
     out.finish(
         {
             "exporter_tool": "dienteazul-sheet",
@@ -256,3 +302,20 @@ def template_bytes() -> bytes:
     buffer = io.BytesIO()
     book.save(buffer)
     return buffer.getvalue()
+
+
+def _repeated(seen: dict[tuple[str, ...], int], payload: dict, line: int) -> int | None:
+    """The earlier line of the file this patient is already on, if any."""
+    name = plain(f"{payload.get('given_name') or ''} {payload.get('family_name') or ''}")
+    keys = []
+    if payload.get("national_id"):
+        keys.append(("id", plain(payload["national_id"]).replace(" ", "")))
+    for other in ("date_of_birth", "email", "mobile_phone", "phone"):
+        if payload.get(other):
+            keys.append((other, name, str(payload[other]).lower()))
+    for key in keys:
+        if key in seen:
+            return seen[key]
+    for key in keys:
+        seen[key] = line
+    return None

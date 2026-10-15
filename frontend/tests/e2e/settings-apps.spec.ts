@@ -35,8 +35,19 @@ test.describe('admin sees the apps screen', () => {
     if (await loggedIn.getByTestId('app-card-data_migration').count()) {
       await expect(loggedIn.getByTestId('app-configure-data_migration')).toHaveAttribute('href', '/settings/apps/data-migration')
       // …and its two procedures have a button each, straight to their tab.
-      await expect(loggedIn.getByTestId('app-action-data_migration-import')).toHaveAttribute('href', '/settings/apps/data-migration?tab=import')
-      await expect(loggedIn.getByTestId('app-action-data_migration-export')).toHaveAttribute('href', '/settings/apps/data-migration?tab=export')
+      // Only for whoever holds `migration_import.*`, and nobody does
+      // while the module is not installed: the App is a row in
+      // `apps.json`, its permissions arrive with the module. The card
+      // therefore shows with no buttons — which is right, there is
+      // nothing to run — and that is the difference between a checkout
+      // with the App enabled and CI, where this assertion failed.
+      const active = ((await (await loggedIn.request.get('/api/v1/modules/-/active')).json()) as {
+        data: { name: string }[]
+      }).data.map(module => module.name)
+      if (active.includes('migration_import')) {
+        await expect(loggedIn.getByTestId('app-action-data_migration-import')).toHaveAttribute('href', '/settings/apps/data-migration?tab=import')
+        await expect(loggedIn.getByTestId('app-action-data_migration-export')).toHaveAttribute('href', '/settings/apps/data-migration?tab=export')
+      }
     }
     await expect(loggedIn.locator('[data-testid^="app-card-"]').first()).toHaveAttribute(
       'data-testid',

@@ -340,7 +340,7 @@ jobs:
       - name: Seed demo data
         run: ./scripts/seed-demo.sh --lang es
 
-      - name: Enable periodontogram and consents modules for e2e coverage
+      - name: Enable the opt-in modules the e2e suite needs
         # periodontogram ships installable=True, auto_install=False, so it
         # starts disabled (ADR 0035) — periodontogram.spec.ts assumes it
         # is running but nothing enabled it here, so the suite silently
@@ -361,6 +361,13 @@ jobs:
             -H "Authorization: Bearer $TOKEN"
           # And `record`, for record.spec.ts (the Expediente tab).
           curl -sf -X POST http://localhost:8000/api/v1/modules/record/enable \
+            -H "Authorization: Bearer $TOKEN"
+          # And `migration_import`: the Data migration card offers the
+          # import and the export as buttons, gated by
+          # `migration_import.*` — permissions that only exist while the
+          # module is installed. Off, the card shows bare and
+          # settings-apps.spec.ts covers nothing of it.
+          curl -sf -X POST http://localhost:8000/api/v1/modules/migration_import/enable \
             -H "Authorization: Bearer $TOKEN"
           docker compose restart backend
           for i in $(seq 1 60); do

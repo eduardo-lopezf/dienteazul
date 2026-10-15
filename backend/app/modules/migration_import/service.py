@@ -206,6 +206,7 @@ class ImportJobService:
             warnings = ImportJobService._build_warnings(handle)
             files = ImportJobService._build_files_summary(handle)
             verifactu_detected = _detect_verifactu_data(handle)
+            job.expected_storage_bytes = handle.storage_bytes()
 
         verifactu_installed = module_registry.is_installed("verifactu")
 
@@ -391,7 +392,25 @@ class ImportJobService:
 
     @staticmethod
     async def _run_pipeline(db: AsyncSession, job: ImportJob, *, passphrase: str | None) -> None:
-        """Walk the DPMF in topological order, dispatch to mappers."""
+        """Walk the DPMF in topological order, dispatch to mappers — writing
+        down every row inserted, so the import can be undone (ADR 0055)."""
+        from .undo import CreatedRowsRecorder
+
+        recorder = CreatedRowsRecorder(job.id)
+        recorder.attach(db)
+        job.tracks_created = True
+        try:
+            await ImportJobService._run_pipeline_recorded(db, job, passphrase=passphrase)
+            # The ledger's last rows go with this commit. Each batch's went
+            # with its own; on a failure, what was rolled back left no row.
+            await db.commit()
+        finally:
+            recorder.detach()
+
+    @staticmethod
+    async def _run_pipeline_recorded(
+        db: AsyncSession, job: ImportJob, *, passphrase: str | None
+    ) -> None:
         from .dpmf.iter import ordered_entity_types
 
         resolver = MappingResolver(db=db, clinic_id=job.clinic_id, job_id=job.id)
@@ -999,3 +1018,56 @@ def _detect_verifactu_data(handle: DpmfHandle) -> bool:
             if any(payload.get(key) for key in keys):
                 return True
     return False
+
+
+class ImportUndoService:
+    """Undo an import: refuse when the clinic built on it, else remove what
+    it created (``undo.py``, ADR 0055)."""
+
+    UNDOABLE = frozenset({"completed", "failed"})
+
+    @staticmethod
+    async def check(db: AsyncSession, job: ImportJob):
+        from .undo import plan_undo
+
+        if not job.tracks_created:
+            raise ValueError(
+                "Esta importación se hizo antes de que se registrara lo que crea; "
+                "no se puede deshacer."
+            )
+        if job.status not in ImportUndoService.UNDOABLE:
+            raise ValueError("Solo se puede deshacer una importación terminada o fallida.")
+        return await plan_undo(db, job)
+
+    @staticmethod
+    async def undo_in_background(job_id: UUID, user_id: UUID) -> None:
+        from .undo import apply_undo, describe_blockers, plan_undo, remove_files
+
+        async with async_session_maker() as db:
+            job = await db.get(ImportJob, job_id)
+            if job is None or job.status != "undoing":
+                return
+            previous = (job.execute_options or {}).get("status_before_undo", "completed")
+            try:
+                plan = await plan_undo(db, job)
+                if plan.blockers:
+                    job.status = previous
+                    job.undo_error = describe_blockers(plan)
+                    await db.commit()
+                    return
+                files = await apply_undo(db, job, plan)
+                job.status = "undone"
+                job.undone_at = datetime.now(UTC)
+                job.undone_by = user_id
+                job.undo_error = None
+                await db.commit()
+            except Exception as exc:
+                logger.exception("undo of job %s failed", job_id)
+                await db.rollback()
+                job = await db.get(ImportJob, job_id)
+                if job is not None:
+                    job.status = previous
+                    job.undo_error = f"No se pudo deshacer: {exc}"
+                    await db.commit()
+                return
+        await remove_files(files)

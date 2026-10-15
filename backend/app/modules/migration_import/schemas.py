@@ -28,6 +28,8 @@ class ExportJobResponse(BaseModel):
     entity_counts: dict[str, int]
     created_at: datetime
     completed_at: datetime | None
+    #: When its file is removed from the server (ready exports only).
+    expires_at: datetime | None = None
 
 
 class ImportJobResponse(BaseModel):
@@ -56,6 +58,12 @@ class ImportJobResponse(BaseModel):
     processed_entities: int
 
     import_fiscal_compliance: bool
+
+    #: It can be undone: what it inserted is on record.
+    tracks_created: bool = False
+    undone_at: datetime | None = None
+    undo_error: str | None = None
+    expected_storage_bytes: int | None = None
 
     started_at: datetime | None
     completed_at: datetime | None
@@ -131,6 +139,10 @@ class PreviewResponse(BaseModel):
     # Verifactu opt-in surface — UI hides the checkbox unless both are true.
     verifactu_data_detected: bool
     verifactu_module_installed: bool
+    #: What the file's documents will take in the clinic's storage, and
+    #: what is left of it (``None``: no limit).
+    storage_needed_bytes: int = 0
+    storage_free_bytes: int | None = None
 
 
 class ExecuteRequest(BaseModel):
@@ -252,6 +264,8 @@ class SheetColumn(BaseModel):
     samples: list[str]
     #: The field its name suggests; ``None`` when nothing fits.
     suggested_field: str | None
+    #: ``name`` (its header) or ``content`` (what its values are).
+    suggested_from: str | None = None
 
 
 class SheetProfessional(BaseModel):
@@ -266,6 +280,10 @@ class SheetUploadResponse(BaseModel):
     row_count: int
     #: Every field a column can be imported as.
     fields: list[str]
+    #: The order of the dates when the values give it away, else ``None``.
+    date_order: str | None = None
+    #: The first row looked like data: columns are "Columna N".
+    headerless: bool = False
     #: Appointments only: who a row without a professional can go to.
     professionals: list[SheetProfessional] = Field(default_factory=list)
 
@@ -276,3 +294,6 @@ class SheetConvertRequest(BaseModel):
     date_order: Literal["dmy", "mdy", "ymd"] = "dmy"
     #: Appointments: the professional for rows that name none.
     default_professional_id: UUID | None = None
+    #: Patients: a row that surely is a patient the clinic has — left out
+    #: (``skip``) or imported all the same (``import``). Warned either way.
+    on_duplicate: Literal["skip", "import"] = "skip"

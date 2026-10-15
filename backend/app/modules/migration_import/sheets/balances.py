@@ -49,6 +49,7 @@ async def convert_balances(
     digest: str,
     destination: Path,
     label: str,
+    problems: list[tuple[str | None, str]] | None = None,
 ) -> dict[str, int]:
     patients = await PatientMatcher.load(db, clinic_id, region)
     resolver = MappingResolver(db=db, clinic_id=clinic_id, job_id=job_id)
@@ -119,6 +120,8 @@ async def convert_balances(
             )
 
     counts = out.counts
+    if problems is not None:
+        problems.extend(out.problems)
     out.finish(
         {
             "exporter_tool": "dienteazul-sheet",

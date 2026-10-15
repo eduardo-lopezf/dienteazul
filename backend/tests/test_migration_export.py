@@ -10,7 +10,7 @@ downloads the file and removes it; the passphrase is required and long.
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -1539,3 +1539,42 @@ async def test_attachments_and_histories_travel_as_they_were(
         None,
     )
     assert plan_entry.created_at == datetime(2026, 6, 1, 13, 0, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_an_export_file_expires_and_its_record_stays(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, test_clinic: Clinic
+) -> None:
+    """The file is there to be downloaded, not kept: past its retention it is
+    removed (and refused even before the hourly task runs); the record of
+    the export stays, ``expired``."""
+    from app.modules.migration_import.export import RETENTION, ExportJobService
+    from app.modules.migration_import.models import ExportJob
+    from app.modules.migration_import.tasks import expire_exports
+
+    started = await client.post(EXPORTS, headers=auth_headers, json={"passphrase": PASSPHRASE})
+    export_id = started.json()["data"]["id"]
+    ready = (await client.get(f"{EXPORTS}/{export_id}", headers=auth_headers)).json()["data"]
+    assert ready["status"] == "completed"
+    completed = datetime.fromisoformat(ready["completed_at"])
+    assert datetime.fromisoformat(ready["expires_at"]) == completed + RETENTION
+
+    job = await db_session.get(ExportJob, UUID(export_id))
+    path = Path(job.file_path)
+    assert path.exists()
+
+    # Not yet: nothing happens.
+    assert await ExportJobService.expire_old(db_session) == 0
+
+    # Past its retention: refused at once, then removed by the task.
+    job.completed_at = datetime.now(UTC) - RETENTION - timedelta(minutes=1)
+    await db_session.commit()
+    late = await client.get(f"{EXPORTS}/{export_id}/download", headers=auth_headers)
+    assert late.status_code == 409
+    assert "caducó" in late.json()["message"]
+
+    await expire_exports()
+    db_session.expire_all()
+    gone = (await client.get(f"{EXPORTS}/{export_id}", headers=auth_headers)).json()["data"]
+    assert (gone["status"], gone["file_size"], gone["expires_at"]) == ("expired", 0, None)
+    assert not path.exists()

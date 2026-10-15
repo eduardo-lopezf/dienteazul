@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -53,7 +54,7 @@ class ImportJob(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint(
             "status IN ('mapping','uploaded','validating','validated','previewing',"
-            "'executing','completed','failed')",
+            "'executing','completed','failed','undoing','undone')",
             name="ck_migration_import_job_status",
         ),
     )
@@ -65,6 +66,14 @@ class ImportJob(Base, TimestampMixin):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="uploaded")
+    #: Its inserted rows are in ``ImportCreatedRow``: it can be undone.
+    tracks_created: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    undone_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    #: Why the last attempt to undo it was refused or failed.
+    undo_error: Mapped[str | None] = mapped_column(Text)
+    #: What the file's documents will take in the clinic's storage.
+    expected_storage_bytes: Mapped[int | None] = mapped_column(BigInteger)
     # State transitions write here so the UI surfaces actionable errors.
     error: Mapped[str | None] = mapped_column(Text)
 
@@ -364,3 +373,22 @@ class ExportJob(Base, TimestampMixin):
     #: Rows written per entity type.
     entity_counts: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ImportCreatedRow(Base):
+    """One row an import inserted, recorded as it was inserted.
+
+    The ledger undo works from: exactly what this job created — never a
+    row it only linked to (an existing cabinet matched by name, a patient
+    an appointments sheet was attached to). Ordered by ``id``.
+    """
+
+    __tablename__ = "migration_import_created_rows"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    job_id: Mapped[UUID] = mapped_column(
+        ForeignKey("migration_import_jobs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    table_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    pk_column: Mapped[str] = mapped_column(String(60), nullable=False)
+    row_key: Mapped[str] = mapped_column(String(64), nullable=False)

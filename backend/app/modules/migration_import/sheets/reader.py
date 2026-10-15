@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from pathlib import Path
@@ -33,14 +34,17 @@ class Sheet:
     rows: list[list[str]]
     #: The line of the file each data row was on, for messages.
     lines: list[int]
+    #: The first row looked like data, not names: columns are "Columna N"
+    #: and that row is imported too.
+    headerless: bool = False
 
 
 def read_sheet(path: Path) -> Sheet:
     suffix = path.suffix.lower()
     if suffix not in SUFFIXES:
-        raise SheetError("only .xlsx and .csv files are read")
+        raise SheetError("Solo se leen archivos .xlsx y .csv.")
     if path.stat().st_size > MAX_BYTES:
-        raise SheetError(f"the file is larger than {MAX_BYTES // (1024 * 1024)} MB")
+        raise SheetError(f"El archivo pesa más de {MAX_BYTES // (1024 * 1024)} MB.")
     raw = _read_xlsx(path) if suffix == ".xlsx" else _read_csv(path)
     return _tidy(raw)
 
@@ -64,13 +68,17 @@ def _read_xlsx(path: Path) -> list[list[str]]:
     try:
         book = load_workbook(path, read_only=True, data_only=True)
     except Exception as exc:  # zip, XML or openpyxl's own errors
-        raise SheetError("the file is not a readable .xlsx") from exc
+        raise SheetError(
+            "No se pudo leer el .xlsx: puede estar dañado o protegido con contraseña."
+        ) from exc
     try:
         rows: list[list[str]] = []
         for values in book.worksheets[0].iter_rows(values_only=True):
             rows.append([_cell(v) for v in values[:MAX_COLUMNS]])
             if len(rows) > MAX_ROWS + 1:
-                raise SheetError(f"the sheet has more than {MAX_ROWS} rows")
+                raise SheetError(
+                    f"La hoja tiene más de {MAX_ROWS} filas; divídela en varios archivos."
+                )
         return rows
     finally:
         book.close()
@@ -91,7 +99,9 @@ def _read_csv(path: Path) -> list[list[str]]:
     for values in csv.reader(io.StringIO(text), dialect):
         rows.append([v.strip() for v in values[:MAX_COLUMNS]])
         if len(rows) > MAX_ROWS + 1:
-            raise SheetError(f"the file has more than {MAX_ROWS} rows")
+            raise SheetError(
+                f"El archivo tiene más de {MAX_ROWS} filas; divídelo en varios archivos."
+            )
     return rows
 
 
@@ -115,10 +125,11 @@ def _decode(data: bytes, from_bytes: Any) -> str:
 def _tidy(raw: list[list[str]]) -> Sheet:
     numbered = [(line, row) for line, row in enumerate(raw, 1) if any(cell for cell in row)]
     if not numbered:
-        raise SheetError("the file is empty")
-    header, data = numbered[0][1], numbered[1:]
+        raise SheetError("El archivo está vacío.")
+    headerless = _looks_like_data(numbered[0][1])
+    header, data = ([], numbered) if headerless else (numbered[0][1], numbered[1:])
     if not data:
-        raise SheetError("the file has a header row and nothing under it")
+        raise SheetError("El archivo solo tiene la fila de encabezados, sin datos debajo.")
     width = max(len(row) for _, row in numbered)
     headers: list[str] = []
     for i in range(width):
@@ -132,4 +143,21 @@ def _tidy(raw: list[list[str]]) -> Sheet:
         headers=headers,
         rows=[row + [""] * (width - len(row)) for _, row in data],
         lines=[line for line, _ in data],
+        headerless=headerless,
     )
+
+
+_VALUE = re.compile(
+    r"^(\S+@\S+\.\S+"  # an email
+    r"|[+(]?\d[\d\s().\-/:,$]*"  # a number, phone, amount, date or time
+    r"|[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d)$",  # a CURP
+    re.IGNORECASE,
+)
+
+
+def _looks_like_data(row: list[str]) -> bool:
+    """Whether a would-be header row is really the first patient: column
+    names are words; emails, numbers, dates and ID documents are values."""
+    cells = [cell for cell in row if cell]
+    values = [cell for cell in cells if _VALUE.match(cell)]
+    return len(values) >= 2 and len(values) * 2 >= len(cells)

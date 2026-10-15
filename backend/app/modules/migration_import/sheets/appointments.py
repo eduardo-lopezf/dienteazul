@@ -74,6 +74,7 @@ async def convert_appointments(
     digest: str,
     destination: Path,
     label: str,
+    problems: list[tuple[str | None, str]] | None = None,
     default_professional_id: UUID | None,
 ) -> dict[str, int]:
     patients = await PatientMatcher.load(db, clinic_id, region)
@@ -190,6 +191,8 @@ async def convert_appointments(
         )
 
     counts = out.counts
+    if problems is not None:
+        problems.extend(out.problems)
     out.finish(
         {
             "exporter_tool": "dienteazul-sheet",

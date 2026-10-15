@@ -143,3 +143,95 @@ def row_uuid(digest: str, line: int, kind: str = "") -> str:
     """The same row of the same file always gets the same id."""
     key = f"{digest}:{line}" if not kind else f"{kind}:{digest}:{line}"
     return str(uuid.uuid5(NAMESPACE, key))
+
+
+# --- What a column holds, read from its values -----------------------------
+#
+# For a column whose name says nothing ("Dato 3"): most of its values are
+# emails, phones, ID documents, dates, times or amounts. Only a guess the
+# person confirms, like the one from the name — and the name wins.
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_CURP = re.compile(r"^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$", re.IGNORECASE)
+_RFC = re.compile(r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$", re.IGNORECASE)
+_DATE = re.compile(r"^\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}")
+_TIME = re.compile(r"^\d{1,2}[:.h]\d{2}(:\d{2})?\s*([ap]\.?m\.?)?$", re.IGNORECASE)
+
+
+def value_kind(value: str, region: str | None = None) -> str | None:
+    """``email``, ``id_document``, ``date``, ``time``, ``phone`` or ``amount``."""
+    text = value.strip()
+    if not text:
+        return None
+    if _EMAIL.match(text):
+        return "email"
+    if _CURP.match(text) or _RFC.match(text):
+        return "id_document"
+    if _DATE.match(text):
+        return "date"
+    if _TIME.match(text):
+        return "time"
+    digits = re.sub(r"\D", "", text)
+    if 8 <= len(digits) <= 15 and re.fullmatch(r"[+\d\s().\-]+", text):
+        return "phone"
+    if parse_amount(text) is not None:
+        return "amount"
+    return None
+
+
+def column_kind(values: list[str], region: str | None = None) -> str | None:
+    """What most of a column's non-empty values are, if most agree."""
+    kinds = [value_kind(v, region) for v in values if v.strip()]
+    if not kinds:
+        return None
+    best = max(set(kinds), key=kinds.count)
+    return best if best is not None and kinds.count(best) * 10 >= len(kinds) * 8 else None
+
+
+def suggest_by_content(
+    rows: list[list[str]],
+    chosen: list[str | None],
+    by_kind: dict[str, tuple[str, ...]],
+    region: str | None = None,
+) -> list[str | None]:
+    """Fill the columns the names left blank, from their values.
+
+    ``by_kind`` maps a value kind to the fields it can be, in preference
+    order; a field already taken is not offered twice."""
+    taken = {field for field in chosen if field}
+    result = list(chosen)
+    for index, field in enumerate(chosen):
+        if field is not None:
+            continue
+        kind = column_kind([row[index] for row in rows[:200]], region)
+        for candidate in by_kind.get(kind or "", ()):
+            if candidate not in taken:
+                result[index] = candidate
+                taken.add(candidate)
+                break
+    return result
+
+
+def infer_date_order(values: list[str]) -> str | None:
+    """``dmy``, ``mdy`` or ``ymd`` when the values say so, else ``None``.
+
+    "25/03/2026" can only be day first; "03/25/2026" only month first; a
+    four-digit first part is year first (ISO dates, which Excel cells
+    become, are read as such whatever the order). A file whose dates all fit both
+    ways says nothing — the person chooses, as before."""
+    seen: set[str] = set()
+    for value in values:
+        parts = re.split(r"[/.\-]", value.strip()[:10])
+        if len(parts) != 3 or not all(p.isdigit() for p in parts):
+            continue
+        a, b, _ = (int(p) for p in parts)
+        if len(parts[0]) == 4:
+            # ISO (what an Excel date cell becomes) reads the same whatever
+            # the order chosen; only 2026/03/25 says something.
+            if value.strip()[4] != "-":
+                seen.add("ymd")
+        elif a > 12 >= b:
+            seen.add("dmy")
+        elif b > 12 >= a:
+            seen.add("mdy")
+    return next(iter(seen)) if len(seen) == 1 else None
