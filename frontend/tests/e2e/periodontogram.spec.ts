@@ -244,6 +244,12 @@ test.describe('periodontogram — receptionist permission boundary', () => {
       waitUntil: 'domcontentloaded'
     })
 
+    // The page first, then the absence. A count of zero is also what a
+    // page that never rendered gives you: this test passed green through
+    // a run where the whole app answered 500 and no screen hydrated,
+    // which is the one moment it should have shouted.
+    await loggedIn.waitForSelector('html[data-ua]', { state: 'attached', timeout: 60_000 })
+
     // Receptionists cannot read perio, so the slot resolves to zero
     // entries and the diagnosis container falls back to the bare
     // odontogram — the sub-tab bar with "Periodontograma" must NOT
