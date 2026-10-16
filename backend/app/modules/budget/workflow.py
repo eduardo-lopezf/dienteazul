@@ -12,6 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
 
+from .integrations import (
+    patients_available,
+    require_catalog,
+    require_patients,
+)
 from .models import Budget, BudgetAccessLog, BudgetSignature
 from .service import BudgetHistoryService
 
@@ -670,7 +675,10 @@ class BudgetWorkflowService:
         if settings.get("budget_public_auth_disabled"):
             return "none"
 
-        # Patient lookup via ORM — patients is in budget.depends.
+        if not patients_available():
+            # Nothing of the patient's is read while Patients is off.
+            return "manual_code"
+
         from app.modules.patients.models import Patient
 
         patient = await db.get(Patient, patient_id)
@@ -769,6 +777,8 @@ class BudgetWorkflowService:
             return True
         if method == "manual_code":
             return _verify_password(value, budget.public_auth_secret_hash or "")
+        if not patients_available():
+            return False
 
         from app.modules.patients.models import Patient
 
@@ -800,6 +810,9 @@ class BudgetWorkflowService:
         snapshots; it gets a fresh ``public_token`` and re-resolves the
         ``public_auth_method`` against the current Patient record.
         """
+        require_patients()
+        require_catalog()
+
         from .service import BudgetItemService, BudgetService
 
         new_budget = Budget(

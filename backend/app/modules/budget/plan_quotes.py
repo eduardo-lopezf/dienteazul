@@ -25,6 +25,7 @@ from app.core.contracts import PlanQuotes, provider
 from app.core.events import EventType, event_bus
 from app.database import async_session_maker
 
+from .integrations import catalog_available, patients_available
 from .models import Budget
 from .providers import plan_budgets
 from .service import BudgetItemService, BudgetService
@@ -179,6 +180,11 @@ async def on_plan_confirmed(data: dict[str, Any]) -> None:
     clinic_id, plan_id = data.get("clinic_id"), data.get("plan_id")
     user_id = data.get("confirmed_by_user_id")
     if not clinic_id or not plan_id or not user_id:
+        return
+    if not (patients_available() and catalog_available()):
+        # No budget without them; "generate the budget" mints it once
+        # they are back (``generate_for_plan``).
+        logger.info("Plan %s confirmed while Patients or the catalog is off", plan_id)
         return
 
     async with async_session_maker() as db:

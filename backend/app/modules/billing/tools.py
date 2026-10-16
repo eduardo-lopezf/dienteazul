@@ -16,6 +16,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
+from app.modules.budget.integrations import patients_available
 
 from .schemas import InvoiceStatus
 from .service import InvoiceService
@@ -38,7 +39,7 @@ class GetInvoiceArgs(BaseModel):
 
 
 def _invoice_summary(invoice) -> dict:
-    patient = invoice.patient
+    patient = invoice.patient if patients_available() else None
     # Invoice axis only: no paid/pending amounts here (off-books rule).
     return {
         "id": invoice.id,

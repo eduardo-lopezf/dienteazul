@@ -16,7 +16,7 @@ from sqlalchemy import select
 from app.core.agents import AgentContext, Tool, ToolCategory
 from app.core.auth.models import Clinic
 
-from .service import LiquidationService
+from .service import APPS_UNAVAILABLE, LiquidationService, can_calculate
 
 
 class PreviewArgs(BaseModel):
@@ -26,6 +26,8 @@ class PreviewArgs(BaseModel):
 
 
 async def _liquidation_preview(ctx: AgentContext, args: PreviewArgs) -> dict:
+    if not can_calculate():
+        return {"error": "apps_unavailable", "detail": APPS_UNAVAILABLE}
     clinic = await ctx.db.scalar(select(Clinic).where(Clinic.id == ctx.clinic_id))
     preview = await LiquidationService.preview(
         ctx.db,

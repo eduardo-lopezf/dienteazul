@@ -1,22 +1,22 @@
 {
   "layers": [
     "/module_layers/agenda/frontend",
-    "/module_layers/patients/frontend",
-    "/module_layers/catalog/frontend",
-    "/module_layers/odontogram/frontend",
-    "/module_layers/media/frontend",
-    "/module_layers/professionals/frontend",
     "/module_layers/budget/frontend",
     "/module_layers/payments/frontend",
     "/module_layers/billing/frontend",
     "/module_layers/cashbox/frontend",
+    "/module_layers/catalog/frontend",
+    "/module_layers/patients/frontend",
     "/module_layers/consents/frontend",
     "/module_layers/copilot/frontend",
     "/module_layers/liquidations/frontend",
+    "/module_layers/media/frontend",
     "/module_layers/migration_import/frontend",
     "/module_layers/notifications/frontend",
+    "/module_layers/odontogram/frontend",
     "/module_layers/patient_timeline/frontend",
     "/module_layers/patients_clinical/frontend",
+    "/module_layers/professionals/frontend",
     "/module_layers/recalls/frontend",
     "/module_layers/record/frontend",
     "/module_layers/reports/frontend",
@@ -29,26 +29,6 @@
     {
       "name": "agenda",
       "path": "/module_layers/agenda/frontend"
-    },
-    {
-      "name": "patients",
-      "path": "/module_layers/patients/frontend"
-    },
-    {
-      "name": "catalog",
-      "path": "/module_layers/catalog/frontend"
-    },
-    {
-      "name": "odontogram",
-      "path": "/module_layers/odontogram/frontend"
-    },
-    {
-      "name": "media",
-      "path": "/module_layers/media/frontend"
-    },
-    {
-      "name": "professionals",
-      "path": "/module_layers/professionals/frontend"
     },
     {
       "name": "budget",
@@ -67,6 +47,14 @@
       "path": "/module_layers/cashbox/frontend"
     },
     {
+      "name": "catalog",
+      "path": "/module_layers/catalog/frontend"
+    },
+    {
+      "name": "patients",
+      "path": "/module_layers/patients/frontend"
+    },
+    {
       "name": "consents",
       "path": "/module_layers/consents/frontend"
     },
@@ -79,6 +67,10 @@
       "path": "/module_layers/liquidations/frontend"
     },
     {
+      "name": "media",
+      "path": "/module_layers/media/frontend"
+    },
+    {
       "name": "migration_import",
       "path": "/module_layers/migration_import/frontend"
     },
@@ -87,12 +79,20 @@
       "path": "/module_layers/notifications/frontend"
     },
     {
+      "name": "odontogram",
+      "path": "/module_layers/odontogram/frontend"
+    },
+    {
       "name": "patient_timeline",
       "path": "/module_layers/patient_timeline/frontend"
     },
     {
       "name": "patients_clinical",
       "path": "/module_layers/patients_clinical/frontend"
+    },
+    {
+      "name": "professionals",
+      "path": "/module_layers/professionals/frontend"
     },
     {
       "name": "recalls",

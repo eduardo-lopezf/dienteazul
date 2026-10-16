@@ -28,7 +28,9 @@ class BillingModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["patients", "catalog", "budget", "payments"],
+        "depends": ["budget", "payments"],
+        # ADR 0037: runs with these off (budget/integrations.py).
+        "integrates": ["patients", "catalog"],
         "installable": True,
         "auto_install": True,
         "removable": False,

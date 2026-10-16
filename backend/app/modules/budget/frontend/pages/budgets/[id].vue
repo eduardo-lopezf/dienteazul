@@ -16,6 +16,7 @@ const router = useRouter()
 const { t, locale } = useI18n()
 const toast = useToast()
 const { can } = usePermissions()
+const { patientsAvailable, catalogAvailable } = useFinanceLinks()
 const api = useApi()
 
 const {
@@ -420,7 +421,7 @@ const primaryActions = computed<EntityAction[]>(() => {
     })
   }
 
-  if (canInvoice() && can(PERMISSIONS.billing.write)) {
+  if (canInvoice() && can(PERMISSIONS.billing.write) && patientsAvailable.value && catalogAvailable.value) {
     actions.push({
       key: 'createInvoice',
       label: t('invoice.createFromBudget'),
@@ -443,7 +444,8 @@ const overflowActions = computed<EntityAction[]>(() => {
       onClick: handleDownloadPDF
     }
   ]
-  if (can(PERMISSIONS.budget.write)) {
+  // A new version is a new budget for the patient, with catalog lines.
+  if (can(PERMISSIONS.budget.write) && patientsAvailable.value && catalogAvailable.value) {
     actions.push({
       key: 'duplicate',
       label: t('budget.actions.duplicate'),
@@ -585,6 +587,16 @@ function getItemName(item: DeepReadonly<BudgetItem>): string {
         </template>
       </DetailPageHeader>
 
+      <UAlert
+        v-if="!patientsAvailable"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="t('finance.appsOff.patients')"
+        class="mb-6"
+        data-testid="budget-patients-off"
+      />
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main content -->
         <div class="lg:col-span-2 space-y-6">
@@ -725,7 +737,7 @@ function getItemName(item: DeepReadonly<BudgetItem>): string {
                   {{ t('budget.items.title') }}
                 </h2>
                 <UButton
-                  v-if="canEdit(currentBudget) && can(PERMISSIONS.budget.write)"
+                  v-if="canEdit(currentBudget) && can(PERMISSIONS.budget.write) && catalogAvailable"
                   icon="i-lucide-plus"
                   size="sm"
                   @click="isAddItemModalOpen = true"
@@ -734,6 +746,14 @@ function getItemName(item: DeepReadonly<BudgetItem>): string {
                 </UButton>
               </div>
             </template>
+
+            <p
+              v-if="canEdit(currentBudget) && !catalogAvailable"
+              class="mb-4 text-caption text-subtle"
+              data-testid="budget-catalog-off"
+            >
+              {{ t('finance.appsOff.catalog') }}
+            </p>
 
             <div
               v-if="currentBudget.items.length === 0"
@@ -905,8 +925,15 @@ function getItemName(item: DeepReadonly<BudgetItem>): string {
               <UCheckbox
                 v-model="sendForm.send_email"
                 :label="t('budget.send.sendByEmail')"
+                :disabled="!patientsAvailable"
               />
             </div>
+            <p
+              v-if="!patientsAvailable"
+              class="text-caption text-subtle"
+            >
+              {{ t('finance.appsOff.emailNeedsPatients') }}
+            </p>
 
             <div
               v-if="sendForm.send_email"

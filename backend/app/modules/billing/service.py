@@ -9,6 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.list_query import parse_sort
+from app.modules.budget.integrations import (
+    CATALOG_UNAVAILABLE,
+    AppUnavailableError,
+    catalog_available,
+    patients_available,
+    require_catalog,
+    require_patients,
+)
 from app.modules.payments.models import Payment as PaymentModel
 from app.modules.payments.models import Refund as RefundModel
 
@@ -448,6 +456,8 @@ class InvoiceItemService:
         data: dict,
     ) -> InvoiceItem:
         """Create an invoice item."""
+        # VAT types are the catalog's: no line is added while it is off.
+        require_catalog()
         # Get VAT rate from VAT type if provided
         vat_rate = 0.0
         if data.get("vat_type_id"):
@@ -516,6 +526,8 @@ class InvoiceItemService:
                 Decimal(str(data["discount_value"])) if data["discount_value"] else None
             )
         if "vat_type_id" in data:
+            if data["vat_type_id"] and not catalog_available():
+                raise AppUnavailableError(CATALOG_UNAVAILABLE)
             item.vat_type_id = data["vat_type_id"]
             # Update VAT rate
             if data["vat_type_id"]:
@@ -700,7 +712,10 @@ class InvoiceService:
         # active. Without search we count the indexed invoices table
         # directly, no join overhead.
         search_join_needed = False
-        if search:
+        if search and not patients_available():
+            # The patient's name is not shown, so it is not searched either.
+            conditions.append(Invoice.invoice_number.ilike(f"%{search}%"))
+        elif search:
             from app.modules.patients.models import Patient
 
             search_term = f"%{search}%"
@@ -841,6 +856,7 @@ class InvoiceService:
         Billing data is NOT stored for drafts - it comes dynamically from the
         patient. When the invoice is issued, billing data is snapshotted.
         """
+        require_patients()
         # Verify patient exists
         from app.modules.patients.models import Patient
 
@@ -913,6 +929,7 @@ class InvoiceService:
                 # Can't change patient if linked to a budget
                 if invoice.budget_id:
                     raise ValueError("Cannot change patient for invoice linked to a budget")
+                require_patients()
 
                 # Verify new patient exists
                 from app.modules.patients.models import Patient
@@ -1013,6 +1030,9 @@ class InvoiceService:
         Returns:
             Created invoice (draft, billing data from patient)
         """
+        require_patients()
+        require_catalog()
+
         from app.modules.budget.models import Budget, BudgetItem
 
         # Get budget

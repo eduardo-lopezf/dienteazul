@@ -1,7 +1,8 @@
 """Event handlers for the notifications module.
 
 These handlers listen to events from other modules and trigger
-notification emails when appropriate.
+notification emails when appropriate. Each one sends only while the Apps
+its message needs are running (ADR 0037, ``integrations.py``).
 """
 
 import logging
@@ -12,6 +13,8 @@ from sqlalchemy import select
 
 from app.core.background import spawn
 from app.database import async_session_maker
+
+from .integrations import running
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,8 @@ class NotificationHandlers:
 
         Sends appointment confirmation email to patient.
         """
+        if not running("agenda", "patients"):
+            return
         spawn(NotificationHandlers._handle_appointment_scheduled(data))
 
     @staticmethod
@@ -67,7 +72,7 @@ class NotificationHandlers:
 
                 # Get professional info if assigned
                 professional_name = None
-                if appointment.professional_id:
+                if appointment.professional_id and running("professionals"):
                     from app.modules.professionals.models import Professional
 
                     result = await db.execute(
@@ -108,6 +113,8 @@ class NotificationHandlers:
 
         Sends appointment cancellation email to patient.
         """
+        if not running("agenda", "patients"):
+            return
         spawn(NotificationHandlers._handle_appointment_cancelled(data))
 
     @staticmethod
@@ -147,7 +154,7 @@ class NotificationHandlers:
 
                 # Get professional info
                 professional_name = None
-                if appointment.professional_id:
+                if appointment.professional_id and running("professionals"):
                     from app.modules.professionals.models import Professional
 
                     result = await db.execute(
@@ -187,6 +194,8 @@ class NotificationHandlers:
 
         Sends welcome email to new patient (if auto_send is enabled).
         """
+        if not running("patients"):
+            return
         spawn(NotificationHandlers._handle_patient_created(data))
 
     @staticmethod
@@ -239,6 +248,8 @@ class NotificationHandlers:
 
         Sends budget email to patient.
         """
+        if not running("budget", "patients"):
+            return
         spawn(NotificationHandlers._handle_budget_sent(data))
 
     @staticmethod
@@ -348,6 +359,8 @@ class NotificationHandlers:
 
         Sends invoice email to patient.
         """
+        if not running("billing", "patients"):
+            return
         spawn(NotificationHandlers._handle_invoice_sent(data))
 
     @staticmethod
@@ -452,6 +465,8 @@ class NotificationHandlers:
 
         Sends budget acceptance confirmation to patient.
         """
+        if not running("budget", "patients"):
+            return
         spawn(NotificationHandlers._handle_budget_accepted(data))
 
     @staticmethod

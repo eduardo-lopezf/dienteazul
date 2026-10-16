@@ -38,7 +38,10 @@ class WhatsappKapsoModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "community",
-        "depends": ["notifications", "patients"],
+        "depends": ["notifications"],
+        # An inbound reply is matched to a patient while Patients runs; off,
+        # it is kept without one (ADR 0037).
+        "integrates": ["patients"],
         "installable": True,
         "auto_install": False,
         "removable": True,

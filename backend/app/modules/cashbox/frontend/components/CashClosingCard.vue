@@ -28,6 +28,10 @@ const { can } = usePermissions()
 const { currentClinic } = useClinic()
 const { format: money } = useCurrency()
 const toast = useToast()
+// Collections are integrated, not required (ADR 0037): with them off the
+// count is the till's own movements and the float.
+const { active, isActive } = useModules()
+const paymentsAvailable = computed(() => active.value === null || isActive('payments'))
 const { closeDay, reopenClosing } = useCashClosings()
 
 const closing = computed<CashClosing | null>(() => props.position?.closing ?? null)
@@ -227,11 +231,11 @@ function instant(value: string | null | undefined): string {
           <dt>{{ t('cashbox.closing.openingFloat') }}</dt>
           <dd>{{ money(position.opening_float) }}</dd>
         </div>
-        <div>
+        <div v-if="paymentsAvailable">
           <dt>{{ t('cashbox.closing.cashCollected') }}</dt>
           <dd>{{ money(position.cash_collected) }}</dd>
         </div>
-        <div>
+        <div v-if="paymentsAvailable">
           <dt>{{ t('cashbox.closing.cashRefunded') }}</dt>
           <!-- No sign on a zero: "−0,00" reads as a negative amount. -->
           <dd>{{ Number(position.cash_refunded) ? '−' : '' }}{{ money(position.cash_refunded) }}</dd>
@@ -246,6 +250,13 @@ function instant(value: string | null | undefined): string {
         </div>
       </dl>
 
+      <p
+        v-if="!paymentsAvailable"
+        class="methods-note"
+        data-testid="cashbox-payments-off"
+      >
+        {{ t('cashbox.paymentsOff') }}
+      </p>
       <p
         v-if="position.collected_by_method.length"
         class="methods-note"

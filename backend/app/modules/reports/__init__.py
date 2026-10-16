@@ -24,7 +24,10 @@ class ReportsModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": [
+        "depends": [],
+        # ADR 0037: each section answers only while its App runs
+        # (integrations.py); with Patients or Professionals off, no names.
+        "integrates": [
             "patients",
             "agenda",
             "catalog",

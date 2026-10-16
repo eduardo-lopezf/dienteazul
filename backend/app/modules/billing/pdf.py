@@ -12,6 +12,8 @@ from app.core.utils.currency import format_currency as _fmt_currency
 if TYPE_CHECKING:
     from app.core.auth.models import Clinic
 
+from app.modules.budget.integrations import patients_available
+
 from .models import Invoice
 
 _LOCALE_BY_LANG = {"es": "es_ES", "en": "en_US"}
@@ -159,7 +161,7 @@ class InvoicePDFService:
 
         # Patient info
         patient_name = ""
-        if invoice.patient:
+        if invoice.patient and patients_available():
             patient_name = f"{invoice.patient.first_name} {invoice.patient.last_name}"
 
         # Format dates

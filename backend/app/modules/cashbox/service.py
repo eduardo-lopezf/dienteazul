@@ -17,6 +17,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.plugins.registry import module_registry
 from app.core.utils.clinic_time import clinic_date, clinic_day_window
 from app.modules.payments.models import Payment, Refund
 
@@ -30,6 +31,16 @@ from .schemas import (
     MethodTotal,
     UserBrief,
 )
+
+
+def _payments_running() -> bool:
+    """Whether collections are running (ADR 0037).
+
+    ``payments`` is integrated, not required: with it off the till holds
+    only what was recorded here, and its payments and refunds are neither
+    read nor counted. They count again when it returns.
+    """
+    return module_registry.is_installed("payments")
 
 
 class CashboxError(ValueError):
@@ -251,35 +262,37 @@ class ClosingService:
     ) -> CashPosition:
         window_start, window_end = clinic_day_window(business_date, business_date, timezone)
 
-        collected = await db.execute(
-            select(
-                Payment.method,
-                func.coalesce(func.sum(Payment.amount), Decimal("0")),
-                func.count(Payment.id),
+        by_method: list[MethodTotal] = []
+        cash_refunded = Decimal("0")
+        if _payments_running():
+            collected = await db.execute(
+                select(
+                    Payment.method,
+                    func.coalesce(func.sum(Payment.amount), Decimal("0")),
+                    func.count(Payment.id),
+                )
+                .where(
+                    Payment.clinic_id == clinic_id,
+                    Payment.payment_date == business_date,
+                )
+                .group_by(Payment.method)
             )
-            .where(
-                Payment.clinic_id == clinic_id,
-                Payment.payment_date == business_date,
-            )
-            .group_by(Payment.method)
-        )
-        by_method = [
-            MethodTotal(method=method, amount=amount, count=count)
-            for method, amount, count in collected.all()
-        ]
+            by_method = [
+                MethodTotal(method=method, amount=amount, count=count)
+                for method, amount, count in collected.all()
+            ]
+            # A refund's method can differ from its payment's: a card payment
+            # handed back in notes still empties the drawer, and only the
+            # refund's own method says whether it did.
+            cash_refunded = await db.scalar(
+                select(func.coalesce(func.sum(Refund.amount), Decimal("0"))).where(
+                    Refund.clinic_id == clinic_id,
+                    Refund.method == "cash",
+                    Refund.refunded_at >= window_start,
+                    Refund.refunded_at < window_end,
+                )
+            ) or Decimal("0")
         cash_collected = next((m.amount for m in by_method if m.method == "cash"), Decimal("0"))
-
-        # A refund's method can differ from its payment's: a card payment
-        # handed back in notes still empties the drawer, and only the
-        # refund's own method says whether it did.
-        cash_refunded = await db.scalar(
-            select(func.coalesce(func.sum(Refund.amount), Decimal("0"))).where(
-                Refund.clinic_id == clinic_id,
-                Refund.method == "cash",
-                Refund.refunded_at >= window_start,
-                Refund.refunded_at < window_end,
-            )
-        ) or Decimal("0")
 
         movements = await MovementService.day_totals(db, clinic_id, currency, business_date)
         closing = await ClosingService.standing(db, clinic_id, business_date)
@@ -659,17 +672,18 @@ class PeriodService:
         """
         days: set[date] = set()
 
-        paid = await db.execute(
-            select(Payment.payment_date)
-            .where(
-                Payment.clinic_id == clinic_id,
-                Payment.method == "cash",
-                Payment.payment_date >= date_from,
-                Payment.payment_date <= date_to,
+        if _payments_running():
+            paid = await db.execute(
+                select(Payment.payment_date)
+                .where(
+                    Payment.clinic_id == clinic_id,
+                    Payment.method == "cash",
+                    Payment.payment_date >= date_from,
+                    Payment.payment_date <= date_to,
+                )
+                .distinct()
             )
-            .distinct()
-        )
-        days.update(row[0] for row in paid.all())
+            days.update(row[0] for row in paid.all())
 
         moved = await db.execute(
             select(CashMovement.business_date)
@@ -685,16 +699,17 @@ class PeriodService:
         # Refunds are instants, so the day they belong to is resolved
         # through the clinic's zone rather than read off the timestamp —
         # the same asymmetry the arqueo's arithmetic lives with.
-        window_start, window_end = clinic_day_window(date_from, date_to, timezone)
-        refunded = await db.execute(
-            select(Refund.refunded_at).where(
-                Refund.clinic_id == clinic_id,
-                Refund.method == "cash",
-                Refund.refunded_at >= window_start,
-                Refund.refunded_at < window_end,
+        if _payments_running():
+            window_start, window_end = clinic_day_window(date_from, date_to, timezone)
+            refunded = await db.execute(
+                select(Refund.refunded_at).where(
+                    Refund.clinic_id == clinic_id,
+                    Refund.method == "cash",
+                    Refund.refunded_at >= window_start,
+                    Refund.refunded_at < window_end,
+                )
             )
-        )
-        days.update(clinic_date(row[0], timezone) for row in refunded.all())
+            days.update(clinic_date(row[0], timezone) for row in refunded.all())
 
         return sorted(day for day in days if day not in counted)
 
@@ -741,58 +756,59 @@ class LateEntryService:
 
         entries: list[LateEntry] = []
 
-        payments = await db.execute(
-            select(Payment).where(
-                Payment.clinic_id == clinic_id,
-                Payment.method == "cash",
-                Payment.payment_date >= date_from,
-                Payment.payment_date <= date_to,
-            )
-        )
-        for payment in payments.scalars().all():
-            closing = closings.get(payment.payment_date)
-            if closing is None or payment.created_at <= closing.closed_at:
-                continue
-            entries.append(
-                LateEntry(
-                    kind="payment",
-                    entry_id=payment.id,
-                    business_date=payment.payment_date,
-                    currency=payment.currency,
-                    amount=payment.amount,
-                    description=payment.reference,
-                    recorded_at=payment.created_at,
-                    closed_at=closing.closed_at,
+        if _payments_running():
+            payments = await db.execute(
+                select(Payment).where(
+                    Payment.clinic_id == clinic_id,
+                    Payment.method == "cash",
+                    Payment.payment_date >= date_from,
+                    Payment.payment_date <= date_to,
                 )
             )
+            for payment in payments.scalars().all():
+                closing = closings.get(payment.payment_date)
+                if closing is None or payment.created_at <= closing.closed_at:
+                    continue
+                entries.append(
+                    LateEntry(
+                        kind="payment",
+                        entry_id=payment.id,
+                        business_date=payment.payment_date,
+                        currency=payment.currency,
+                        amount=payment.amount,
+                        description=payment.reference,
+                        recorded_at=payment.created_at,
+                        closed_at=closing.closed_at,
+                    )
+                )
 
-        window_start, window_end = clinic_day_window(date_from, date_to, timezone)
-        refunds = await db.execute(
-            select(Refund).where(
-                Refund.clinic_id == clinic_id,
-                Refund.method == "cash",
-                Refund.refunded_at >= window_start,
-                Refund.refunded_at < window_end,
-            )
-        )
-        for refund in refunds.scalars().all():
-            day = clinic_date(refund.refunded_at, timezone)
-            closing = closings.get(day)
-            if closing is None or refund.created_at <= closing.closed_at:
-                continue
-            entries.append(
-                LateEntry(
-                    kind="refund",
-                    entry_id=refund.id,
-                    business_date=day,
-                    currency=currency,
-                    # Negative: a refund empties the drawer.
-                    amount=-refund.amount,
-                    description=refund.reason_code,
-                    recorded_at=refund.created_at,
-                    closed_at=closing.closed_at,
+            window_start, window_end = clinic_day_window(date_from, date_to, timezone)
+            refunds = await db.execute(
+                select(Refund).where(
+                    Refund.clinic_id == clinic_id,
+                    Refund.method == "cash",
+                    Refund.refunded_at >= window_start,
+                    Refund.refunded_at < window_end,
                 )
             )
+            for refund in refunds.scalars().all():
+                day = clinic_date(refund.refunded_at, timezone)
+                closing = closings.get(day)
+                if closing is None or refund.created_at <= closing.closed_at:
+                    continue
+                entries.append(
+                    LateEntry(
+                        kind="refund",
+                        entry_id=refund.id,
+                        business_date=day,
+                        currency=currency,
+                        # Negative: a refund empties the drawer.
+                        amount=-refund.amount,
+                        description=refund.reason_code,
+                        recorded_at=refund.created_at,
+                        closed_at=closing.closed_at,
+                    )
+                )
 
         # Cash rows only. A non-cash movement never carries a stamp — the
         # closing does not freeze what it did not count — so without this

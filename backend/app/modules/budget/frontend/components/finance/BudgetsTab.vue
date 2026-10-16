@@ -36,6 +36,7 @@ const { t, locale } = useI18n()
 const toast = useToast()
 const api = useApi()
 const { can } = usePermissions()
+const { patientsAvailable, professionalsAvailable } = useFinanceLinks()
 const { downloadPDF } = useBudgets()
 
 // --- Filters --------------------------------------------------------------
@@ -300,6 +301,15 @@ async function handleDownloadPDF(b: BudgetListItem, ev: Event) {
          nobody planned. -->
 
     <template #toolbar>
+      <UAlert
+        v-if="!patientsAvailable"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="t('finance.appsOff.patients')"
+        class="mb-3"
+        data-testid="budgets-patients-off"
+      />
       <FilterBar
         :active-count="activeFilterCount"
         @reset="resetFilters"
@@ -335,6 +345,7 @@ async function handleDownloadPDF(b: BudgetListItem, ev: Event) {
         />
 
         <FilterEntityPicker
+          v-if="professionalsAvailable"
           :model-value="filters.assigned_professional_id"
           :label="t('budget.filters.professional')"
           icon="i-lucide-user"

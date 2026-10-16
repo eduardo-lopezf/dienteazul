@@ -3020,6 +3020,7 @@
     }
   },
   "notifications": {
+    "patientsOff": "The Patients app is not enabled: no message is sent. Agenda, budget and invoice notices are sent only while their app is enabled.",
     "communications": {
       "language": {
         "cardTitle": "Communications language",
@@ -4315,7 +4316,13 @@
       "empty": "No figures to show",
       "emptyHint": "Your role can work the lists but cannot read the money reports."
     },
-    "empty": "No finance module is installed."
+    "empty": "No finance module is installed.",
+    "appsOff": {
+      "patients": "The Patients app is not enabled: saved budgets, invoices and payments are shown without the patient, and nothing new can be created.",
+      "catalog": "The treatment catalog is not enabled: no lines can be added. What is already quoted can still be read and collected.",
+      "professionals": "The Professionals app is not enabled: no professional can be assigned.",
+      "emailNeedsPatients": "Without the Patients app it cannot be emailed; mark it as delivered."
+    }
   },
   "consents": {
     "rule": {

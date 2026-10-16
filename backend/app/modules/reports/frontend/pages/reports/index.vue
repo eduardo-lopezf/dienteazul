@@ -32,10 +32,12 @@ watch(
   { deep: true }
 )
 
-const canPayments = computed(() => can('payments.reports.read'))
-const canScheduling = computed(() => can('reports.scheduling.read'))
-const canBilling = computed(() => can('reports.billing.read'))
-const canBudgets = computed(() => can('reports.budgets.read'))
+// A section shows only while its App runs (ADR 0037).
+const { on } = useReportApps()
+const canPayments = computed(() => can('payments.reports.read') && on('payments'))
+const canScheduling = computed(() => can('reports.scheduling.read') && on('agenda'))
+const canBilling = computed(() => can('reports.billing.read') && on('billing'))
+const canBudgets = computed(() => can('reports.budgets.read') && on('budget'))
 
 const noAccess = computed(
   () => !canPayments.value && !canScheduling.value && !canBilling.value && !canBudgets.value

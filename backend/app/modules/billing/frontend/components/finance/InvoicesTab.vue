@@ -24,6 +24,8 @@ const router = useRouter()
 const toast = useToast()
 const api = useApi()
 const { can } = usePermissions()
+// An invoice is made for a patient: none while Patients is off (ADR 0037).
+const { patientsAvailable } = useFinanceLinks()
 const { currentClinic } = useClinic()
 const { deleteInvoice, formatCurrency } = useInvoices()
 
@@ -197,7 +199,7 @@ async function handleDelete(inv: InvoiceListItem, ev: Event) {
   >
     <template #actions>
       <UButton
-        v-if="can(PERMISSIONS.billing.write)"
+        v-if="can(PERMISSIONS.billing.write) && patientsAvailable"
         color="primary"
         variant="solid"
         icon="i-lucide-plus"
@@ -208,6 +210,15 @@ async function handleDelete(inv: InvoiceListItem, ev: Event) {
     </template>
 
     <template #toolbar>
+      <UAlert
+        v-if="!patientsAvailable"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="t('finance.appsOff.patients')"
+        class="mb-3"
+        data-testid="invoices-patients-off"
+      />
       <FilterBar
         :active-count="activeFilterCount"
         @reset="resetFilters"
@@ -264,7 +275,7 @@ async function handleDelete(inv: InvoiceListItem, ev: Event) {
         :title="activeFilterCount || filters.q ? t('invoice.noItems') : t('invoice.empty')"
       >
         <template
-          v-if="!activeFilterCount && !filters.q && can(PERMISSIONS.billing.write)"
+          v-if="!activeFilterCount && !filters.q && can(PERMISSIONS.billing.write) && patientsAvailable"
           #actions
         >
           <UButton

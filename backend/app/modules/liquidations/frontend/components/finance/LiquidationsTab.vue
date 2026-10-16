@@ -18,6 +18,12 @@ import { formatDateOnly } from '~~/app/utils/date'
 
 const { t, locale } = useI18n()
 const { can } = usePermissions()
+// Payments and Professionals are integrated, not required (ADR 0037):
+// with either off the issued settlements are read and paid, none is worked out.
+const { active, isActive } = useModules()
+const canCalculate = computed(() =>
+  active.value === null || (isActive('payments') && isActive('professionals'))
+)
 const { format: money } = useCurrency()
 const { currentClinic } = useClinic()
 const toast = useToast()
@@ -84,7 +90,7 @@ const commissionFor = computed(() =>
 
 async function reload() {
   await fetchIssued(period.value.from, period.value.to)
-  if (professionalId.value) {
+  if (professionalId.value && canCalculate.value) {
     await fetchPreview(professionalId.value, period.value.from, period.value.to)
   }
 }
@@ -200,8 +206,19 @@ async function submitIssue() {
 
 <template>
   <div class="liq-tab">
+    <UAlert
+      v-if="!canCalculate"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-info"
+      :description="t('liquidations.appsOff')"
+      data-testid="liquidations-apps-off"
+    />
     <div class="liq-head">
-      <UFormField :label="t('liquidations.professional')">
+      <UFormField
+        v-if="canCalculate"
+        :label="t('liquidations.professional')"
+      >
         <USelect
           v-model="professionalId"
           class="min-w-56"
@@ -229,7 +246,7 @@ async function submitIssue() {
       class="h-28 w-full"
     />
 
-    <UCard v-else-if="preview">
+    <UCard v-else-if="preview && canCalculate">
       <template #header>
         <div class="flex items-center justify-between gap-2 flex-wrap">
           <span class="font-medium">

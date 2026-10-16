@@ -103,32 +103,26 @@ async def test_install_schedules_dependency_chain(
     await _reconcile(db_session)
 
     # Mark billing as uninstalled to simulate a fresh install of it and
-    # its chain.
-    billing = (
-        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == "billing"))
-    ).scalar_one()
-    budget = (
-        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == "budget"))
-    ).scalar_one()
-    catalog = (
-        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == "catalog"))
-    ).scalar_one()
-    billing.state = ModuleState.UNINSTALLED.value
-    budget.state = ModuleState.UNINSTALLED.value
-    catalog.state = ModuleState.UNINSTALLED.value
+    # its chain: billing depends on payments, which depends on budget.
+    # `catalog` is only integrated (ADR 0037) and is not pulled in.
+    chain = ("budget", "payments", "billing")
+    for name in (*chain, "catalog"):
+        row = (
+            await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == name))
+        ).scalar_one()
+        row.state = ModuleState.UNINSTALLED.value
     await db_session.commit()
 
     svc = ModuleService(db_session)
     scheduled = await svc.install("billing")
 
-    assert "billing" in scheduled
-    assert "budget" in scheduled
-    assert "catalog" in scheduled
+    assert set(chain) <= set(scheduled)
+    assert "catalog" not in scheduled
     # Dependency-first order.
-    assert scheduled.index("catalog") < scheduled.index("budget") < scheduled.index("billing")
+    assert scheduled.index("budget") < scheduled.index("payments") < scheduled.index("billing")
 
     # All three now marked to_install.
-    for name in ("billing", "budget", "catalog"):
+    for name in chain:
         row = (
             await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == name))
         ).scalar_one()

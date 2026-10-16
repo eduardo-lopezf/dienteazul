@@ -23,6 +23,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.plugins.registry import module_registry
 from app.core.utils.clinic_time import clinic_date, clinic_day_window
 from app.modules.cashbox.models import CashMovement
 from app.modules.cashbox.service import MovementService
@@ -42,6 +43,29 @@ CENTS = Decimal("0.01")
 
 class LiquidationError(ValueError):
     """A refusal the caller can fix. Routers turn it into a 422."""
+
+
+APPS_UNAVAILABLE = (
+    "Settlements cannot be calculated: the Payments and Professionals apps must be enabled"
+)
+
+
+def can_calculate() -> bool:
+    """Whether what a settlement is made of is running (ADR 0037).
+
+    ``payments`` (what was earned and collected) and ``professionals`` (who
+    is paid) are integrated, not required. With either off the settlements
+    already issued are read and paid, and no new one is calculated, issued
+    or given a percentage.
+    """
+    return module_registry.is_installed("payments") and module_registry.is_installed(
+        "professionals"
+    )
+
+
+def _require_calculation() -> None:
+    if not can_calculate():
+        raise LiquidationError(APPS_UNAVAILABLE)
 
 
 class CommissionService:
@@ -75,6 +99,7 @@ class CommissionService:
     async def upsert(
         db: AsyncSession, clinic_id: UUID, professional_id: UUID, data: dict
     ) -> ProfessionalCommission:
+        _require_calculation()
         professional = await db.scalar(
             select(Professional).where(
                 Professional.id == professional_id,
@@ -112,6 +137,7 @@ class LiquidationService:
         date_from: date,
         date_to: date,
     ) -> LiquidationPreview:
+        _require_calculation()
         if date_to < date_from:
             raise LiquidationError("The period ends before it starts.")
 
@@ -348,9 +374,12 @@ class LiquidationService:
 
         if method == "cash":
             business_date = data.get("business_date") or clinic_date(datetime.now(UTC), timezone)
+            # The name is the Professionals app's: left out while it is off.
             name = (
-                f"{liquidation.professional.first_name} {liquidation.professional.last_name}"
-            ).strip()
+                f"{liquidation.professional.first_name} {liquidation.professional.last_name}".strip()
+                if module_registry.is_installed("professionals")
+                else ""
+            )
             movement = await MovementService.create(
                 db,
                 clinic_id,
@@ -364,7 +393,7 @@ class LiquidationService:
                     # Names the period so the row is readable from the till
                     # screen without following the link back.
                     "concept": (
-                        f"Liquidación {name} · "
+                        f"Liquidación {name + ' · ' if name else ''}"
                         f"{liquidation.date_from:%d/%m} – {liquidation.date_to:%d/%m}"
                     ),
                     "reference": None,

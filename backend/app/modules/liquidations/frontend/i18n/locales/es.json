@@ -1,5 +1,6 @@
 {
   "liquidations": {
+    "appsOff": "Para calcular una liquidación hacen falta las apps Presupuestos y cobros y Profesionales. Mientras alguna esté apagada se ven y se pagan las liquidaciones ya emitidas, pero no se calculan nuevas.",
     "nav": {
       "liquidations": "Liquidaciones"
     },

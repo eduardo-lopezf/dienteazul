@@ -59,15 +59,23 @@ IMPORTS: dict[str, set[str]] = {
 #: ``integrates`` is not here: it runs without those (ADR 0037).
 REQUIRES: dict[str, set[str]] = {
     **IMPORTS,
-    # `billing` imports `reports` for one endpoint without depending on it —
-    # the known debt of `test_module_isolation.KNOWN_VIOLATIONS`.
-    "budgets_payments": {"patients", "treatments", "professionals"},
+    # Budgets and payments integrates Patients, Treatments (catalog,
+    # odontogram) and Professionals, and runs with any of them off
+    # (`budget/integrations.py`). `billing` also imports `reports` for one
+    # endpoint without depending on it — the known debt of
+    # `test_module_isolation.KNOWN_VIOLATIONS`.
+    "budgets_payments": set(),
     # `record` declares Professionals and reaches it through
     # `ProfessionalDirectory`, without importing it.
     "clinical_record": {"patients", "professionals"},
     # Data migration writes into every App it finds running and requires
     # none: whatever belongs to an App that is off is left out.
     "data_migration": set(),
+    # Cash, Communications and Reports integrate what they read and require
+    # none of it (ADR 0037): each guards the parts that need it.
+    "cash": set(),
+    "communications": set(),
+    "reports": set(),
 }
 
 _IMPORT = re.compile(r"\s*(?:from|import)\s+app\.modules\.([a-z_]+)")

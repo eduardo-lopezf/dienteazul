@@ -5,7 +5,9 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from .integrations import patients_available, professionals_available
 
 # ============================================================================
 # Budget Status Types (Simplified)
@@ -387,6 +389,16 @@ class BudgetResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode="after")
+    def _hide_apps_that_are_off(self) -> "BudgetResponse":
+        # ADR 0037: an App that is off shows none of its records. The ids
+        # are the budget's own columns and stay; they show again with it.
+        if not patients_available():
+            self.patient = None
+        if not professionals_available():
+            self.assigned_professional = None
+        return self
+
 
 class BudgetDetailResponse(BudgetResponse):
     """Schema for budget with full details including items."""
@@ -415,6 +427,12 @@ class BudgetListResponse(BaseModel):
     creator: UserBrief | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _hide_patients_when_off(self) -> "BudgetListResponse":
+        if not patients_available():
+            self.patient = None
+        return self
 
 
 # ============================================================================

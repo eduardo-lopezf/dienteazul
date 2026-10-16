@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
+from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
 from .hooks import BillingHookRegistry
 from .models import Invoice, InvoiceItem
@@ -107,6 +108,9 @@ class InvoiceWorkflowService:
             create_credit_note: For creating credit notes in draft status
             hooks.BillingComplianceHook.on_credit_note_issued: For country-specific behavior
         """
+        # A legal document for the patient: none while Patients is off (ADR 0037).
+        if not patients_available():
+            raise InvoiceWorkflowError(PATIENTS_UNAVAILABLE)
         if not InvoiceWorkflowService.can_issue(invoice):
             if invoice.status != "draft":
                 raise InvoiceWorkflowError(f"Cannot issue invoice from status '{invoice.status}'")
@@ -515,6 +519,8 @@ class InvoiceWorkflowService:
             issue_invoice: To issue the credit note after editing
             hooks.BillingComplianceHook.on_credit_note_issued: For country-specific behavior
         """
+        if not patients_available():
+            raise InvoiceWorkflowError(PATIENTS_UNAVAILABLE)
         if not InvoiceWorkflowService.can_create_credit_note(original_invoice):
             raise InvoiceWorkflowError(
                 f"Cannot create credit note for invoice with status '{original_invoice.status}'"

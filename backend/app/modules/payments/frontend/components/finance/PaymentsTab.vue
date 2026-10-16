@@ -17,6 +17,8 @@ import { formatDateOnly } from '~~/app/utils/date'
 const { t, locale } = useI18n()
 const api = useApi()
 const { can } = usePermissions()
+// With Patients off this list only reads: no payment, no refund (ADR 0037).
+const { patientsAvailable } = useFinanceLinks()
 
 interface PatientBrief {
   id: string
@@ -255,7 +257,7 @@ function formatDate(s: string | undefined): string {
   >
     <template #actions>
       <UButton
-        v-if="can(PERMISSIONS.payments.recordWrite)"
+        v-if="can(PERMISSIONS.payments.recordWrite) && patientsAvailable"
         color="primary"
         icon="i-lucide-plus"
         @click="showCreate = true"
@@ -265,6 +267,15 @@ function formatDate(s: string | undefined): string {
     </template>
 
     <template #toolbar>
+      <UAlert
+        v-if="!patientsAvailable"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="t('finance.appsOff.patients')"
+        class="mb-3"
+        data-testid="payments-patients-off"
+      />
       <FilterBar
         :active-count="activeFilterCount"
         @reset="resetFilters"
@@ -289,6 +300,7 @@ function formatDate(s: string | undefined): string {
         <FilterDateRange v-model="dateRange" />
 
         <FilterEntityPicker
+          v-if="patientsAvailable"
           :model-value="filters.patient_id"
           :label="t('payments.list.filter.patient')"
           icon="i-lucide-user"
@@ -327,7 +339,7 @@ function formatDate(s: string | undefined): string {
         :title="t('payments.list.empty')"
       >
         <template
-          v-if="!activeFilterCount && !filters.q && can(PERMISSIONS.payments.recordWrite)"
+          v-if="!activeFilterCount && !filters.q && can(PERMISSIONS.payments.recordWrite) && patientsAvailable"
           #actions
         >
           <UButton
@@ -404,7 +416,7 @@ function formatDate(s: string | undefined): string {
             </div>
           </button>
           <UButton
-            v-if="can(PERMISSIONS.payments.recordRefund) && Number(p.net_amount) > 0"
+            v-if="can(PERMISSIONS.payments.recordRefund) && patientsAvailable && Number(p.net_amount) > 0"
             variant="soft"
             color="warning"
             size="xs"
@@ -463,7 +475,7 @@ function formatDate(s: string | undefined): string {
             </UBadge>
           </div>
           <div
-            v-if="can(PERMISSIONS.payments.recordRefund) && Number(p.net_amount) > 0"
+            v-if="can(PERMISSIONS.payments.recordRefund) && patientsAvailable && Number(p.net_amount) > 0"
             class="flex justify-end"
           >
             <UButton

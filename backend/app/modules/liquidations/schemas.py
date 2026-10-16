@@ -5,7 +5,9 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.plugins.registry import module_registry
 
 CommissionBasis = Literal["collected", "earned"]
 PaymentMethod = Literal["cash", "transfer", "other"]
@@ -27,6 +29,21 @@ class ProfessionalBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class _HidesProfessional(BaseModel):
+    """With Professionals off its records are not shown (ADR 0037).
+
+    ``professional_id`` is this module's own column and stays.
+    """
+
+    professional: ProfessionalBrief | None = None
+
+    @model_validator(mode="after")
+    def _hide_professional_when_off(self) -> "_HidesProfessional":
+        if not module_registry.is_installed("professionals"):
+            self.professional = None
+        return self
+
+
 # --- The arrangement ---------------------------------------------------
 
 
@@ -36,7 +53,7 @@ class CommissionUpsert(BaseModel):
     notes: str | None = None
 
 
-class CommissionResponse(BaseModel):
+class CommissionResponse(_HidesProfessional):
     id: UUID
     professional_id: UUID
     basis: str
@@ -69,7 +86,7 @@ class LiquidationLine(BaseModel):
         return self.earned - self.collected
 
 
-class LiquidationPreview(BaseModel):
+class LiquidationPreview(_HidesProfessional):
     """What a settlement would say if it were issued right now.
 
     Recalculated on every read, and that is correct while nobody has been
@@ -121,7 +138,7 @@ class LiquidationPay(BaseModel):
     notes: str | None = Field(default=None, max_length=300)
 
 
-class LiquidationResponse(BaseModel):
+class LiquidationResponse(_HidesProfessional):
     id: UUID
     professional_id: UUID
     professional: ProfessionalBrief | None = None

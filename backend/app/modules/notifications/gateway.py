@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.events import EventType, event_bus
 
 from .channels import Channel, OutboundMessage, SendStatus, channel_registry
+from .integrations import SKIP_PATIENTS_UNAVAILABLE, running
 from .models import CommunicationMessage
 from .service import NotificationService, resolve_clinic_communication_locale
 
@@ -86,6 +87,18 @@ class NotificationGateway:
             )
             if existing.first():
                 return None
+
+        if patient_id is not None and not running("patients"):
+            return await NotificationGateway._skip(
+                db,
+                clinic_id,
+                notification_type,
+                patient_id,
+                to_address or "",
+                SKIP_PATIENTS_UNAVAILABLE,
+                triggered_by_event,
+                triggered_by_user_id,
+            )
 
         patient = await NotificationGateway._load_patient(db, clinic_id, patient_id)
 
@@ -398,8 +411,11 @@ class NotificationGateway:
         """Resolve a clinic patient by phone, ignoring formatting.
 
         Exact match first, then a last-9-digits match so ``+34 600 11 22 33``
-        finds a patient stored as ``600112233``. Clinic-scoped.
+        finds a patient stored as ``600112233``. Clinic-scoped. Nobody is
+        found while Patients is off (ADR 0037).
         """
+        if not running("patients"):
+            return None
         from app.modules.patients.models import Patient
 
         exact = (
@@ -431,7 +447,7 @@ class NotificationGateway:
     # ------------------------------------------------------------------ helpers
     @staticmethod
     async def _load_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID | None):
-        if not patient_id:
+        if not patient_id or not running("patients"):
             return None
         from app.modules.patients.models import Patient
 

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.agenda.models import Appointment
 from app.modules.professionals.models import Professional
 
+from ..integrations import running
+
 
 class SchedulingReportService:
     """Service for scheduling/appointment reports."""
@@ -194,7 +196,7 @@ class SchedulingReportService:
         # Get professional names
         prof_ids = [r.professional_id for r in rows if r.professional_id]
         prof_names: dict[UUID, str] = {}
-        if prof_ids:
+        if prof_ids and running("professionals"):
             result = await db.execute(select(Professional).where(Professional.id.in_(prof_ids)))
             for professional in result.scalars():
                 prof_names[professional.id] = f"{professional.first_name} {professional.last_name}"

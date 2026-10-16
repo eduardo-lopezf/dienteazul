@@ -1,5 +1,6 @@
 {
   "liquidations": {
+    "appsOff": "A settlement needs the Budgets and payments and Professionals apps. While either is off, settlements already issued can be read and paid, but no new one is calculated.",
     "nav": {
       "liquidations": "Settlements"
     },

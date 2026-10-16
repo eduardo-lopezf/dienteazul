@@ -1,5 +1,6 @@
 {
   "cashbox": {
+    "paymentsOff": "Presupuestos y cobros no está activada: el arqueo cuenta solo los movimientos registrados en caja.",
     "nav": {
       "cashbox": "Caja"
     },

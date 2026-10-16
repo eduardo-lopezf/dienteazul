@@ -35,7 +35,9 @@ class CashboxModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["payments"],
+        "depends": [],
+        # ADR 0037: with Cobros off the till counts only its own movements.
+        "integrates": ["payments"],
         "installable": True,
         "auto_install": True,
         # Same reason as `payments`: a cash count is an accounting record

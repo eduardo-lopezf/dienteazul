@@ -5,6 +5,7 @@ const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
 const toast = useToast()
+const { catalogAvailable } = useFinanceLinks()
 
 const {
   currentInvoice,
@@ -430,6 +431,7 @@ function goBack() {
                   {{ t('invoice.items') }}
                 </h3>
                 <UButton
+                  v-if="catalogAvailable"
                   icon="i-lucide-plus"
                   size="sm"
                   @click="openAddItemModal"
@@ -438,6 +440,13 @@ function goBack() {
                 </UButton>
               </div>
             </template>
+
+            <p
+              v-if="!catalogAvailable"
+              class="mb-4 text-caption text-subtle"
+            >
+              {{ t('finance.appsOff.catalog') }}
+            </p>
 
             <!-- Empty state -->
             <div

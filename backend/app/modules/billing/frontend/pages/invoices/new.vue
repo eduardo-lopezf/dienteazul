@@ -7,6 +7,8 @@ const router = useRouter()
 const toast = useToast()
 const { createInvoice } = useInvoices()
 const api = useApi()
+// VAT types are the catalog's: with it off no line is added (ADR 0037).
+const { catalogAvailable } = useFinanceLinks()
 
 // Track if coming from patient page
 const comesFromPatient = computed(() => route.query.from === 'patient' && route.query.patient_id)
@@ -55,6 +57,7 @@ function handleItemAdded(item: InvoiceItemCreate) {
 
 // Load VAT types
 onMounted(async () => {
+  if (!catalogAvailable.value) return
   try {
     const response = await api.get<{ data: VatType[] }>('/api/v1/catalog/vat-types')
     vatTypes.value = response.data
@@ -324,6 +327,7 @@ function goBack() {
                 {{ t('invoice.items') }}
               </h3>
               <UButton
+                v-if="catalogAvailable"
                 icon="i-lucide-plus"
                 size="sm"
                 @click="openAddItemModal"
@@ -332,6 +336,14 @@ function goBack() {
               </UButton>
             </div>
           </template>
+
+          <p
+            v-if="!catalogAvailable"
+            class="mb-4 text-caption text-subtle"
+            data-testid="invoice-catalog-off"
+          >
+            {{ t('finance.appsOff.catalog') }}
+          </p>
 
           <!-- Empty state -->
           <div
@@ -344,6 +356,7 @@ function goBack() {
             />
             <p>{{ t('budget.items.empty') }}</p>
             <UButton
+              v-if="catalogAvailable"
               variant="outline"
               class="mt-3"
               icon="i-lucide-plus"

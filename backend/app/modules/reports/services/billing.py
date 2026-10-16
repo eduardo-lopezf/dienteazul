@@ -14,6 +14,8 @@ from app.modules.billing.models import Invoice, InvoiceItem, InvoicePayment, Inv
 from app.modules.budget.models import Budget
 from app.modules.catalog.models import VatType
 
+from ..integrations import NO_NAME, running
+
 
 class BillingReportService:
     """Service for billing reports."""
@@ -31,7 +33,37 @@ class BillingReportService:
         **Invoice axis only.** Sums issued invoice totals; never references
         payments. Keep this single-axis so it cannot surface the
         invoiced-vs-collected difference (off-books rule).
+
+        With Patients off the figures stay and the names go (ADR 0037).
         """
+        if not running("patients"):
+            result = await db.execute(
+                select(
+                    Invoice.patient_id,
+                    func.coalesce(func.sum(Invoice.total), Decimal("0")).label("total_invoiced"),
+                    func.count(Invoice.id).label("invoice_count"),
+                )
+                .where(
+                    Invoice.clinic_id == clinic_id,
+                    Invoice.status.notin_(["draft", "voided"]),
+                    Invoice.issue_date >= date_from,
+                    Invoice.issue_date <= date_to,
+                    Invoice.deleted_at.is_(None),
+                )
+                .group_by(Invoice.patient_id)
+                .order_by(desc("total_invoiced"))
+                .limit(limit)
+            )
+            return [
+                {
+                    "patient_id": str(row.patient_id),
+                    "patient_name": NO_NAME,
+                    "total_invoiced": float(row.total_invoiced),
+                    "invoice_count": int(row.invoice_count),
+                }
+                for row in result.all()
+            ]
+
         from app.modules.patients.models import Patient
 
         result = await db.execute(
@@ -319,8 +351,10 @@ class BillingReportService:
         paginate (no usage today, surface added when needed).
         """
         today = date.today()
+        # Names only while Patients runs (ADR 0037).
+        named = running("patients")
 
-        result = await db.execute(
+        query = (
             select(Invoice)
             .where(
                 Invoice.clinic_id == clinic_id,
@@ -328,10 +362,12 @@ class BillingReportService:
                 Invoice.due_date < today,
                 Invoice.deleted_at.is_(None),
             )
-            .options(joinedload(Invoice.patient))
             .order_by(Invoice.due_date)
             .limit(limit)
         )
+        if named:
+            query = query.options(joinedload(Invoice.patient))
+        result = await db.execute(query)
 
         invoices = result.scalars().all()
 
@@ -350,7 +386,9 @@ class BillingReportService:
                 "id": inv.id,
                 "invoice_number": inv.invoice_number,
                 "patient_name": (
-                    f"{inv.patient.last_name}, {inv.patient.first_name}" if inv.patient else "-"
+                    f"{inv.patient.last_name}, {inv.patient.first_name}"
+                    if named and inv.patient
+                    else NO_NAME
                 ),
                 "issue_date": inv.issue_date,
                 "due_date": inv.due_date,

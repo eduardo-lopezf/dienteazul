@@ -12,6 +12,7 @@ from app.core.utils.currency import format_currency as _fmt_currency
 if TYPE_CHECKING:
     from app.core.auth.models import Clinic
 
+from .integrations import patients_available, professionals_available
 from .models import Budget, BudgetSignature
 
 _LOCALE_BY_LANG = {"es": "es_ES", "en": "en_US"}
@@ -225,12 +226,12 @@ class BudgetPDFService:
 
         # Patient info
         patient_name = ""
-        if budget.patient:
+        if budget.patient and patients_available():
             patient_name = f"{budget.patient.first_name} {budget.patient.last_name}"
 
         # Professional info
         professional_name = ""
-        if budget.assigned_professional:
+        if budget.assigned_professional and professionals_available():
             professional_name = f"{budget.assigned_professional.first_name} {budget.assigned_professional.last_name}"
 
         # Validity period

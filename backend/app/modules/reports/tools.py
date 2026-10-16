@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
 
+from .integrations import running
 from .services import BillingReportService, SchedulingReportService
 
 
@@ -34,6 +35,8 @@ class TopClientsArgs(BaseModel):
 
 
 async def _billing_report(ctx: AgentContext, params: PeriodArgs) -> dict:
+    if not running("billing"):
+        return {"error": "app_unavailable", "detail": "This report's app is not enabled"}
     summary = await BillingReportService.get_summary(
         ctx.db, ctx.clinic_id, params.date_from, params.date_to
     )
@@ -47,6 +50,8 @@ async def _billing_report(ctx: AgentContext, params: PeriodArgs) -> dict:
 
 
 async def _top_clients_by_billing(ctx: AgentContext, params: TopClientsArgs) -> dict:
+    if not running("billing"):
+        return {"error": "app_unavailable", "detail": "This report's app is not enabled"}
     rows = await BillingReportService.top_clients_by_billing(
         ctx.db,
         ctx.clinic_id,
@@ -58,6 +63,8 @@ async def _top_clients_by_billing(ctx: AgentContext, params: TopClientsArgs) -> 
 
 
 async def _scheduling_report(ctx: AgentContext, params: PeriodArgs) -> dict:
+    if not running("agenda"):
+        return {"error": "app_unavailable", "detail": "This report's app is not enabled"}
     return await SchedulingReportService.get_summary(
         ctx.db, ctx.clinic_id, params.date_from, params.date_to
     )

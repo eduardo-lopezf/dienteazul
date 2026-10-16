@@ -12,6 +12,7 @@ from app.database import get_db
 from app.modules.professionals.models import Professional
 
 from .gateway import NotificationGateway
+from .integrations import PATIENTS_UNAVAILABLE, running
 from .schemas import (
     ClinicNotificationSettingsResponse,
     ClinicNotificationSettingsUpdate,
@@ -202,6 +203,8 @@ async def get_patient_preferences(
     patient outside the clinic is a 404 rather than an empty default:
     answering would write a row pointing at another clinic's patient.
     """
+    if not running("patients"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
     try:
         prefs = await NotificationService.get_or_create_patient_preferences(
             db, ctx.clinic_id, patient_id
@@ -223,6 +226,8 @@ async def update_patient_preferences(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[NotificationPreferenceResponse]:
     """Update notification preferences for a patient."""
+    if not running("patients"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
     try:
         prefs = await NotificationService.update_patient_preferences(
             db, ctx.clinic_id, patient_id, data.model_dump(exclude_unset=True)
@@ -321,7 +326,28 @@ async def send_notification(
 
     Used for notifications that are not auto-sent, like welcome emails
     or budget emails when auto_send is disabled.
+
+    Every one goes to a patient: refused while Patients is off, and an
+    appointment or budget notice while the agenda or budgets is (ADR 0037).
     """
+    if not running("patients"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+    appointment_types = (
+        "appointment_confirmation",
+        "appointment_reminder",
+        "appointment_cancelled",
+    )
+    if data.notification_type in appointment_types and not running("agenda"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The agenda is not enabled: appointment notices cannot be sent",
+        )
+    if data.notification_type in ("budget_sent", "budget_accepted") and not running("budget"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Budgets is not enabled: budget notices cannot be sent",
+        )
+
     from sqlalchemy import select
 
     from app.modules.agenda.models import Appointment
@@ -390,7 +416,7 @@ async def send_notification(
         context["appointment_time"] = appointment.start_time.strftime("%H:%M")
 
         # Get professional
-        if appointment.professional_id:
+        if appointment.professional_id and running("professionals"):
             result = await db.execute(
                 select(Professional).where(Professional.id == appointment.professional_id)
             )
@@ -545,6 +571,8 @@ async def reply_to_conversation(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[ConversationMessageResponse]:
     """Send a free-form reply to the patient (within the 24h session window)."""
+    if not running("patients"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
     msg = await NotificationGateway.enqueue(
         db,
         ctx.clinic_id,

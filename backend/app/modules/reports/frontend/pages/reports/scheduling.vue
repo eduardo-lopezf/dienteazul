@@ -13,6 +13,12 @@ import type {
 
 const { t } = useI18n()
 const router = useRouter()
+
+// This section's App is off (ADR 0037): back to the reports that remain.
+const { on: appOn, loaded: appsLoaded } = useReportApps()
+watchEffect(() => {
+  if (appsLoaded.value && !appOn('agenda')) void router.replace('/reports')
+})
 const {
   fetchSchedulingSummary,
   fetchFirstVisits,

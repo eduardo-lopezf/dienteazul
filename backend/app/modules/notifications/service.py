@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.email import EmailResult, email_service
 
+from .integrations import PATIENTS_UNAVAILABLE, running
 from .models import (
     ClinicNotificationSettings,
     ClinicSmtpSettings,
@@ -294,8 +295,9 @@ class NotificationService:
         if prefs:
             return prefs
 
-        # `patients` is a declared dependency (manifest.depends), and the
-        # local import is the idiom the rest of this module already uses.
+        # Nothing is written for a patient while Patients is off (ADR 0037).
+        if not running("patients"):
+            raise ValueError(PATIENTS_UNAVAILABLE)
         from app.modules.patients.models import Patient
 
         owned = await db.scalar(

@@ -4,6 +4,9 @@ import type { NotificationTypeSettings, SmtpSettingsUpdate, SmtpTestRequest } fr
 const { t } = useI18n()
 const { isAdmin } = usePermissions()
 const auth = useAuth()
+// Every message goes to a patient: none is sent while Patients is off (ADR 0037).
+const { active, isActive } = useModules()
+const patientsAvailable = computed(() => active.value === null || isActive('patients'))
 const {
   settings,
   smtpSettings,
@@ -256,6 +259,15 @@ if (!isAdmin.value) {
         </UButton>
       </div>
     </div>
+
+    <UAlert
+      v-if="!patientsAvailable"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-info"
+      :description="t('notifications.patientsOff')"
+      data-testid="notifications-patients-off"
+    />
 
     <!-- Loading state -->
     <div

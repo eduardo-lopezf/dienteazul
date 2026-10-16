@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.core.agents import AgentContext, Tool, ToolCategory
 
+from .integrations import PATIENTS_UNAVAILABLE, patients_available
 from .schemas import BudgetStatus
 from .service import BudgetService
 from .workflow import BudgetWorkflowError, BudgetWorkflowService
@@ -47,7 +48,7 @@ class SendBudgetArgs(BaseModel):
 
 
 def _budget_summary(budget) -> dict:
-    patient = budget.patient
+    patient = budget.patient if patients_available() else None
     return {
         "id": budget.id,
         "number": budget.budget_number,
@@ -100,6 +101,8 @@ async def _send_budget(ctx: AgentContext, params: SendBudgetArgs) -> dict:
 
     recipient_email = None
     if params.send_email:
+        if not patients_available():
+            return {"error": "patients_unavailable", "detail": PATIENTS_UNAVAILABLE}
         # patient is joinedloaded by get_budget — no cross-module import.
         if budget.patient is None or not budget.patient.email:
             return {

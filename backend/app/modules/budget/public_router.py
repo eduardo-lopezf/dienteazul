@@ -40,6 +40,7 @@ from app.core.auth.router import limiter
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .integrations import patients_available
 from .schemas import BudgetDetailResponse
 from .service import BudgetService
 from .workflow import (
@@ -209,13 +210,15 @@ async def get_public_budget_meta(
     # Default to Spanish — matches the project's primary user base.
     clinic_language = clinic_language or "es"
 
-    patient_row = (
-        await db.execute(
-            _text("SELECT first_name FROM patients WHERE id = :id"),
-            {"id": budget.patient_id},
-        )
-    ).first()
-    patient_first_name = patient_row.first_name if patient_row else None
+    patient_first_name = None
+    if patients_available():
+        patient_row = (
+            await db.execute(
+                _text("SELECT first_name FROM patients WHERE id = :id"),
+                {"id": budget.patient_id},
+            )
+        ).first()
+        patient_first_name = patient_row.first_name if patient_row else None
 
     method = budget.public_auth_method
     requires_verification = method != "none" and not already_decided

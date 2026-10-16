@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
 from .hooks import BillingHookRegistry
 from .schemas import (
@@ -74,7 +75,13 @@ async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -
     discloses nothing that was leaking — it stops the route answering a
     question about a patient it should not be able to name
     (ADR 0029, invariant 2).
+
+    While Patients is off the read goes on without asking (ADR 0037): the
+    summary is scoped by ``clinic_id`` anyway.
     """
+    if not patients_available():
+        return
+
     from sqlalchemy import select
 
     from app.modules.patients.models import Patient
@@ -708,6 +715,9 @@ async def send_invoice_email(
             status_code=400,
             detail=f"Cannot send invoice with status '{invoice.status}'. Invoice must be issued first.",
         )
+
+    if data.send_email and not patients_available():
+        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
 
     # Check patient has email
     patient = invoice.patient

@@ -13,6 +13,7 @@ from app.core.plugins import BaseModule
 from app.core.scheduling import ScheduledJob
 from app.database import async_session_maker
 
+from .integrations import catalog_available
 from .models import Budget, BudgetAccessLog, BudgetHistory, BudgetItem, BudgetSignature
 from .public_router import public_router
 from .router import router
@@ -39,7 +40,9 @@ class BudgetModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["patients", "catalog", "odontogram", "professionals"],
+        "depends": [],
+        # ADR 0037: the App runs while any of these is off (integrations.py).
+        "integrates": ["patients", "catalog", "odontogram", "professionals"],
         "installable": True,
         "auto_install": True,
         "removable": False,
@@ -185,6 +188,10 @@ class BudgetModule(BaseModule):
             # Plan has no budget yet, or treatment without catalog ref —
             # nothing to mirror.
             return
+        if not catalog_available():
+            # No line is added while the catalog is off; "price what was
+            # added" (``plan_quotes.price_additions``) catches up later.
+            return
 
         async with async_session_maker() as db:
             try:
@@ -273,6 +280,8 @@ class BudgetModule(BaseModule):
         items_payload = data.get("items") or []
 
         if not plan_id or not budget_id_raw or not clinic_id:
+            return
+        if not catalog_available():
             return
 
         async with async_session_maker() as db:

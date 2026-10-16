@@ -1,5 +1,6 @@
 {
   "cashbox": {
+    "paymentsOff": "Budgets and payments is not enabled: the count includes only the movements recorded in the till.",
     "nav": {
       "cashbox": "Till"
     },

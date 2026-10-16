@@ -12,6 +12,8 @@ const router = useRouter()
 const { t, locale } = useI18n()
 const toast = useToast()
 const { can } = usePermissions()
+// With Patients off an invoice is only read: not issued, collected or rectified.
+const { patientsAvailable } = useFinanceLinks()
 const { currentClinic } = useClinic()
 const {
   currentInvoice,
@@ -330,7 +332,7 @@ const primaryActions = computed<EntityAction[]>(() => {
   if (!inv) return []
   const actions: EntityAction[] = []
 
-  if (canRecordPayment(inv) && can(PERMISSIONS.billing.write)) {
+  if (canRecordPayment(inv) && can(PERMISSIONS.billing.write) && patientsAvailable.value) {
     actions.push({
       key: 'recordPayment',
       label: t('invoice.actions.recordPayment'),
@@ -340,7 +342,7 @@ const primaryActions = computed<EntityAction[]>(() => {
     })
   }
 
-  if (canIssue(inv) && can(PERMISSIONS.billing.write)) {
+  if (canIssue(inv) && can(PERMISSIONS.billing.write) && patientsAvailable.value) {
     actions.push({
       key: 'issue',
       label: t('invoice.actions.issue'),
@@ -388,7 +390,7 @@ const overflowActions = computed<EntityAction[]>(() => {
     })
   }
 
-  if (canCreateCreditNote(inv) && can(PERMISSIONS.billing.write)) {
+  if (canCreateCreditNote(inv) && can(PERMISSIONS.billing.write) && patientsAvailable.value) {
     actions.push({
       key: 'createCreditNote',
       label: t('invoice.actions.createCreditNote'),
@@ -587,6 +589,16 @@ function goToCreditNoteFor() {
           />
         </template>
       </DetailPageHeader>
+
+      <UAlert
+        v-if="!patientsAvailable"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="t('finance.appsOff.patients')"
+        class="mb-6"
+        data-testid="invoice-patients-off"
+      />
 
       <!-- Critical banner — AEAT rejection (or future compliance failures).
            The header badge keeps the at-a-glance signal; this banner makes

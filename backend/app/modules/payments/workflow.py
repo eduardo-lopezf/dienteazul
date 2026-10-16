@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import EventType, event_bus
+from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 from app.modules.budget.models import Budget
 
 from .models import Payment, PaymentAllocation, PaymentHistory, Refund
@@ -28,6 +29,15 @@ class PaymentWorkflowError(ValueError):
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _require_patients() -> None:
+    """Money is moved for a patient: none while Patients is off (ADR 0037).
+
+    What is already recorded stays readable.
+    """
+    if not patients_available():
+        raise PaymentWorkflowError(PATIENTS_UNAVAILABLE)
 
 
 async def _validate_allocations_for_clinic(
@@ -105,6 +115,7 @@ async def record_payment(
 
     Each item of ``allocations`` is ``{target_type, target_id?, amount}``.
     """
+    _require_patients()
     if not allocations:
         raise PaymentWorkflowError("At least one allocation required")
     allocated_total = _allocations_sum(allocations)
@@ -202,6 +213,7 @@ async def reallocate_payment(
     event per new row carries the previous target so subscribers can
     reconcile budget/on_account/invoice balances.
     """
+    _require_patients()
     if not new_allocations:
         raise PaymentWorkflowError("At least one allocation required")
     if _allocations_sum(new_allocations) != payment.amount:
@@ -278,6 +290,7 @@ async def refund_payment(
     refunded_by: UUID,
 ) -> Refund:
     """Create a Refund row, enforcing the per-payment cap."""
+    _require_patients()
     if amount <= 0:
         raise PaymentWorkflowError("Refund amount must be > 0")
 

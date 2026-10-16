@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.auth.models import Clinic
 from app.core.auth.permissions import has_permission
+from app.core.plugins.registry import module_registry
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
@@ -757,7 +758,12 @@ async def list_vat_mapping(
     _: Annotated[None, Depends(require_permission("verifactu.settings.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[VatClassificationListResponse]:
-    """Return every VAT type for the clinic with its current AEAT mapping."""
+    """Return every VAT type for the clinic with its current AEAT mapping.
+
+    Empty while the catalog, which owns the VAT types, is off (ADR 0037).
+    """
+    if not module_registry.is_installed("catalog"):
+        return ApiResponse(data=VatClassificationListResponse(items=[]))
 
     from app.modules.catalog.models import VatType
 
@@ -809,6 +815,11 @@ async def upsert_vat_mapping(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[VatClassificationItem]:
     """Set or clear the AEAT classification override for a VAT type."""
+    if not module_registry.is_installed("catalog"):
+        raise HTTPException(
+            status_code=400,
+            detail="VAT types cannot be classified: the treatment catalog is not enabled",
+        )
 
     from app.modules.catalog.models import VatType
 

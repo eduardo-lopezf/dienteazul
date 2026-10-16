@@ -12,6 +12,8 @@ from sqlalchemy import and_, select
 
 from app.database import async_session_maker
 
+from .integrations import running
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +44,11 @@ async def process_appointment_reminders() -> None:
     4. Sends reminder if not already sent
 
     The reminder window is: now < start_time <= now + hours_before
+
+    Stands still while the agenda or Patients is off (ADR 0037).
     """
+    if not running("agenda", "patients"):
+        return
     from app.core.auth.models import Clinic
     from app.modules.agenda.models import Appointment
     from app.modules.notifications.gateway import NotificationGateway
@@ -110,7 +116,7 @@ async def process_appointment_reminders() -> None:
 
                     # Get professional info
                     professional_name = None
-                    if appointment.professional_id:
+                    if appointment.professional_id and running("professionals"):
                         from app.modules.professionals.models import Professional
 
                         result = await db.execute(
@@ -179,6 +185,8 @@ async def send_single_reminder(appointment_id: UUID, clinic_id: UUID) -> bool:
     Returns:
         True if sent successfully, False otherwise.
     """
+    if not running("agenda", "patients"):
+        return False
     from app.core.auth.models import Clinic
     from app.modules.agenda.models import Appointment
     from app.modules.notifications.gateway import NotificationGateway
@@ -213,7 +221,7 @@ async def send_single_reminder(appointment_id: UUID, clinic_id: UUID) -> bool:
 
             # Get professional
             professional_name = None
-            if appointment.professional_id:
+            if appointment.professional_id and running("professionals"):
                 from app.modules.professionals.models import Professional
 
                 result = await db.execute(

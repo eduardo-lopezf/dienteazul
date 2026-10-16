@@ -18,6 +18,7 @@ from app.core.agents import AgentContext, Tool, ToolCategory
 
 from .channels import Channel
 from .gateway import NotificationGateway
+from .integrations import PATIENTS_UNAVAILABLE, running
 
 
 class SendNotificationArgs(BaseModel):
@@ -39,6 +40,9 @@ class SendNotificationArgs(BaseModel):
 
 
 async def _send_notification(ctx: AgentContext, params: SendNotificationArgs) -> dict:
+    if not running("patients"):
+        return {"error": "patients_unavailable", "detail": PATIENTS_UNAVAILABLE}
+
     from app.modules.patients.models import Patient
 
     patient = (

@@ -37,7 +37,10 @@ class LiquidationsModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["payments", "professionals", "cashbox"],
+        "depends": ["cashbox"],
+        # ADR 0037: with either off, issued settlements are read and paid and
+        # no new one is calculated (`service.can_calculate`).
+        "integrates": ["payments", "professionals"],
         "installable": True,
         # Not every clinic has associates on a percentage, and the ones that
         # do not should not carry the screen. Opt in.

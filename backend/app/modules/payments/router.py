@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
+from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
 from .schedules import ScheduleService
 from .schemas import (
@@ -66,8 +67,14 @@ from .workflow import (
 router = APIRouter()
 
 
-async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> None:
+async def _ensure_patient(
+    db: AsyncSession, clinic_id: UUID, patient_id: UUID, *, writing: bool = False
+) -> None:
     """404 when the patient is not this clinic's.
+
+    While Patients is off (ADR 0037) nothing new is written for a patient
+    — ``writing`` answers 400 — and a read goes on without asking: every
+    query behind these routes is scoped by ``clinic_id`` anyway.
 
     Mirrors the odontogram / periodontogram pattern, minus its
     ``status != "archived"`` clause: money outlives the chart, and an
@@ -78,6 +85,11 @@ async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -
     question about a patient it should not be able to name
     (ADR 0029, invariant 2).
     """
+    if not patients_available():
+        if writing:
+            raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
+        return
+
     from sqlalchemy import select
 
     from app.modules.patients.models import Patient
@@ -145,7 +157,7 @@ async def create_payment_schedule(
     Amounts are taken as given: only the caller knows what the total is for,
     and a plan knows its phases where payments does not.
     """
-    await _ensure_patient(db, ctx.clinic_id, payload.patient_id)
+    await _ensure_patient(db, ctx.clinic_id, payload.patient_id, writing=True)
     try:
         schedule = await ScheduleService.create(
             db, ctx.clinic_id, ctx.user_id, payload.model_dump()
@@ -183,6 +195,8 @@ async def update_payment_schedule(
     Allowed after money has been collected: settlement is derived from the
     payments, so the new instalments are simply re-covered in order.
     """
+    if not patients_available():
+        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
     try:
         schedule = await ScheduleService.update(
             db, ctx.clinic_id, schedule_id, payload.model_dump(exclude_unset=True)
@@ -204,6 +218,8 @@ async def cancel_payment_schedule(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Supersede an agreement. Never deleted — it is part of what happened."""
+    if not patients_available():
+        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
     if not await ScheduleService.cancel(db, ctx.clinic_id, schedule_id):
         raise HTTPException(status_code=404, detail="Schedule not found")
     await db.commit()
@@ -291,6 +307,10 @@ async def list_receivables(
     Declared before ``/{payment_id}``: FastAPI resolves in registration
     order and "receivables" would otherwise be parsed as a payment id.
     """
+    if not patients_available():
+        # A row is a patient to call; none can be named while Patients is off.
+        return PaginatedApiResponse(data=[], total=0, page=page, page_size=page_size)
+
     from sqlalchemy import select
 
     from app.modules.patients.models import Patient
@@ -379,7 +399,7 @@ async def record_collection_contact(
     the money is whoever rings to ask for it, and a second grant to
     administer would only ever be set to the same people.
     """
-    await _ensure_patient(db, ctx.clinic_id, patient_id)
+    await _ensure_patient(db, ctx.clinic_id, patient_id, writing=True)
     contact = await LedgerService.record_contact(
         db, ctx.clinic_id, patient_id, ctx.user_id, data.model_dump()
     )

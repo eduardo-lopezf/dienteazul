@@ -12,6 +12,12 @@ from app.core.list_query import parse_sort
 from app.modules.catalog.models import TreatmentCatalogItem, VatType
 from app.modules.professionals.models import Professional
 
+from .integrations import (
+    patients_available,
+    require_catalog,
+    require_patients,
+    require_professionals,
+)
 from .models import Budget, BudgetHistory, BudgetItem
 
 
@@ -24,6 +30,7 @@ async def _validate_professional_in_clinic(
     leaking professionals across tenants or assigning a non-clinical
     profile. Raises ``ValueError`` so the router maps it to a 400.
     """
+    require_professionals()
     result = await db.execute(
         select(Professional.id).where(
             Professional.id == professional_id,
@@ -119,6 +126,8 @@ class BudgetItemService:
         data: dict,
     ) -> BudgetItem:
         """Create a budget item with price snapshot."""
+        # Every line is a catalog item: none is added while it is off.
+        require_catalog()
         # Get catalog item for price snapshot
         catalog_item = await db.get(TreatmentCatalogItem, data["catalog_item_id"])
         if not catalog_item or catalog_item.clinic_id != clinic_id:
@@ -302,7 +311,10 @@ class BudgetService:
                     )
                 )
 
-        if search:
+        if search and not patients_available():
+            # The patient's name is not shown, so it is not searched either.
+            conditions.append(Budget.budget_number.ilike(f"%{search}%"))
+        elif search:
             search_pattern = f"%{search}%"
             # Import Patient model for search
             from app.modules.patients.models import Patient
@@ -395,6 +407,7 @@ class BudgetService:
         historic Gesdén presupuestos keep their original year+number
         instead of getting renumbered into the current year.
         """
+        require_patients()
         assigned_professional_id = data.get("assigned_professional_id")
         if assigned_professional_id is not None:
             await _validate_professional_in_clinic(db, clinic_id, assigned_professional_id)
@@ -474,6 +487,9 @@ class BudgetService:
             BudgetWorkflowService,
             _resolve_clinic_settings,
         )
+
+        require_patients()
+        require_catalog()
 
         plan_id_raw = snapshot.get("plan_id")
         patient_id_raw = snapshot.get("patient_id")
@@ -586,6 +602,9 @@ class BudgetService:
         The caller decides what counts as unpriced and passes those items;
         see ``TreatmentPlanService.unbudgeted_items``.
         """
+        require_patients()
+        require_catalog()
+
         from .workflow import (
             DEFAULT_BUDGET_VALIDITY_DAYS,
             BudgetWorkflowService,
@@ -854,6 +873,9 @@ class BudgetService:
         created_by: UUID,
     ) -> Budget:
         """Create a new version of a budget."""
+        # A new budget for the patient, carrying its catalog lines.
+        require_patients()
+        require_catalog()
         # Get the latest version for this budget number
         result = await db.execute(
             select(func.max(Budget.version)).where(

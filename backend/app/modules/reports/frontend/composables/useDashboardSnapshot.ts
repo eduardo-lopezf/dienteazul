@@ -91,6 +91,7 @@ function num(value: string | number | null | undefined): number {
 export function useDashboardSnapshot() {
   const reports = useReports()
   const { can } = usePermissions()
+  const { on } = useReportApps()
   const route = useRoute()
 
   // Seed filters from URL on first mount so a bookmarked period is
@@ -141,8 +142,9 @@ export function useDashboardSnapshot() {
 
     const range = filters.value
     const prev = previousRange(range)
-    const canPayments = can('payments.reports.read')
-    const canScheduling = can('reports.scheduling.read')
+    // A section reads only while its App runs (ADR 0037).
+    const canPayments = can('payments.reports.read') && on('payments')
+    const canScheduling = can('reports.scheduling.read') && on('agenda')
 
     const tasks: Promise<unknown>[] = []
 

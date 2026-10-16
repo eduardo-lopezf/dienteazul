@@ -4008,6 +4008,7 @@
     }
   },
   "notifications": {
+    "patientsOff": "La app Pacientes no está activada: no se envía ningún mensaje. Los avisos de Agenda, Presupuestos o Facturas se envían solo mientras su app está activa.",
     "communications": {
       "language": {
         "cardTitle": "Idioma de comunicaciones",
@@ -4315,7 +4316,13 @@
       "empty": "Sin cifras que mostrar",
       "emptyHint": "Tu perfil puede trabajar las listas pero no leer los informes de dinero."
     },
-    "empty": "Ningún módulo financiero está instalado."
+    "empty": "Ningún módulo financiero está instalado.",
+    "appsOff": {
+      "patients": "La app Pacientes no está activada: se muestran los presupuestos, las facturas y los cobros guardados, sin el paciente, y no se puede crear nada nuevo.",
+      "catalog": "El catálogo de tratamientos no está activado: no se pueden añadir líneas. Lo ya presupuestado se puede consultar y cobrar.",
+      "professionals": "La app Profesionales no está activada: no se puede asignar un profesional.",
+      "emailNeedsPatients": "Sin la app Pacientes no se puede enviar por correo; márcalo como entregado."
+    }
   },
   "consents": {
     "rule": {

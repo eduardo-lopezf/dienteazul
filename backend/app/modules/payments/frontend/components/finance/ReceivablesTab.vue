@@ -44,6 +44,7 @@ interface ReceivableRow {
 const { t, locale } = useI18n()
 const api = useApi()
 const { can } = usePermissions()
+const { patientsAvailable } = useFinanceLinks()
 const { format: money } = useCurrency()
 
 const BUCKETS = ['0-30', '31-60', '61-90', '90+'] as const
@@ -171,6 +172,15 @@ function chasedToday(row: ReceivableRow): boolean {
 
 <template>
   <div class="receivables">
+    <!-- A row is a patient to call: none is listed while Patients is off. -->
+    <UAlert
+      v-if="!patientsAvailable"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-info"
+      :description="t('finance.appsOff.patients')"
+      data-testid="receivables-patients-off"
+    />
     <div class="receivables-toolbar">
       <UInput
         v-model="search"

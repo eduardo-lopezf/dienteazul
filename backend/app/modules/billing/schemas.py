@@ -5,7 +5,9 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.modules.budget.integrations import patients_available
 
 # ============================================================================
 # Invoice Status and Payment Types
@@ -512,6 +514,14 @@ class InvoiceResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode="after")
+    def _hide_patients_when_off(self) -> "InvoiceResponse":
+        # ADR 0037: Patients off shows none of its records; the invoice's
+        # own billing snapshot and ``patient_id`` stay.
+        if not patients_available():
+            self.patient = None
+        return self
+
 
 class InvoiceDetailResponse(InvoiceResponse):
     """Schema for invoice with full details including items and payment links."""
@@ -547,6 +557,14 @@ class InvoiceListResponse(BaseModel):
     creator: UserBrief | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _hide_patients_when_off(self) -> "InvoiceListResponse":
+        # ADR 0037: Patients off shows none of its records; the invoice's
+        # own billing snapshot and ``patient_id`` stay.
+        if not patients_available():
+            self.patient = None
+        return self
 
 
 # ============================================================================

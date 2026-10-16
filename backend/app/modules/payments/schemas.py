@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.modules.budget.integrations import patients_available
+
 PaymentMethod = Literal["cash", "card", "bank_transfer", "direct_debit", "insurance", "other"]
 AllocationTarget = Literal["budget", "on_account"]
 RefundReason = Literal["duplicate", "overpaid", "treatment_cancelled", "dispute", "other"]
@@ -146,7 +148,11 @@ class PaymentResponse(BaseModel):
             refunded_total=refunded,
             net_amount=payment.amount - refunded,
             recorder=UserBrief.model_validate(payment.recorder) if payment.recorder else None,
-            patient=PatientBrief.model_validate(payment.patient) if payment.patient else None,
+            patient=(
+                PatientBrief.model_validate(payment.patient)
+                if payment.patient and patients_available()
+                else None
+            ),
         )
 
 

@@ -11,6 +11,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .integrations import needs
 from .schemas import (
     AppointmentFunnel,
     BillingSummary,
@@ -47,7 +48,11 @@ router = APIRouter(tags=["reports"])
 # ============================================================================
 
 
-@router.get("/billing/summary", response_model=ApiResponse[BillingSummary])
+@router.get(
+    "/billing/summary",
+    response_model=ApiResponse[BillingSummary],
+    dependencies=[Depends(needs("billing"))],
+)
 async def get_billing_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
@@ -63,7 +68,11 @@ async def get_billing_summary(
     return ApiResponse(data=BillingSummary(**data))
 
 
-@router.get("/billing/overdue", response_model=ApiResponse[list[OverdueInvoice]])
+@router.get(
+    "/billing/overdue",
+    response_model=ApiResponse[list[OverdueInvoice]],
+    dependencies=[Depends(needs("billing"))],
+)
 async def get_overdue_invoices(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
@@ -79,7 +88,11 @@ async def get_overdue_invoices(
     return ApiResponse(data=[OverdueInvoice(**item) for item in data])
 
 
-@router.get("/billing/by-payment-method", response_model=ApiResponse[list[PaymentMethodSummary]])
+@router.get(
+    "/billing/by-payment-method",
+    response_model=ApiResponse[list[PaymentMethodSummary]],
+    dependencies=[Depends(needs("billing"))],
+)
 async def get_by_payment_method(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
@@ -98,6 +111,7 @@ async def get_by_payment_method(
 @router.get(
     "/billing/by-professional",
     response_model=ApiResponse[list[ProfessionalBillingSummary]],
+    dependencies=[Depends(needs("billing"))],
 )
 async def get_by_professional(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
@@ -114,7 +128,11 @@ async def get_by_professional(
     return ApiResponse(data=[ProfessionalBillingSummary(**item) for item in data])
 
 
-@router.get("/billing/vat-summary", response_model=ApiResponse[list[VatSummaryItem]])
+@router.get(
+    "/billing/vat-summary",
+    response_model=ApiResponse[list[VatSummaryItem]],
+    dependencies=[Depends(needs("billing"))],
+)
 async def get_vat_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
@@ -130,7 +148,11 @@ async def get_vat_summary(
     return ApiResponse(data=[VatSummaryItem(**item) for item in data])
 
 
-@router.get("/billing/gaps", response_model=ApiResponse[list[NumberingGap]])
+@router.get(
+    "/billing/gaps",
+    response_model=ApiResponse[list[NumberingGap]],
+    dependencies=[Depends(needs("billing"))],
+)
 async def get_numbering_gaps(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.billing.read"))],
@@ -150,7 +172,11 @@ async def get_numbering_gaps(
 # ============================================================================
 
 
-@router.get("/budgets/summary", response_model=ApiResponse[BudgetSummary])
+@router.get(
+    "/budgets/summary",
+    response_model=ApiResponse[BudgetSummary],
+    dependencies=[Depends(needs("budget"))],
+)
 async def get_budget_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
@@ -166,7 +192,11 @@ async def get_budget_summary(
     return ApiResponse(data=BudgetSummary(**data))
 
 
-@router.get("/budgets/by-professional", response_model=ApiResponse[list[BudgetByProfessional]])
+@router.get(
+    "/budgets/by-professional",
+    response_model=ApiResponse[list[BudgetByProfessional]],
+    dependencies=[Depends(needs("budget"))],
+)
 async def get_budgets_by_professional(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
@@ -179,7 +209,11 @@ async def get_budgets_by_professional(
     return ApiResponse(data=[BudgetByProfessional(**item) for item in data])
 
 
-@router.get("/budgets/by-treatment", response_model=ApiResponse[list[BudgetByTreatment]])
+@router.get(
+    "/budgets/by-treatment",
+    response_model=ApiResponse[list[BudgetByTreatment]],
+    dependencies=[Depends(needs("budget"))],
+)
 async def get_budgets_by_treatment(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
@@ -193,7 +227,11 @@ async def get_budgets_by_treatment(
     return ApiResponse(data=[BudgetByTreatment(**item) for item in data])
 
 
-@router.get("/budgets/by-status", response_model=ApiResponse[list[BudgetByStatus]])
+@router.get(
+    "/budgets/by-status",
+    response_model=ApiResponse[list[BudgetByStatus]],
+    dependencies=[Depends(needs("budget"))],
+)
 async def get_budgets_by_status(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.budgets.read"))],
@@ -211,7 +249,11 @@ async def get_budgets_by_status(
 # ============================================================================
 
 
-@router.get("/scheduling/summary", response_model=ApiResponse[SchedulingSummary])
+@router.get(
+    "/scheduling/summary",
+    response_model=ApiResponse[SchedulingSummary],
+    dependencies=[Depends(needs("agenda"))],
+)
 async def get_scheduling_summary(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.scheduling.read"))],
@@ -227,7 +269,11 @@ async def get_scheduling_summary(
     return ApiResponse(data=SchedulingSummary(**data))
 
 
-@router.get("/scheduling/first-visits", response_model=ApiResponse[FirstVisitsSummary])
+@router.get(
+    "/scheduling/first-visits",
+    response_model=ApiResponse[FirstVisitsSummary],
+    dependencies=[Depends(needs("agenda"))],
+)
 async def get_first_visits(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.scheduling.read"))],
@@ -240,7 +286,11 @@ async def get_first_visits(
     return ApiResponse(data=FirstVisitsSummary(**data))
 
 
-@router.get("/scheduling/by-professional", response_model=ApiResponse[list[HoursByProfessional]])
+@router.get(
+    "/scheduling/by-professional",
+    response_model=ApiResponse[list[HoursByProfessional]],
+    dependencies=[Depends(needs("agenda"))],
+)
 async def get_hours_by_professional(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.scheduling.read"))],
@@ -255,7 +305,11 @@ async def get_hours_by_professional(
     return ApiResponse(data=[HoursByProfessional(**item) for item in data])
 
 
-@router.get("/scheduling/by-cabinet", response_model=ApiResponse[list[CabinetUtilization]])
+@router.get(
+    "/scheduling/by-cabinet",
+    response_model=ApiResponse[list[CabinetUtilization]],
+    dependencies=[Depends(needs("agenda"))],
+)
 async def get_cabinet_utilization(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.scheduling.read"))],
@@ -270,7 +324,11 @@ async def get_cabinet_utilization(
     return ApiResponse(data=[CabinetUtilization(**item) for item in data])
 
 
-@router.get("/scheduling/by-day-of-week", response_model=ApiResponse[list[DayOfWeekStats]])
+@router.get(
+    "/scheduling/by-day-of-week",
+    response_model=ApiResponse[list[DayOfWeekStats]],
+    dependencies=[Depends(needs("agenda"))],
+)
 async def get_by_day_of_week(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("reports.scheduling.read"))],
@@ -289,6 +347,7 @@ async def get_by_day_of_week(
 @router.get(
     "/scheduling/waiting-times",
     response_model=ApiResponse[WaitingTimeStats],
+    dependencies=[Depends(needs("agenda"))],
 )
 async def get_waiting_times(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
@@ -320,6 +379,7 @@ async def get_waiting_times(
 @router.get(
     "/scheduling/punctuality",
     response_model=ApiResponse[PunctualityStats],
+    dependencies=[Depends(needs("agenda"))],
 )
 async def get_punctuality(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
@@ -351,6 +411,7 @@ async def get_punctuality(
 @router.get(
     "/scheduling/duration-variance",
     response_model=ApiResponse[DurationVarianceStats],
+    dependencies=[Depends(needs("agenda"))],
 )
 async def get_duration_variance(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
@@ -382,6 +443,7 @@ async def get_duration_variance(
 @router.get(
     "/scheduling/funnel",
     response_model=ApiResponse[AppointmentFunnel],
+    dependencies=[Depends(needs("agenda"))],
 )
 async def get_appointment_funnel(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],

@@ -30,7 +30,9 @@ class VerifactuModule(BaseModule):
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
-        "depends": ["billing", "catalog"],
+        "depends": ["billing"],
+        # VAT types are the catalog's; with it off none is classified.
+        "integrates": ["catalog"],
         "installable": True,
         "auto_install": False,
         "removable": True,
@@ -111,6 +113,7 @@ class VerifactuModule(BaseModule):
     async def install(self, ctx) -> None:
         from sqlalchemy import select
 
+        from app.core.plugins.registry import module_registry
         from app.modules.billing.hooks import BillingHookRegistry
         from app.modules.catalog.models import VatType
 
@@ -120,6 +123,10 @@ class VerifactuModule(BaseModule):
         BillingHookRegistry.register(VerifactuHook())
         register_jobs()
         ctx.logger.info("verifactu hook registered for country=ES")
+
+        if not module_registry.is_installed("catalog"):
+            # VAT types are the catalog's (ADR 0037): nothing to seed from.
+            return
 
         # Seed default AEAT classification for every existing
         # zero-rated VAT type. For dental clinics, rate=0 typically

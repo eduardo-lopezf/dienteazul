@@ -13,6 +13,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .integrations import PATIENTS_UNAVAILABLE, AppUnavailableError, patients_available
 from .pdf import BudgetPDFService
 from .schemas import (
     BudgetAcceptRequest,
@@ -154,6 +155,8 @@ async def create_budget(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[BudgetDetailResponse]:
     """Create a new budget."""
+    if not patients_available():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
     # Verify patient exists
     from app.modules.patients.models import Patient
 
@@ -347,6 +350,8 @@ async def send_budget(
         recipient_email = None
 
         if data.send_email:
+            if not patients_available():
+                raise BudgetWorkflowError(PATIENTS_UNAVAILABLE)
             # Get patient email for sending
             from app.modules.patients.models import Patient
 
@@ -563,7 +568,10 @@ async def resend_budget(
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
-    new_budget = await BudgetWorkflowService.clone_to_new_draft(db, budget, ctx.user_id)
+    try:
+        new_budget = await BudgetWorkflowService.clone_to_new_draft(db, budget, ctx.user_id)
+    except AppUnavailableError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return ApiResponse(data=BudgetResponse.model_validate(new_budget))
 
 
@@ -654,7 +662,10 @@ async def duplicate_budget(
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
 
-    new_budget = await BudgetService.duplicate_budget(db, budget, ctx.user_id)
+    try:
+        new_budget = await BudgetService.duplicate_budget(db, budget, ctx.user_id)
+    except AppUnavailableError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     # Reload with relationships
     new_budget = await BudgetService.get_budget(

@@ -8,6 +8,9 @@ const toast = useToast()
 const { fetchBudget } = useBudgets()
 const { createFromBudget } = useInvoices()
 const api = useApi()
+// An invoice for the patient, with the budget's lines: needs both Apps.
+const { patientsAvailable, catalogAvailable } = useFinanceLinks()
+const appsOff = computed(() => !patientsAvailable.value || !catalogAvailable.value)
 
 const budgetId = route.params.budgetId as string
 
@@ -33,7 +36,9 @@ onMounted(async () => {
   try {
     const [budgetData, vatResponse] = await Promise.all([
       fetchBudget(budgetId),
-      api.get<{ data: VatType[] }>('/api/v1/catalog/vat-types')
+      catalogAvailable.value
+        ? api.get<{ data: VatType[] }>('/api/v1/catalog/vat-types')
+        : Promise.resolve({ data: [] as VatType[] })
     ])
 
     budget.value = budgetData
@@ -248,10 +253,21 @@ function goBack() {
           v-if="budget"
           class="text-caption text-subtle"
         >
-          {{ budget.budget_number }} - {{ budget.patient?.last_name }}, {{ budget.patient?.first_name }}
+          {{ budget.budget_number }}<template v-if="budget.patient">
+            - {{ budget.patient.last_name }}, {{ budget.patient.first_name }}
+          </template>
         </p>
       </div>
     </div>
+
+    <UAlert
+      v-if="appsOff"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-info"
+      :description="t(!patientsAvailable ? 'finance.appsOff.patients' : 'finance.appsOff.catalog')"
+      data-testid="invoice-from-budget-apps-off"
+    />
 
     <!-- Loading -->
     <div
@@ -555,7 +571,7 @@ function goBack() {
               block
               color="primary"
               :loading="isSubmitting"
-              :disabled="selectedItems.size === 0"
+              :disabled="selectedItems.size === 0 || appsOff"
               @click="handleSubmit"
             >
               {{ t('invoice.createDraft') }}
