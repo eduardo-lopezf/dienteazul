@@ -65,8 +65,7 @@
     {
       "name": "professionals",
       "version": "0.1",
-      "tier": "optional",
-      "core_for_tiers": ["clinic", "clinic_pro", "hospital"],
+      "tier": "core",
       "status": "enabled",
       "modules": ["professionals"]
     },

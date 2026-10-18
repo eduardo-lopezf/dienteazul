@@ -15,6 +15,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.core.auth.models import Clinic
+from app.core.plugins.registry import module_registry
 from app.modules.patients.models import Patient
 
 REFERRAL = {
@@ -59,6 +60,30 @@ async def test_the_purpose_decides_the_evidence_and_nothing_leaves_without_it(
 
     listed = await client.get(_url(test_patient), headers=auth_headers)
     assert listed.json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_record_is_read_and_handed_over_without_professionals_or_the_catalog(
+    client: AsyncClient, auth_headers: dict, test_patient: Patient
+) -> None:
+    """Both are integrated, not required (ADR 0037): the record reads who
+    wrote each entry while the directory runs, and does without it."""
+    await _allergy(client, auth_headers, test_patient)
+    switched_off = [m for m in ("professionals", "catalog") if module_registry.is_installed(m)]
+    for module in switched_off:
+        module_registry.deactivate(module)
+    try:
+        record = await client.get(
+            f"/api/v1/record/patients/{test_patient.id}", headers=auth_headers
+        )
+        assert record.status_code == 200, record.text
+        assert record.json()["data"]["professionals"] == []
+
+        made = await client.post(_url(test_patient), headers=auth_headers, json=REFERRAL)
+        assert made.status_code == 201, made.text
+    finally:
+        for module in switched_off:
+            module_registry.activate(module)
 
 
 @pytest.mark.asyncio

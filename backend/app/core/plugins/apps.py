@@ -276,16 +276,32 @@ def required_apps(app: AppDefinition) -> list[str]:
     return list(dict.fromkeys(owner[module] for module in required_modules(app)))
 
 
-def modules_outside(apps: list[str] | None) -> frozenset[str]:
+def clinic_apps(apps: list[str] | None, account_tier: str | None) -> list[str] | None:
+    """The Apps a clinic has: those chosen for it plus the mandatory ones.
+
+    ``None`` — nobody chose for the clinic — means every App. A stored list
+    is a choice made when the catalog was what it was; an App that became
+    mandatory for the clinic's tier since is the clinic's all the same, so
+    making one core needs no rewrite of every clinic's list.
+    """
+    if apps is None:
+        return None
+    mandatory = mandatory_apps(account_tier) if account_tier else []
+    return [*apps, *(name for name in mandatory if name not in apps)]
+
+
+def modules_outside(apps: list[str] | None, account_tier: str | None = None) -> frozenset[str]:
     """Modules a clinic does not have, given the Apps chosen for it.
 
     ``None`` — nobody chose for the clinic — means it has every App, so
     nothing is outside. Otherwise it is every module of every App that is
-    not on the list. What the deployment itself has switched off is a
-    separate matter (:func:`modules_disabled_by_app`).
+    not on the list nor mandatory for ``account_tier``
+    (:func:`clinic_apps`). What the deployment itself has switched off is
+    a separate matter (:func:`modules_disabled_by_app`).
     """
-    if apps is None:
+    has = clinic_apps(apps, account_tier)
+    if has is None:
         return frozenset()
     return frozenset(
-        module for app in load_app_catalog() if app.name not in apps for module in app.modules
+        module for app in load_app_catalog() if app.name not in has for module in app.modules
     )

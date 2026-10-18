@@ -48,6 +48,13 @@ class AccountTier(StrEnum):
     HOSPITAL = "hospital"
 
 
+#: One professional's practice, as opposed to a clinic: the account holder
+#: is the practice's only professional.
+INDIVIDUAL_TIERS: Final[frozenset[AccountTier]] = frozenset(
+    {AccountTier.BASIC, AccountTier.MEDIUM, AccountTier.ADVANCED}
+)
+
+
 # The entry tiers exist to be cheap, and a self-hosted deployment is the
 # opposite of cheap for the clinic: it carries the infrastructure, the
 # backups and the upgrades, plus the licence (ADR 0028). Offering them

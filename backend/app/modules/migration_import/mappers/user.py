@@ -42,7 +42,7 @@ from sqlalchemy import select
 
 from app.core.auth.models import ClinicMembership, User
 
-from .base import MapperContext
+from .base import MapperContext, account_email_for_import
 
 
 class UserMapper:
@@ -67,6 +67,15 @@ class UserMapper:
 
         if not email:
             email = f"migrado+user-{canonical_uuid[:8]}@dental-bridge.local"
+
+        # Never reach an account that is not this clinic's (ADR 0057).
+        email = await account_email_for_import(
+            ctx,
+            email=email,
+            canonical_uuid=canonical_uuid,
+            entity_type="user",
+            source_id=source_id,
+        )
 
         existing_user = await ctx.db.execute(select(User).where(User.email == email))
         user = existing_user.scalar_one_or_none()

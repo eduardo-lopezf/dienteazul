@@ -17,8 +17,8 @@ the dataclasses here are the whole vocabulary.
 
 from __future__ import annotations
 
-from collections.abc import Collection
-from dataclasses import dataclass
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, TypeVar
 from uuid import UUID
@@ -143,6 +143,36 @@ class ProfessionalDirectory(Protocol):
         """The directory profile an account *is* in this clinic, if it
         has one. Never creates: clinical attribution names nobody rather
         than guess (ADR 0032)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProfessionalActivity:
+    """What one App says about one professional's work.
+
+    ``patient_ids`` are the patients that App has them seeing, so the
+    profile can count each patient once across Apps; ``counts`` are that
+    App's own figures under keys it owns (``appointments``,
+    ``treatments_pending``, ...).
+    """
+
+    patient_ids: frozenset[UUID] = frozenset()
+    counts: Mapping[str, int] = field(default_factory=dict)
+
+
+class ProfessionalWorkload(Protocol):
+    """Supplied by every App that assigns work to a professional.
+
+    Unlike the other contracts several modules supply it at once — ask
+    :func:`providers`, never :func:`provider`. One that is off says
+    nothing, and the profile shows what the rest know.
+    """
+
+    async def activity(
+        self, db: AsyncSession, clinic_id: UUID, professional_ids: Collection[UUID]
+    ) -> dict[UUID, ProfessionalActivity]:
+        """An entry for every one of ``professional_ids``, zeros included:
+        a missing figure means the App is off, never that nothing is
+        assigned."""
 
 
 class PlannedTreatments(Protocol):
@@ -286,6 +316,15 @@ class WorkingHours(Protocol):
     ) -> dict[UUID, str]:
         """``"on_break"`` or ``"off"`` for professionals not working at
         ``at``. Those who are working are left out."""
+
+
+def providers(contract: type[T]) -> list[T]:
+    """Every running module's implementation of ``contract``.
+
+    For contracts several modules supply together
+    (:class:`ProfessionalWorkload`)."""
+    found = (module.get_providers().get(contract) for module in module_registry.list_modules())
+    return [implementation for implementation in found if implementation is not None]
 
 
 def provider(contract: type[T]) -> T | None:

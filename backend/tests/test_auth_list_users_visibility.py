@@ -1,22 +1,20 @@
-"""Every account that can sign in must be visible to an admin.
+"""`GET /auth/users` shows this clinic's staff and nobody else's.
 
-`GET /auth/users` built its list by joining `ClinicMembership` for the
-caller's clinic, so an account without a membership *there* did not appear
-— while `POST /auth/login` never asked for one, and let it in. That is the
-worst pairing available: an account nobody can see and nobody can
-deactivate, still holding a password that works.
+The listing used to return **every account in the deployment** — email,
+name, sign-in state, created date — and that was deliberate. It rested on
+one premise, written into the endpoint: "one clinic per deployment, so an
+account outside this clinic is residue of the same installation rather
+than another tenant's staff". Deployments hold several clinics, so the
+premise was false and the screen was showing each tenant the others'
+people.
 
-It is not hypothetical. A deployment holds exactly one clinic (nothing
-creates a second except `/auth/setup` and the demo seed), so running
-`seed_demo.py` over an installation that already had its own clinic leaves
-the original users behind a clinic the admin is no longer looking at. That
-is how a live server ended up with a user it could not see and could not
-stop.
+The problem the global listing was built for is covered at the door
+instead: `/auth/login` refuses an account with no membership anywhere
+(`test_auth_account_access.py`), so "remove from the clinic" already
+stops the login. An account that belongs to *another* clinic is that
+clinic's business.
 
-The listing is deliberately **not** scoped to the clinic, which is an
-exception to the rule that every query filters by `clinic_id`
-(`CLAUDE.md`). It is bounded: the rows say who can sign in and whether
-they have access here, and nothing about any other clinic.
+These tests are the ratchet. They fail if the listing ever widens again.
 """
 
 from __future__ import annotations
@@ -31,127 +29,118 @@ from app.core.auth.models import Clinic, ClinicMembership, User
 from app.core.auth.service import hash_password
 
 
-async def _make_user(db: AsyncSession, email: str) -> User:
+async def _user(db: AsyncSession, email: str, first: str = "Someone") -> User:
     user = User(
         email=email,
         password_hash=hash_password("TestPass1234"),
-        first_name="Left",
-        last_name="Behind",
+        first_name=first,
+        last_name="Elsewhere",
     )
     db.add(user)
     await db.commit()
     return user
 
 
-def _row(body: dict, email: str) -> dict | None:
-    return next((u for u in body["data"] if u["email"] == email), None)
-
-
-@pytest.mark.asyncio
-async def test_a_user_with_no_membership_anywhere_is_listed(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    test_clinic: Clinic,
-    db_session: AsyncSession,
-) -> None:
-    """The account the seed strands: it can log in and belonged to nobody."""
-    orphan = await _make_user(db_session, f"orphan-{uuid4().hex[:8]}@example.com")
-
-    response = await client.get("/api/v1/auth/users", headers=auth_headers)
-    assert response.status_code == 200, response.text
-
-    listed = _row(response.json(), orphan.email)
-    assert listed is not None, "an account that can sign in was hidden from the admin"
-    # No role, because it has no access here — that is the thing to show.
-    assert listed["role"] is None
-    assert listed["has_clinic_access"] is False
-
-
-@pytest.mark.asyncio
-async def test_a_user_left_in_another_clinic_is_listed(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    test_clinic: Clinic,
-    db_session: AsyncSession,
-) -> None:
-    """The other shape of the same problem, and the likelier one.
-
-    `seed_demo.py` adds its own clinic rather than adopting the one that is
-    there, so the users of the original clinic keep working logins while
-    the admin now administers a different clinic.
-    """
-    other = Clinic(
+async def _clinic(db: AsyncSession, name: str) -> Clinic:
+    clinic = Clinic(
         id=uuid4(),
-        name="Clinic From Before The Seed",
-        tax_id="B99999999",
+        name=name,
+        tax_id=f"B{uuid4().int % 100000000:08d}",
         address={"street": "Elsewhere", "city": "Bilbao"},
         settings={},
         account_tier="clinic",
     )
-    db_session.add(other)
-    stranded = await _make_user(db_session, f"stranded-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=stranded.id, clinic_id=other.id, role="admin"))
+    db.add(clinic)
+    await db.commit()
+    return clinic
+
+
+def _emails(body: dict) -> set[str]:
+    return {u["email"] for u in body["data"]}
+
+
+@pytest.mark.asyncio
+async def test_another_clinics_staff_are_not_listed(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_clinic: Clinic,
+    db_session: AsyncSession,
+) -> None:
+    """The reported leak: one tenant reading another tenant's people."""
+    theirs = await _user(db_session, f"theirs-{uuid4().hex[:8]}@example.com")
+    other = await _clinic(db_session, "Another Tenant")
+    db_session.add(ClinicMembership(user_id=theirs.id, clinic_id=other.id, role="admin"))
     await db_session.commit()
 
     response = await client.get("/api/v1/auth/users", headers=auth_headers)
+
     assert response.status_code == 200, response.text
-
-    listed = _row(response.json(), stranded.email)
-    assert listed is not None, "an account that can sign in was hidden from the admin"
-    assert listed["has_clinic_access"] is False
-    # Their role elsewhere is not this clinic's business, and saying "admin"
-    # here would read as administrator *of this clinic*.
-    assert listed["role"] is None
+    assert theirs.email not in _emails(response.json())
 
 
 @pytest.mark.asyncio
-async def test_members_of_this_clinic_keep_their_role(
+async def test_an_account_with_no_membership_is_not_listed(
     client: AsyncClient,
     auth_headers: dict[str, str],
     test_clinic: Clinic,
     db_session: AsyncSession,
 ) -> None:
-    """The listing that already worked must not change shape."""
-    member = await _make_user(db_session, f"member-{uuid4().hex[:8]}@example.com")
-    db_session.add(
-        ClinicMembership(user_id=member.id, clinic_id=test_clinic.id, role="receptionist")
-    )
-    await db_session.commit()
+    """It cannot sign in either, so there is nothing for an admin to do.
+
+    This is the row the old listing existed to surface. Login refuses it
+    now, which is where that belongs.
+    """
+    orphan = await _user(db_session, f"orphan-{uuid4().hex[:8]}@example.com")
 
     response = await client.get("/api/v1/auth/users", headers=auth_headers)
-    listed = _row(response.json(), member.email)
 
-    assert listed is not None
-    assert listed["role"] == "receptionist"
-    assert listed["has_clinic_access"] is True
+    assert orphan.email not in _emails(response.json())
 
 
 @pytest.mark.asyncio
-async def test_each_account_is_listed_once(
+async def test_this_clinics_staff_are_listed_with_their_role(
     client: AsyncClient,
     auth_headers: dict[str, str],
     test_clinic: Clinic,
     db_session: AsyncSession,
 ) -> None:
-    """A user with a membership here *and* elsewhere is one row, not two."""
-    other = Clinic(
-        id=uuid4(),
-        name="Second Clinic",
-        tax_id="B88888888",
-        address={"street": "Elsewhere", "city": "Vigo"},
-        settings={},
-        account_tier="clinic",
-    )
-    db_session.add(other)
-    both = await _make_user(db_session, f"both-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=both.id, clinic_id=test_clinic.id, role="dentist"))
-    db_session.add(ClinicMembership(user_id=both.id, clinic_id=other.id, role="admin"))
+    """The positive control: scoping it to nothing would pass the rest."""
+    ours = await _user(db_session, f"ours-{uuid4().hex[:8]}@example.com")
+    db_session.add(ClinicMembership(user_id=ours.id, clinic_id=test_clinic.id, role="hygienist"))
     await db_session.commit()
 
     body = (await client.get("/api/v1/auth/users", headers=auth_headers)).json()
-    rows = [u for u in body["data"] if u["email"] == both.email]
 
-    assert len(rows) == 1
-    assert rows[0]["role"] == "dentist", "the role shown must be the one for this clinic"
-    assert rows[0]["has_clinic_access"] is True
-    assert body["total"] == len(body["data"])
+    listed = next((u for u in body["data"] if u["email"] == ours.email), None)
+    assert listed is not None, "this clinic's own staff must appear"
+    assert listed["role"] == "hygienist"
+
+
+@pytest.mark.asyncio
+async def test_someone_in_both_clinics_appears_once_with_the_role_here(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_clinic: Clinic,
+    db_session: AsyncSession,
+) -> None:
+    """A person may be staff in two clinics; each sees only its own half.
+
+    The account is shared — one email, one login — so the isolation that
+    matters is that the role shown is the one here, and that the other
+    membership is not reported at all.
+    """
+    both = await _user(db_session, f"both-{uuid4().hex[:8]}@example.com")
+    other = await _clinic(db_session, "Their Clinic")
+    db_session.add_all(
+        [
+            ClinicMembership(user_id=both.id, clinic_id=test_clinic.id, role="assistant"),
+            ClinicMembership(user_id=both.id, clinic_id=other.id, role="admin"),
+        ]
+    )
+    await db_session.commit()
+
+    body = (await client.get("/api/v1/auth/users", headers=auth_headers)).json()
+
+    rows = [u for u in body["data"] if u["email"] == both.email]
+    assert len(rows) == 1, "one person is one row"
+    assert rows[0]["role"] == "assistant", "the role elsewhere must not leak"

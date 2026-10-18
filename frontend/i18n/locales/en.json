@@ -1558,10 +1558,7 @@
     "removeFromClinicAction": "Remove",
     "removeFromClinicConfirm": "Remove from this clinic:",
     "removeFromClinicNote": "They lose access to this clinic. The account is not deleted: if they should not get in anywhere, deactivate it.",
-    "blockAccess": "Block this account from signing in",
-    "allowAccess": "Let this account sign in again",
     "noClinicAccess": "No access to this clinic",
-    "noClinicAccessHint": "This account can sign in but does not belong to this clinic. Deactivate it if it should no longer get in.",
     "noUsers": "No users registered",
     "youTag": "(you)",
     "userActive": "User active",
@@ -1594,8 +1591,6 @@
     },
     "messages": {
       "userCreated": "User created successfully",
-      "accessBlocked": "This account can no longer sign in.",
-      "accessAllowed": "This account can sign in again.",
       "userUpdated": "User updated successfully",
       "userRemoved": "User removed from the clinic"
     },

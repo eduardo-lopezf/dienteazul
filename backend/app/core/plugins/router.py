@@ -30,6 +30,7 @@ from app.database import get_db
 
 from .apps import (
     AppStatus,
+    clinic_apps,
     integrated_modules,
     load_app_catalog,
     modules_disabled_by_app,
@@ -58,7 +59,7 @@ async def list_apps(
     but that was not chosen for the clinic is not enabled for it.
     """
     on_disk = statuses_on_disk()
-    chosen = ctx.clinic.apps
+    chosen = clinic_apps(ctx.clinic.apps, ctx.clinic.account_tier)
     offered = ctx.clinic.available_apps or []
     return ApiResponse(
         data=[
@@ -108,7 +109,8 @@ async def enable_app(
     """
     clinic = ctx.clinic
     catalog = {app.name: app for app in load_app_catalog()}
-    chosen, offered = clinic.apps, clinic.available_apps or []
+    chosen = clinic_apps(clinic.apps, clinic.account_tier)
+    offered = clinic.available_apps or []
     if name not in catalog:
         raise HTTPException(status_code=404, detail=f"App not found: {name}")
     if chosen is None or name in chosen:
@@ -194,7 +196,9 @@ async def active_modules(
     seen_destinations: set[str] = set()
     # Held back for everyone by the deployment, or not among the Apps
     # chosen for this clinic: either way it is not there for the caller.
-    held_back = modules_disabled_by_app() | modules_outside(ctx.clinic.apps)
+    held_back = modules_disabled_by_app() | modules_outside(
+        ctx.clinic.apps, ctx.clinic.account_tier
+    )
 
     for info in await svc.list_modules():
         if info.state != ModuleState.INSTALLED or info.name in held_back:
@@ -208,7 +212,7 @@ async def active_modules(
         nav = list(manifest.frontend.get("navigation") or [])
         filtered_nav = []
         for item in nav:
-            if not _nav_visible(item, ctx.role):
+            if not _nav_visible(item, ctx.role, ctx.clinic.account_tier):
                 continue
             destination = item.get("to")
             if destination in seen_destinations:
@@ -236,7 +240,12 @@ async def active_modules(
     return ApiResponse(data=active)
 
 
-def _nav_visible(item: dict[str, Any], role: str) -> bool:
+def _nav_visible(item: dict[str, Any], role: str, account_tier: str) -> bool:
+    # An entry may name the tiers it is for (`tiers`): a screen that is a
+    # clinic's tool and noise to one professional's practice.
+    tiers = item.get("tiers")
+    if tiers and account_tier not in tiers:
+        return False
     perm = item.get("permission")
     if not perm:
         return True

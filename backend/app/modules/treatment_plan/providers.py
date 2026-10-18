@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Collection
 from uuid import UUID
 
@@ -9,11 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.contracts import PlannedTreatmentBrief, TreatmentLink
+from app.core.contracts import PlannedTreatmentBrief, ProfessionalActivity, TreatmentLink
 from app.modules.catalog.models import TreatmentCatalogItem
 from app.modules.odontogram.models import Treatment
 
-from .models import PlannedTreatmentItem
+from .models import PlannedTreatmentItem, TreatmentPlan
 
 
 class PlannedTreatmentsProvider:
@@ -155,4 +156,74 @@ class PlanQuotesProvider:
         return snapshot
 
 
+#: A plan still being worked: confirmed and not finished.
+_PLANS_IN_PROGRESS = ("pending", "active")
+
+
+class PlanWorkload:
+    """Each professional's plans and treatments, for their profile (ADR 0039).
+
+    A plan is theirs when they are its doctor, a treatment when it is
+    assigned to them. Deleted plans and cancelled treatments count for
+    nothing; a draft plan's patient is not yet one they see.
+    """
+
+    async def activity(
+        self, db: AsyncSession, clinic_id: UUID, professional_ids: Collection[UUID]
+    ) -> dict[UUID, ProfessionalActivity]:
+        if not professional_ids:
+            return {}
+        patients: dict[UUID, set[UUID]] = defaultdict(set)
+        counts: dict[UUID, dict[str, int]] = defaultdict(
+            lambda: {"plans_in_progress": 0, "treatments_pending": 0, "treatments_completed": 0}
+        )
+
+        plans = await db.execute(
+            select(
+                TreatmentPlan.assigned_professional_id,
+                TreatmentPlan.patient_id,
+                TreatmentPlan.status,
+            ).where(
+                TreatmentPlan.clinic_id == clinic_id,
+                TreatmentPlan.assigned_professional_id.in_(professional_ids),
+                TreatmentPlan.deleted_at.is_(None),
+                TreatmentPlan.status != "draft",
+            )
+        )
+        for row in plans.all():
+            patients[row.assigned_professional_id].add(row.patient_id)
+            if row.status in _PLANS_IN_PROGRESS:
+                counts[row.assigned_professional_id]["plans_in_progress"] += 1
+
+        items = await db.execute(
+            select(
+                PlannedTreatmentItem.assigned_professional_id,
+                PlannedTreatmentItem.status,
+                TreatmentPlan.patient_id,
+            )
+            .join(TreatmentPlan, PlannedTreatmentItem.treatment_plan_id == TreatmentPlan.id)
+            .where(
+                TreatmentPlan.clinic_id == clinic_id,
+                TreatmentPlan.deleted_at.is_(None),
+                TreatmentPlan.status != "draft",
+                PlannedTreatmentItem.assigned_professional_id.in_(professional_ids),
+                PlannedTreatmentItem.status != "cancelled",
+            )
+        )
+        for row in items.all():
+            patients[row.assigned_professional_id].add(row.patient_id)
+            key = "treatments_completed" if row.status == "completed" else "treatments_pending"
+            counts[row.assigned_professional_id][key] += 1
+
+        return {
+            professional_id: ProfessionalActivity(
+                patient_ids=frozenset(patients[professional_id]),
+                counts=counts[professional_id],
+            )
+            # Every one asked about: no plans is a zero, not silence.
+            for professional_id in professional_ids
+        }
+
+
 plan_quotes = PlanQuotesProvider()
+workload = PlanWorkload()

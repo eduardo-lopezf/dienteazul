@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.core.auth.permissions import ROLES
+from app.core.privacy.tiers import AccountTier
 
 from .alembic_paths import module_branch_is_isolated
 from .manifest import ManifestError
@@ -31,6 +32,9 @@ if TYPE_CHECKING:
 
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
+
+
+_ACCOUNT_TIERS = frozenset(tier.value for tier in AccountTier)
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,14 @@ def validate_module(
                 )
 
     for item in manifest.frontend.get("navigation") or []:
+        if unknown_tiers := sorted(set(item.get("tiers") or ()) - _ACCOUNT_TIERS):
+            issues.append(
+                ValidationIssue(
+                    module_name=name,
+                    code="NAV_UNKNOWN_TIER",
+                    message=f"navigation to={item.get('to')} names unknown tiers {unknown_tiers}",
+                )
+            )
         perm = item.get("permission")
         if perm and "." not in perm:
             issues.append(

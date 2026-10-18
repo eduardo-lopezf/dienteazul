@@ -22,7 +22,11 @@ const { t } = useI18n()
 const searchQuery = ref('')
 const isOpen = ref(false)
 const highlightedIndex = ref(-1)
-const inputRef = ref<HTMLInputElement | null>(null)
+// A `UInput`, not an `<input>`: the ref holds the component, and the
+// native field is what it exposes as `inputRef`. Annotating this
+// `HTMLInputElement` is what let the same `focus()` call ship broken in
+// `PatientVisualSelector`.
+const inputRef = ref<{ inputRef?: HTMLInputElement | null } | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const dropdownStyle = ref<Record<string, string>>({})
 
@@ -144,7 +148,7 @@ watch(displayItems, () => {
 
 // Expose for parent to control
 defineExpose({
-  focus: () => inputRef.value?.focus(),
+  focus: () => inputRef.value?.inputRef?.focus(),
   clear: clearSelection
 })
 </script>

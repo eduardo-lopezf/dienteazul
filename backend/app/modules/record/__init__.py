@@ -45,8 +45,11 @@ class RecordModule(BaseModule):
         # them, so `patients_clinical` and friends are *not* dependencies and
         # the composition simply has fewer sections when one is uninstalled.
         # What is declared is what the header reads directly: who the record is
-        # about, and which professional answers for it.
-        "depends": ["patients", "professionals"],
+        # about. Which professional answers for each entry comes through
+        # `ProfessionalDirectory` (ADR 0039) and is left out while the
+        # Professionals App is off (ADR 0037): integrated, not required.
+        "depends": ["patients"],
+        "integrates": ["professionals"],
         "installable": True,
         # Off by default: a clinic that never discloses a record does not need
         # it, and phase 0's clinical guarantees do not depend on it being here.

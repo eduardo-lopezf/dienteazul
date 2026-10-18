@@ -1,20 +1,21 @@
-"""An account that belongs to no clinic cannot sign in, and an admin can
-cut off one that does not belong to theirs.
+"""An account that belongs to no clinic cannot sign in.
 
-Two halves of the same hole. `/auth/login` only ever asked for a password
-and an active flag, so an account with no membership anywhere signed in
-happily and got a token with `clinic_id = None` — able to do nothing, and
-invisible to the one screen that could stop it.
+`/auth/login` only ever asked for a password and an active flag, so an
+account with no membership anywhere signed in happily and got a token
+with `clinic_id = None` — able to do nothing, and invisible to the one
+screen that could stop it. Accounts reach that state on their own:
+`DELETE /auth/users/{id}` removes the membership and keeps the account,
+so "remove from clinic" left a working login behind.
 
-Accounts reach that state on their own: `DELETE /auth/users/{id}` removes
-the membership and keeps the account, so "remove from clinic" left a
-working login behind. Seeding over an installation that already had a
-clinic does the same to every user of the original one.
+No membership, no sign-in — which also makes removing someone from the
+clinic mean what it says.
 
-The first half closes it for good: no membership, no sign-in — which also
-makes removing someone from the clinic mean what it says. The second half
-covers what that cannot reach, an account stranded in *another* clinic
-row, where only an operator can decide it should stop working.
+This file used to have a second half, covering an admin's switch over
+accounts belonging to *other* clinics. That switch is gone: it rested on
+"one clinic per deployment", and deployments hold several, so it was one
+tenant reaching into another's staff. The last test here is what stops it
+coming back. Tenant-scoped listing is pinned in
+`test_auth_list_users_visibility.py`.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership, User
@@ -128,132 +128,98 @@ async def test_a_membership_in_another_clinic_still_signs_in(
     assert (await _login(client, stranded.email)).status_code == 200
 
 
-# --- cutting off an account that is not this clinic's ------------------
+# --- the operator switch is gone --------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_an_admin_can_stop_an_account_that_has_no_access_here(
+async def test_no_endpoint_lets_a_clinic_touch_an_outside_account(
     client: AsyncClient,
     auth_headers: dict[str, str],
     test_clinic: Clinic,
     db_session: AsyncSession,
 ) -> None:
-    """What login-gating cannot reach: a live account in another clinic row."""
+    """`PATCH /auth/users/{id}/active` was a cross-tenant kill switch.
+
+    It refused to act on this clinic's own staff (409) and existed only
+    for everybody else's, which made it a way for one tenant to stop
+    another tenant's people signing in. Removed rather than narrowed:
+    there is no version of "disable somebody else's staff" that belongs
+    to a clinic admin.
+    """
+    outsider = await _user(db_session, f"outsider-{uuid4().hex[:8]}@example.com")
     other = await _other_clinic(db_session)
-    stranded = await _user(db_session, f"stranded-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=stranded.id, clinic_id=other.id, role="admin"))
-    await db_session.commit()
-    assert (await _login(client, stranded.email)).status_code == 200
-
-    response = await client.patch(
-        f"/api/v1/auth/users/{stranded.id}/active",
-        json={"is_active": False},
-        headers=auth_headers,
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["data"]["is_active"] is False
-
-    assert (await _login(client, stranded.email)).status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_stopping_an_account_invalidates_the_tokens_it_holds(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    test_clinic: Clinic,
-    db_session: AsyncSession,
-) -> None:
-    """A password that no longer works is no use if the open session does."""
-    other = await _other_clinic(db_session)
-    stranded = await _user(db_session, f"stranded-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=stranded.id, clinic_id=other.id, role="admin"))
-    await db_session.commit()
-    tokens = (await _login(client, stranded.email)).json()
-
-    await client.patch(
-        f"/api/v1/auth/users/{stranded.id}/active",
-        json={"is_active": False},
-        headers=auth_headers,
-    )
-
-    refreshed = await client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
-    )
-    assert refreshed.status_code == 401, refreshed.text
-
-
-@pytest.mark.asyncio
-async def test_an_account_can_be_let_back_in(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    test_clinic: Clinic,
-    db_session: AsyncSession,
-) -> None:
-    """Reversible: an operator who stops the wrong account can undo it."""
-    other = await _other_clinic(db_session)
-    stranded = await _user(db_session, f"stranded-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=stranded.id, clinic_id=other.id, role="admin"))
-    await db_session.commit()
-
-    for active in (False, True):
-        response = await client.patch(
-            f"/api/v1/auth/users/{stranded.id}/active",
-            json={"is_active": active},
-            headers=auth_headers,
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["data"]["is_active"] is active
-
-    assert (await _login(client, stranded.email)).status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_a_member_of_this_clinic_is_not_managed_here(
-    client: AsyncClient,
-    auth_headers: dict[str, str],
-    test_clinic: Clinic,
-    db_session: AsyncSession,
-) -> None:
-    """One way to do a thing: members go through `PUT /users/{id}`, which
-    also carries their role and profile."""
-    member = await _user(db_session, f"member-{uuid4().hex[:8]}@example.com")
-    db_session.add(ClinicMembership(user_id=member.id, clinic_id=test_clinic.id, role="dentist"))
+    db_session.add(ClinicMembership(user_id=outsider.id, clinic_id=other.id, role="dentist"))
     await db_session.commit()
 
     response = await client.patch(
-        f"/api/v1/auth/users/{member.id}/active",
+        f"/api/v1/auth/users/{outsider.id}/active",
         json={"is_active": False},
         headers=auth_headers,
     )
+
+    assert response.status_code in (404, 405), response.text
+
+    # And the account is untouched, which is the thing that matters.
+    await db_session.refresh(outsider)
+    assert outsider.is_active is True
+
+
+# --- one account, two clinics -----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_disabling_a_two_clinic_account_is_refused(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_clinic: Clinic,
+    db_session: AsyncSession,
+) -> None:
+    """`is_active` belongs to the account, and an account is global.
+
+    So switching it off for somebody who is also staff somewhere else
+    would end their sign-in there too — this clinic reaching into
+    another's. Refused, with the per-clinic action named: removing them
+    from this clinic, which login already honours.
+    """
+    shared = await _user(db_session, f"shared-{uuid4().hex[:8]}@example.com")
+    other = await _other_clinic(db_session)
+    db_session.add_all(
+        [
+            ClinicMembership(user_id=shared.id, clinic_id=test_clinic.id, role="assistant"),
+            ClinicMembership(user_id=shared.id, clinic_id=other.id, role="dentist"),
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.put(
+        f"/api/v1/auth/users/{shared.id}",
+        json={"is_active": False},
+        headers=auth_headers,
+    )
+
     assert response.status_code == 409, response.text
+    await db_session.refresh(shared)
+    assert shared.is_active is True, "the other clinic's sign-in was ended anyway"
 
 
 @pytest.mark.asyncio
-async def test_an_admin_cannot_stop_themselves(
+async def test_disabling_an_account_of_this_clinic_only_still_works(
     client: AsyncClient,
     auth_headers: dict[str, str],
     test_clinic: Clinic,
     db_session: AsyncSession,
 ) -> None:
-    me = (await client.get("/api/v1/auth/me", headers=auth_headers)).json()["data"]["user"]
+    """The positive control: the guard must not block ordinary staff."""
+    ours = await _user(db_session, f"ours-{uuid4().hex[:8]}@example.com")
+    db_session.add(ClinicMembership(user_id=ours.id, clinic_id=test_clinic.id, role="assistant"))
+    await db_session.commit()
 
-    response = await client.patch(
-        f"/api/v1/auth/users/{me['id']}/active",
+    response = await client.put(
+        f"/api/v1/auth/users/{ours.id}",
         json={"is_active": False},
         headers=auth_headers,
     )
-    assert response.status_code in (400, 409), response.text
-    still = await db_session.execute(select(User).where(User.id == me["id"]))
-    assert still.scalar_one().is_active is True
 
-
-@pytest.mark.asyncio
-async def test_an_unknown_account_is_not_found(
-    client: AsyncClient, auth_headers: dict[str, str], test_clinic: Clinic
-) -> None:
-    response = await client.patch(
-        f"/api/v1/auth/users/{uuid4()}/active",
-        json={"is_active": False},
-        headers=auth_headers,
-    )
-    assert response.status_code == 404, response.text
+    assert response.status_code == 200, response.text
+    await db_session.refresh(ours)
+    assert ours.is_active is False

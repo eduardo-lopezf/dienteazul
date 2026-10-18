@@ -65,9 +65,10 @@ REQUIRES: dict[str, set[str]] = {
     # endpoint without depending on it — the known debt of
     # `test_module_isolation.KNOWN_VIOLATIONS`.
     "budgets_payments": set(),
-    # `record` declares Professionals and reaches it through
-    # `ProfessionalDirectory`, without importing it.
-    "clinical_record": {"patients", "professionals"},
+    # `record` and `consents` integrate Professionals through
+    # `ProfessionalDirectory` and require only the Patients App (media
+    # included).
+    "clinical_record": {"patients"},
     # Data migration writes into every App it finds running and requires
     # none: whatever belongs to an App that is off is left out.
     "data_migration": set(),

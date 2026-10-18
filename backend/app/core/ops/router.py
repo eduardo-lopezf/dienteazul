@@ -47,7 +47,12 @@ from app.core.plugins.apps import (
     required_apps,
 )
 from app.core.privacy.policy import CustodyMode
-from app.core.privacy.tiers import AccountTier, TierCustodyError, validate_tier_custody
+from app.core.privacy.tiers import (
+    INDIVIDUAL_TIERS,
+    AccountTier,
+    TierCustodyError,
+    validate_tier_custody,
+)
 from app.core.schemas import ApiResponse
 from app.core.tenancy import TenantContext
 from app.core.tenancy.dependencies import get_tenant
@@ -187,7 +192,7 @@ async def get_clinic_log(
 
 #: Tiers sold to one professional rather than to a clinic: the clinic
 #: record carries the holder's own name and tax id.
-_INDIVIDUAL_TIERS = frozenset({AccountTier.BASIC, AccountTier.MEDIUM, AccountTier.ADVANCED})
+_INDIVIDUAL_TIERS = INDIVIDUAL_TIERS
 
 
 class ClinicCreate(BaseModel):
@@ -329,6 +334,21 @@ def _chosen_specialties(chosen: list[str] | None) -> list[str] | None:
             f"every clinic has the specialty: {', '.join(missing)}",
         )
     return [key for key in known if key in chosen]
+
+
+def _announce_tier(db: AsyncSession, clinic: Clinic, tier: str) -> None:
+    """Say so after the commit when ``clinic`` moves to another tier.
+
+    Modules keep what a tier implies on their side: ``professionals`` gives
+    the holder of an individual practice their profile.
+    """
+    if clinic.account_tier == tier:
+        return
+    event_bus.publish_after_commit(
+        db,
+        EventType.CLINIC_ACCOUNT_TIER_CHANGED,
+        {"clinic_id": str(clinic.id), "account_tier": tier, "previous_tier": clinic.account_tier},
+    )
 
 
 def _chosen_apps(chosen: list[str], tier: AccountTier) -> list[str]:
@@ -737,6 +757,7 @@ async def update_clinic(
     specialties = _chosen_specialties(data.specialties)
 
     clinic.available_apps = _offered_apps(data.available_apps, apps)
+    _announce_tier(db, clinic, data.account_tier.value)
     clinic.account_tier = data.account_tier.value
     clinic.timezone = data.timezone
     clinic.tax_id = data.tax_id
@@ -810,6 +831,7 @@ async def set_clinic_tier(
         validate_tier_custody(data.account_tier, tenant.privacy.custody_mode)
     except TierCustodyError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    _announce_tier(db, clinic, data.account_tier.value)
     clinic.account_tier = data.account_tier.value
     if clinic.apps is not None:
         catalog = {app.name: app for app in load_app_catalog()}

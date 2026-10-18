@@ -7,10 +7,10 @@
     "/module_layers/cashbox/frontend",
     "/module_layers/catalog/frontend",
     "/module_layers/patients/frontend",
+    "/module_layers/media/frontend",
     "/module_layers/consents/frontend",
     "/module_layers/copilot/frontend",
     "/module_layers/liquidations/frontend",
-    "/module_layers/media/frontend",
     "/module_layers/migration_import/frontend",
     "/module_layers/notifications/frontend",
     "/module_layers/odontogram/frontend",
@@ -55,6 +55,10 @@
       "path": "/module_layers/patients/frontend"
     },
     {
+      "name": "media",
+      "path": "/module_layers/media/frontend"
+    },
+    {
       "name": "consents",
       "path": "/module_layers/consents/frontend"
     },
@@ -65,10 +69,6 @@
     {
       "name": "liquidations",
       "path": "/module_layers/liquidations/frontend"
-    },
-    {
-      "name": "media",
-      "path": "/module_layers/media/frontend"
     },
     {
       "name": "migration_import",

@@ -81,3 +81,32 @@ class ProfessionalResponse(BaseModel):
     has_system_access: bool = False
     created_at: datetime
     updated_at: datetime
+
+
+class MyProfessionalUpdate(BaseModel):
+    """What a professional edits of their own profile.
+
+    Not who the profile is (the account link, the type) nor whether it is
+    active: those are the clinic's to decide (``PUT /{id}``).
+    """
+
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    specialty_ids: list[UUID] | None = None
+    license_number: str | None = Field(default=None, max_length=80)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=30)
+
+
+class ProfessionalWorkloadResponse(BaseModel):
+    """What is assigned to one professional, as the Apps that run say.
+
+    ``patients`` counts each patient once across Apps; ``counts`` holds each
+    App's own figures (``appointments``, ``appointments_upcoming``,
+    ``plans_in_progress``, ``treatments_pending``, ``treatments_completed``).
+    A key is missing when the App that owns it is off.
+    """
+
+    professional_id: UUID
+    patients: int
+    counts: dict[str, int] = Field(default_factory=dict)

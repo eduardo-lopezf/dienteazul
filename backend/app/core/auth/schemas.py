@@ -186,21 +186,12 @@ class UserCreate(BaseModel):
     )
 
 
-class UserAccessUpdate(BaseModel):
-    """Whether an account outside this clinic may sign in at all."""
-
-    is_active: bool
-
-
 class UserWithRoleResponse(BaseModel):
-    """Schema for a user an admin can act on, and their role here.
+    """Schema for a member of the calling admin's clinic, and their role.
 
-    ``role`` is ``None`` for an account with no membership in the calling
-    admin's clinic. Such an account can still sign in — ``/auth/login``
-    never asked for a membership — so it has to be visible or nobody can
-    deactivate it. Its role in some *other* clinic is deliberately not
-    reported: "admin" next to a name reads as administrator of the clinic
-    being looked at.
+    Only this clinic's staff are ever listed, so ``role`` is always set.
+    It stays optional in the type because ``UserUpdate`` may leave it
+    untouched, not because an account without one can appear here.
     """
 
     id: UUID
@@ -210,7 +201,6 @@ class UserWithRoleResponse(BaseModel):
     is_active: bool
     role: str | None
     #: Whether this account is a member of the clinic that asked.
-    has_clinic_access: bool = True
     created_at: str
 
     model_config = ConfigDict(from_attributes=True)

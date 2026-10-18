@@ -26,17 +26,18 @@ class ConsentsModule(BaseModule):
         "license": "BSL-1.1",
         "category": "official",
         # The patient the letter is about: a foreign key, and no consent
-        # without one.
-        "depends": ["patients"],
+        # without one. Media is required too: a letter signed on paper is
+        # filed as a scan among the patient's documents.
+        "depends": ["patients", "media"],
         # Who explained it is read through `ProfessionalDirectory` and kept
         # as a snapshot (ADR 0039). With the directory off, drafts and
         # data-use consents still work; an informed consent cannot be
         # signed, because it has to name a professional.
         #
-        # A letter signed on paper is filed as a scan among the patient's
-        # documents, checked through `PatientDocuments`. With Media off a
-        # consent can still be printed and signed on screen.
-        "integrates": ["professionals", "media"],
+        # The scan is checked through `PatientDocuments`; that guard stays
+        # in place for a deployment that switches the Patients App's Media
+        # module off on its own.
+        "integrates": ["professionals"],
         "installable": True,
         # Off by default, like the rest of the Clinical record App.
         "auto_install": False,

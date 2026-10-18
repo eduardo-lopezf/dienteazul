@@ -5,7 +5,7 @@ import type { ClinicUser } from '~/composables/useUsers'
 const { t } = useI18n()
 const auth = useAuth()
 const { isAdmin } = usePermissions()
-const { users, isLoading, availableRoles, fetchUsers, createUser, updateUser, setUserActive, removeFromClinic } = useUsers()
+const { users, isLoading, availableRoles, fetchUsers, createUser, updateUser, removeFromClinic } = useUsers()
 
 const translatedRoles = computed(() =>
   availableRoles.map(role => ({
@@ -26,7 +26,6 @@ const sortedUsers = computed(() => {
   return [...users.value].sort((a, b) => {
     // Accounts without access here sink to the bottom: they are the ones
     // to act on, but they are not staff of this clinic.
-    if (a.has_clinic_access !== b.has_clinic_access) return a.has_clinic_access ? -1 : 1
     if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
     const ra = a.role ? ROLE_ORDER[a.role] ?? 99 : 99
     const rb = b.role ? ROLE_ORDER[b.role] ?? 99 : 99
@@ -205,13 +204,9 @@ async function handleDelete() {
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <!-- An account with no membership here can still sign in, so it is
-               listed and labelled rather than hidden. -->
           <UBadge
             :color="getRoleBadgeColor(user.role)"
             variant="subtle"
-            :icon="user.has_clinic_access ? undefined : 'i-lucide-user-x'"
-            :title="user.has_clinic_access ? undefined : t('settings.noClinicAccessHint')"
           >
             {{ getRoleLabel(user.role) }}
           </UBadge>
@@ -222,23 +217,7 @@ async function handleDelete() {
           >
             {{ t('common.inactive') }}
           </UBadge>
-          <!-- Editing and deleting resolve the user through a membership
-               here and answer 404 for these accounts, so the only control
-               offered is the one that works: whether they can sign in.
-               Reversible, which is why it asks for no confirmation. -->
           <UButton
-            v-if="!user.has_clinic_access"
-            :icon="user.is_active ? 'i-lucide-ban' : 'i-lucide-rotate-ccw'"
-            size="xs"
-            variant="ghost"
-            :color="user.is_active ? 'error' : 'neutral'"
-            :loading="isLoading"
-            :aria-label="user.is_active ? t('settings.blockAccess') : t('settings.allowAccess')"
-            :title="user.is_active ? t('settings.blockAccess') : t('settings.allowAccess')"
-            @click="setUserActive(user.id, !user.is_active)"
-          />
-          <UButton
-            v-if="user.has_clinic_access"
             icon="i-lucide-pencil"
             size="xs"
             variant="ghost"
@@ -249,7 +228,7 @@ async function handleDelete() {
           <!-- `user-minus`, not a bin: this takes the person off this
                clinic's staff and leaves the account alone. -->
           <UButton
-            v-if="user.has_clinic_access && !isCurrentUser(user.id)"
+            v-if="!isCurrentUser(user.id)"
             icon="i-lucide-user-minus"
             size="xs"
             variant="ghost"

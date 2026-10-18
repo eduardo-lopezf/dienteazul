@@ -1558,10 +1558,7 @@
     "removeFromClinicAction": "Quitar",
     "removeFromClinicConfirm": "¿Quitar de esta clínica a",
     "removeFromClinicNote": "Pierde el acceso a esta clínica. La cuenta no se elimina: si no debe poder entrar en ningún sitio, desactívala.",
-    "blockAccess": "Bloquear el acceso de esta cuenta",
-    "allowAccess": "Permitir el acceso de esta cuenta",
     "noClinicAccess": "Sin acceso a esta clínica",
-    "noClinicAccessHint": "Esta cuenta puede iniciar sesión pero no pertenece a esta clínica. Desactívala si ya no debe entrar.",
     "noUsers": "No hay usuarios registrados",
     "youTag": "(tú)",
     "userActive": "Usuario activo",
@@ -1594,8 +1591,6 @@
     },
     "messages": {
       "userCreated": "Usuario creado correctamente",
-      "accessBlocked": "Esta cuenta ya no puede iniciar sesión.",
-      "accessAllowed": "Esta cuenta vuelve a poder iniciar sesión.",
       "userUpdated": "Usuario actualizado correctamente",
       "userRemoved": "Usuario quitado de la clínica"
     },

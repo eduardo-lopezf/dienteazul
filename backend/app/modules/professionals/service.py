@@ -8,7 +8,9 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import TEXT
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth.models import ClinicMembership, User
+from app.core.auth.models import Clinic, ClinicMembership, User
+from app.core.contracts import ProfessionalWorkload, providers
+from app.core.privacy.tiers import INDIVIDUAL_TIERS
 from app.modules.catalog.models import Specialty
 
 from .models import Professional, professional_specialties
@@ -232,3 +234,87 @@ class ProfessionalService:
             )
         )
         return set(result.scalars().all())
+
+
+class HolderProfileService:
+    """The profile of the professional who *is* an individual practice.
+
+    Under an individual tier (``INDIVIDUAL_TIERS``) the account holder is
+    the practice's professional: patients, treatments and appointments are
+    assigned to them, so they need a directory profile from the first day,
+    and the clinic has no directory screen to make one from.
+
+    The link to the account is stated by construction — the holder of the
+    practice is the professional of the practice — not inferred from an
+    e-mail (ADR 0032).
+    """
+
+    @staticmethod
+    async def ensure(db: AsyncSession, clinic_id: UUID) -> Professional | None:
+        """The holder's profile, made if missing. ``None`` for a clinic tier.
+
+        Idempotent. An existing profile not linked to any account is left
+        alone and a linked one is made beside it: telling which unlinked
+        profile is the holder would be a guess.
+        """
+        clinic = await db.get(Clinic, clinic_id)
+        if clinic is None or clinic.account_tier not in INDIVIDUAL_TIERS:
+            return None
+        holder = await db.scalar(
+            select(User)
+            .join(ClinicMembership, ClinicMembership.user_id == User.id)
+            .where(ClinicMembership.clinic_id == clinic_id, ClinicMembership.role == "admin")
+            .order_by(ClinicMembership.created_at, User.id)
+            .limit(1)
+        )
+        if holder is None:
+            return None
+        existing = await db.scalar(
+            select(Professional).where(
+                Professional.clinic_id == clinic_id, Professional.user_id == holder.id
+            )
+        )
+        if existing is not None:
+            return existing
+        profile = Professional(
+            clinic_id=clinic_id,
+            user_id=holder.id,
+            first_name=holder.first_name or "",
+            last_name=holder.last_name or "",
+            email=holder.email,
+            license_number=holder.professional_id,
+            professional_type="dentist",
+        )
+        db.add(profile)
+        await db.flush()
+        return profile
+
+
+class WorkloadService:
+    """What each professional has assigned, from every App that assigns it."""
+
+    @staticmethod
+    async def for_clinic(
+        db: AsyncSession, clinic_id: UUID, professional_ids: list[UUID] | None = None
+    ) -> list[tuple[UUID, int, dict[str, int]]]:
+        """``(professional_id, patients, counts)`` per professional.
+
+        The clinic's active professionals unless ``professional_ids`` says
+        which; always scoped by ``clinic_id``.
+        """
+        query = select(Professional.id).where(Professional.clinic_id == clinic_id)
+        if professional_ids is not None:
+            query = query.where(Professional.id.in_(professional_ids))
+        else:
+            query = query.where(Professional.is_active.is_(True))
+        ids = list((await db.execute(query)).scalars().all())
+
+        patients: dict[UUID, set[UUID]] = {pid: set() for pid in ids}
+        counts: dict[UUID, dict[str, int]] = {pid: {} for pid in ids}
+        for workload in providers(ProfessionalWorkload):
+            for pid, activity in (await workload.activity(db, clinic_id, ids)).items():
+                if pid not in patients:
+                    continue
+                patients[pid] |= activity.patient_ids
+                counts[pid].update(activity.counts)
+        return [(pid, len(patients[pid]), counts[pid]) for pid in ids]

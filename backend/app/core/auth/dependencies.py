@@ -226,7 +226,9 @@ async def get_clinic_context(
         )
 
     segments = request.url.path.split("/")
-    if len(segments) > 3 and segments[3] in modules_outside(membership.clinic.apps):
+    if len(segments) > 3 and segments[3] in modules_outside(
+        membership.clinic.apps, membership.clinic.account_tier
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 
     # Bind clinic_id + user_id onto the per-request logging context so

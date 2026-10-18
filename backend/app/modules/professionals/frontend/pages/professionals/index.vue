@@ -34,6 +34,16 @@ if (!can(PERMISSIONS.professionals.read)) {
   await navigateTo('/')
 }
 
+// The directory is a clinic's screen. One professional's practice has a
+// single profile, its holder's, kept from Settings → My professional
+// details; its sidebar has no entry here, and a typed URL goes home.
+const { isIndividualPractice } = useClinic()
+watchEffect(() => {
+  if (isIndividualPractice.value) void navigateTo('/', { replace: true })
+})
+
+const { byId: workloadById, load: loadWorkload } = useProfessionalWorkload()
+
 const professionals = ref<Professional[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -388,7 +398,7 @@ watch([typeFilter, showInactive], () => {
 
 watch(page, load)
 onMounted(async () => {
-  await Promise.all([load(), specialtiesApi.fetchSpecialties(), loadAccounts()])
+  await Promise.all([load(), specialtiesApi.fetchSpecialties(), loadAccounts(), loadWorkload()])
 })
 </script>
 
@@ -495,6 +505,19 @@ onMounted(async () => {
               <p class="text-caption text-subtle truncate">
                 {{ specialtyLabel(professional) || labelForType(professional.professional_type) }}
                 <span v-if="professional.license_number"> · {{ t('professionals.licenseShort') }} {{ professional.license_number }}</span>
+              </p>
+              <p
+                v-if="workloadById[professional.id]"
+                class="text-caption text-subtle truncate"
+                data-testid="professional-workload-row"
+              >
+                {{ t('professionals.workload.rowPatients', { n: workloadById[professional.id]!.patients }) }}
+                <template v-if="workloadById[professional.id]!.counts.appointments_upcoming !== undefined">
+                  · {{ t('professionals.workload.rowAppointments', { n: workloadById[professional.id]!.counts.appointments_upcoming }) }}
+                </template>
+                <template v-if="workloadById[professional.id]!.counts.treatments_pending !== undefined">
+                  · {{ t('professionals.workload.rowTreatments', { n: workloadById[professional.id]!.counts.treatments_pending }) }}
+                </template>
               </p>
             </div>
             <span class="hidden lg:block text-caption text-subtle truncate max-w-52">
@@ -739,6 +762,7 @@ onMounted(async () => {
     :professional="profileProfessional"
     :photo-src="profileProfessional ? photoSrcById[profileProfessional.id] : undefined"
     :can-edit="can(PERMISSIONS.professionals.write)"
+    :workload="profileProfessional ? workloadById[profileProfessional.id] : undefined"
     @edit="editFromProfile"
   />
 </template>

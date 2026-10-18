@@ -111,11 +111,15 @@ class TreatmentPlanModule(BaseModule):
         ]
 
     def get_providers(self) -> dict[type, object]:
-        from app.core.contracts import PlannedTreatments, PlanQuotes
+        from app.core.contracts import PlannedTreatments, PlanQuotes, ProfessionalWorkload
 
-        from .providers import plan_quotes, planned_treatments
+        from .providers import plan_quotes, planned_treatments, workload
 
-        return {PlannedTreatments: planned_treatments, PlanQuotes: plan_quotes}
+        return {
+            PlannedTreatments: planned_treatments,
+            PlanQuotes: plan_quotes,
+            ProfessionalWorkload: workload,
+        }
 
     def get_router(self) -> APIRouter:
         return router

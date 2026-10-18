@@ -1,5 +1,25 @@
 {
   "professionals": {
+    "workload": {
+      "title": "Lo asignado",
+      "patients": "Pacientes que atiende",
+      "appointments": "Citas",
+      "appointmentsUpcoming": "Citas próximas",
+      "plansInProgress": "Planes en curso",
+      "treatmentsPending": "Tratamientos pendientes",
+      "treatmentsCompleted": "Tratamientos realizados",
+      "rowPatients": "{n} pacientes",
+      "rowAppointments": "{n} citas próximas",
+      "rowTreatments": "{n} tratamientos pendientes",
+      "help": "Pacientes distintos con alguna cita o plan de este profesional. Cada cifra sale de su app y solo se muestra mientras la app está activa."
+    },
+    "mine": {
+      "title": "Mis datos profesionales",
+      "description": "Tus datos como profesional: los que salen en tus citas, tratamientos, membretes y cartas.",
+      "notProfessional": "Esta cuenta no es un profesional de esta clínica.",
+      "saved": "Datos guardados",
+      "failed": "No se pudieron guardar tus datos"
+    },
     "account": {
       "label": "Cuenta vinculada",
       "help": "La cuenta con la que esta persona entra al sistema. Es lo que permite que una anotación clínica diga quién responde por ella. Déjalo en «Sin cuenta» si no usa el sistema.",

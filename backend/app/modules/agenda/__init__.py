@@ -79,11 +79,11 @@ class AgendaModule(BaseModule):
         ]
 
     def get_providers(self) -> dict[type, object]:
-        from app.core.contracts import AppointmentBook
+        from app.core.contracts import AppointmentBook, ProfessionalWorkload
 
-        from .providers import appointment_book
+        from .providers import appointment_book, workload
 
-        return {AppointmentBook: appointment_book}
+        return {AppointmentBook: appointment_book, ProfessionalWorkload: workload}
 
     def get_router(self) -> APIRouter:
         return router

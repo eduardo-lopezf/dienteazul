@@ -95,6 +95,22 @@ function getSlotHeight() {
 
 const calendarRef = ref<HTMLElement | null>(null)
 
+/** Slot of a `HH:MM` wall-clock time on this grid. */
+function slotOfTime(iso: string): number {
+  return getSlotIndex(iso.split('T')[1]?.substring(0, 5) ?? '08:00')
+}
+
+// Rows grow where a booked appointment needs the room to be read.
+const slotRows = useSlotRows({
+  slotCount: () => (endHour.value - startHour.value) * SLOTS_PER_HOUR,
+  baseHeight: getSlotHeight,
+  spans: () =>
+    allAppointmentsWithDayIndex.value.map(({ appointment }) => ({
+      start: slotOfTime(appointment.start_time),
+      end: slotOfTime(appointment.end_time)
+    }))
+})
+
 const {
   dragState,
   createDragState,
@@ -109,6 +125,7 @@ const {
   clearSelection
 } = useSlotGridDrag({
   slotHeight: getSlotHeight,
+  slotTop: slotRows.top,
   maxSlotIndex: () => (endHour.value - startHour.value) * SLOTS_PER_HOUR - 1,
   columnCount: () => weekDays.value.length,
   gutterColumns: 1,
@@ -264,8 +281,8 @@ function getAppointmentStyle(appointment: Appointment): Record<string, string> {
   const endSlot = getSlotIndex(endTime)
   const spanSlots = Math.max(1, endSlot - startSlot)
 
-  const height = spanSlots * getSlotHeight()
-  const topOffset = startSlot * getSlotHeight()
+  const height = slotRows.span(startSlot, startSlot + spanSlots)
+  const topOffset = slotRows.top(startSlot)
 
   return {
     top: `${topOffset}px`,
@@ -569,8 +586,9 @@ const allAppointmentsWithDayIndex = computed(() => {
           <div
             v-for="(slot, slotIndex) in timeSlots"
             :key="slot"
-            class="grid grid-cols-8 border-b border-[var(--color-border-subtle)] h-[var(--density-slot-height,28px)]"
+            class="grid grid-cols-8 border-b border-[var(--color-border-subtle)]"
             :class="{ 'border-[var(--color-border)]': slotIndex % SLOTS_PER_HOUR === 0 }"
+            :style="{ height: `${slotRows.heights.value[slotIndex]}px` }"
           >
             <div class="p-1 text-right border-r border-subtle flex items-center justify-end pr-2">
               <span
@@ -615,8 +633,8 @@ const allAppointmentsWithDayIndex = computed(() => {
                   class="absolute inset-x-0 pointer-events-none z-10 schedules-blocked"
                   :title="seg.reason || 'Clínica cerrada'"
                   :style="{
-                    top: `${seg.startSlot * getSlotHeight()}px`,
-                    height: `${(seg.endSlot - seg.startSlot) * getSlotHeight()}px`
+                    top: `${slotRows.top(seg.startSlot)}px`,
+                    height: `${slotRows.span(seg.startSlot, seg.endSlot)}px`
                   }"
                 />
 
@@ -625,8 +643,8 @@ const allAppointmentsWithDayIndex = computed(() => {
                   v-if="createDragState && createDragState.columnIndex === dayIndex"
                   class="absolute left-1 right-1 rounded border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-primary-soft)] pointer-events-none z-40 flex items-start p-1"
                   :style="{
-                    top: `${createDragState.startSlot * getSlotHeight()}px`,
-                    height: `${Math.max(1, createDragState.currentSlot - createDragState.startSlot + 1) * getSlotHeight()}px`,
+                    top: `${slotRows.top(createDragState.startSlot)}px`,
+                    height: `${slotRows.span(createDragState.startSlot, createDragState.startSlot + Math.max(1, createDragState.currentSlot - createDragState.startSlot + 1))}px`,
                     minHeight: `${getSlotHeight()}px`
                   }"
                 >

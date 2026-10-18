@@ -14,7 +14,10 @@ class ProfessionalsModule(BaseModule):
     manifest = {
         "name": "professionals",
         "version": "0.1.0",
-        "summary": "Clinic directory and scheduling source of truth for professionals.",
+        "summary": (
+            "Who the work is assigned to: the holder of an individual practice, "
+            "or a clinic's directory of professionals."
+        ),
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
         "category": "official",
@@ -38,6 +41,10 @@ class ProfessionalsModule(BaseModule):
                     "to": "/professionals",
                     "permission": "professionals.read",
                     "order": 45,
+                    # One professional's practice has a single profile, its
+                    # holder's, edited from their account settings: the
+                    # directory is a clinic's screen.
+                    "tiers": ["clinic", "clinic_pro", "hospital"],
                 },
             ],
         },
@@ -45,6 +52,16 @@ class ProfessionalsModule(BaseModule):
 
     def get_models(self) -> list:
         return [Professional]
+
+    def get_event_handlers(self) -> dict:
+        from app.core.events import EventType
+
+        from .events import on_clinic_account_tier_changed, on_clinic_created
+
+        return {
+            EventType.CLINIC_CREATED: on_clinic_created,
+            EventType.CLINIC_ACCOUNT_TIER_CHANGED: on_clinic_account_tier_changed,
+        }
 
     def get_providers(self) -> dict[type, object]:
         from app.core.contracts import ProfessionalDirectory

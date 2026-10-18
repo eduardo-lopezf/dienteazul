@@ -50,7 +50,6 @@ const form = reactive({
   last_name: '',
   phone: ''
 })
-const firstNameRef = ref<HTMLInputElement | null>(null)
 const isSubmitting = ref(false)
 const createError = ref<string | null>(null)
 const duplicateMatch = ref<Patient | null>(null)
@@ -136,8 +135,14 @@ function enterCreateMode(query: string) {
   form.phone = ''
   createError.value = null
   duplicateMatch.value = null
+  // The create form is `v-else` of the search branch, so switching mode
+  // mounts it — and `autofocus` on the first field puts the cursor there.
+  // It used to be `nextTick(() => firstNameRef.value?.focus())`, with the
+  // ref on a `UInput`: that hands back the component instance, which has
+  // no `focus()`. The typo was invisible because the ref was annotated
+  // `HTMLInputElement`, a type it never held. What a user saw was an
+  // error toast and a form their cursor was not in.
   mode.value = 'create'
-  nextTick(() => firstNameRef.value?.focus())
 }
 
 function cancelCreate() {
@@ -352,8 +357,8 @@ async function submitCreate() {
           required
         >
           <UInput
-            ref="firstNameRef"
             v-model="form.first_name"
+            autofocus
             autocapitalize="words"
             autocomplete="given-name"
             class="w-full"

@@ -35,7 +35,7 @@ from sqlalchemy import select
 from app.core.auth.models import ClinicMembership, User
 
 from ..models import ImportWarning
-from .base import MapperContext, ProfessionalFilterOptions
+from .base import MapperContext, ProfessionalFilterOptions, account_email_for_import
 
 # Map DPMF's canonical `role` string (see dental-bridge's
 # ``ProfessionalRole`` StrEnum) into Diente Azul's membership role values.
@@ -156,7 +156,17 @@ class ProfessionalMapper:
             filter_reason = _filter_reason(payload, source_id, ctx.professional_filters)
         is_active = filter_reason is None
 
-        # Re-use an existing User if email already known.
+        # Re-use an existing User if email already known — but only one
+        # that is already this clinic's. An address held by another
+        # clinic's account gets a local substitute (ADR 0057).
+        email = await account_email_for_import(
+            ctx,
+            email=email,
+            canonical_uuid=canonical_uuid,
+            entity_type="professional",
+            source_id=source_id,
+        )
+
         existing_user = await ctx.db.execute(select(User).where(User.email == email))
         user = existing_user.scalar_one_or_none()
         if user is None:

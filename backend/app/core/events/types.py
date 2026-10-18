@@ -24,6 +24,11 @@ class EventType:
     # enables and disables the packs to match.
     # Payload: {clinic_id, specialties}.
     CLINIC_SPECIALTIES_SET = "clinic.specialties_set"
+    # The operator moved a clinic to another account tier
+    # (``PUT``/``PATCH`` under ``/api/v1/ops/clinics/{id}``). Consumed by
+    # `professionals`, which gives the holder of an individual practice
+    # their profile. Payload: {clinic_id, account_tier, previous_tier}.
+    CLINIC_ACCOUNT_TIER_CHANGED = "clinic.account_tier_changed"
 
     # Specialty packs (catalog). A clinic switched a discipline on or off,
     # or put its reference catalogue back. Consumed by `treatment_plan`,

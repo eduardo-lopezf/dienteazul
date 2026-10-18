@@ -14,6 +14,7 @@
  * one itself. Without it, initials.
  */
 import type { Professional } from '~~/app/types'
+import type { ProfessionalWorkload } from '../composables/useProfessionalWorkload'
 
 const props = defineProps<{
   open: boolean
@@ -22,6 +23,8 @@ const props = defineProps<{
   photoSrc?: string
   /** Hides the edit action for read-only roles. */
   canEdit: boolean
+  /** What is assigned to them; absent while it loads or fails. */
+  workload?: ProfessionalWorkload
 }>()
 
 const emit = defineEmits<{
@@ -56,6 +59,28 @@ const specialtyNames = computed(() =>
     .map(s => s.names[locale.value] || s.names.es || s.names.en || '')
     .filter(Boolean)
 )
+
+/**
+ * What is assigned to them, in the order a clinic asks: who they see, then
+ * what is booked, then the work. Only figures some running App supplied.
+ */
+const workloadStats = computed(() => {
+  const w = props.workload
+  if (!w) return []
+  const stats = [{ key: 'patients', label: t('professionals.workload.patients'), value: w.patients }]
+  const keys = [
+    ['appointments_upcoming', 'appointmentsUpcoming'],
+    ['appointments', 'appointments'],
+    ['plans_in_progress', 'plansInProgress'],
+    ['treatments_pending', 'treatmentsPending'],
+    ['treatments_completed', 'treatmentsCompleted']
+  ] as const
+  for (const [key, label] of keys) {
+    const value = w.counts[key]
+    if (value !== undefined) stats.push({ key, label: t(`professionals.workload.${label}`), value })
+  }
+  return stats
+})
 
 /**
  * The mosaic. Only tiles with something to say are built, so a sparse
@@ -178,6 +203,33 @@ const tiles = computed(() => {
         </div>
 
         <div class="flex-1 overflow-y-auto px-6 pb-2 pt-5">
+          <section
+            v-if="workloadStats.length"
+            class="mb-4"
+            data-testid="professional-workload"
+          >
+            <p class="text-caption text-subtle mb-2">
+              {{ t('professionals.workload.title') }}
+            </p>
+            <dl class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div
+                v-for="stat in workloadStats"
+                :key="stat.key"
+                class="rounded-token-lg border border-subtle bg-surface-muted px-3 py-2"
+              >
+                <dt class="text-caption text-subtle">
+                  {{ stat.label }}
+                </dt>
+                <dd class="text-h2 text-default tabular-nums">
+                  {{ stat.value }}
+                </dd>
+              </div>
+            </dl>
+            <p class="mt-2 text-caption text-subtle">
+              {{ t('professionals.workload.help') }}
+            </p>
+          </section>
+
           <!-- The mosaic. Two columns where there is room, one where
                there is not; each tile is one fact.
 

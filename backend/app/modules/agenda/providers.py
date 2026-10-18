@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Collection
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.contracts import VisitNote
+from app.core.contracts import ProfessionalActivity, VisitNote
 
 from .models import Appointment, AppointmentTreatment
 
@@ -63,4 +65,56 @@ class AgendaAppointmentBook:
         ]
 
 
+#: Still ahead: booked and not yet seen.
+_UPCOMING = ("scheduled", "confirmed")
+
+
+class AgendaWorkload:
+    """Each professional's appointments, for their profile (ADR 0039).
+
+    Cancelled ones are not work: they count for nothing, and their patient
+    is not one the professional sees.
+    """
+
+    async def activity(
+        self, db: AsyncSession, clinic_id: UUID, professional_ids: Collection[UUID]
+    ) -> dict[UUID, ProfessionalActivity]:
+        if not professional_ids:
+            return {}
+        result = await db.execute(
+            select(
+                Appointment.professional_id,
+                Appointment.patient_id,
+                Appointment.status,
+                Appointment.start_time,
+            ).where(
+                Appointment.clinic_id == clinic_id,
+                Appointment.professional_id.in_(professional_ids),
+                Appointment.status != "cancelled",
+            )
+        )
+        now = datetime.now(UTC)
+        patients: dict[UUID, set[UUID]] = defaultdict(set)
+        total: dict[UUID, int] = defaultdict(int)
+        upcoming: dict[UUID, int] = defaultdict(int)
+        for row in result.all():
+            total[row.professional_id] += 1
+            if row.status in _UPCOMING and row.start_time >= now:
+                upcoming[row.professional_id] += 1
+            if row.patient_id is not None:
+                patients[row.professional_id].add(row.patient_id)
+        return {
+            professional_id: ProfessionalActivity(
+                patient_ids=frozenset(patients[professional_id]),
+                counts={
+                    "appointments": total[professional_id],
+                    "appointments_upcoming": upcoming[professional_id],
+                },
+            )
+            # Every one asked about: no appointments is a zero, not silence.
+            for professional_id in professional_ids
+        }
+
+
 appointment_book = AgendaAppointmentBook()
+workload = AgendaWorkload()

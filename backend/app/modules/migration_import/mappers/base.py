@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins.registry import module_registry
 
-from ..models import EntityMapping
+from ..models import EntityMapping, ImportWarning
 
 
 def running(*modules: str) -> bool:
@@ -285,6 +285,67 @@ class MapperContext:
     # the first patient mapped. Empty by default so test paths that
     # bypass the link mapper just see the 1:1 fallback.
     client_to_patients: dict[str, list[UUID]] = field(default_factory=dict)
+
+
+async def account_email_for_import(
+    ctx: MapperContext,
+    *,
+    email: str,
+    canonical_uuid: str,
+    entity_type: str,
+    source_id: str,
+) -> str:
+    """The address this import may open a staff account under.
+
+    ``users.email`` is unique across the deployment and an account is
+    global (ADR 0057), so looking a person up by email reaches accounts
+    belonging to clinics the importer has nothing to do with. Both the
+    user and professional mappers did exactly that and then added a
+    membership, which silently made another tenant's staff into this
+    clinic's — and gave them its patient data.
+
+    So: the address is returned unchanged when it is free, or when it
+    already belongs to somebody who is this clinic's staff (the
+    idempotent re-run every mapper relies on). When it belongs to an
+    account outside this clinic, a synthetic local address is returned
+    instead and a warning is recorded. The import still brings the
+    person in, under an account of this clinic's own — the outside one
+    is not read, not written, and not attached.
+
+    Derived from ``canonical_uuid``, so a re-run lands on the same
+    address and the import stays idempotent.
+    """
+    from app.core.auth.models import ClinicMembership, User
+
+    owner = await ctx.db.scalar(select(User.id).where(User.email == email))
+    if owner is None:
+        return email
+
+    member_here = await ctx.db.scalar(
+        select(ClinicMembership.id).where(
+            ClinicMembership.user_id == owner,
+            ClinicMembership.clinic_id == ctx.clinic_id,
+        )
+    )
+    if member_here is not None:
+        return email
+
+    substitute = f"migrado+{entity_type}-{canonical_uuid[:12]}@dental-bridge.local"
+    ctx.db.add(
+        ImportWarning(
+            job_id=ctx.job_id,
+            entity_type=entity_type,
+            source_id=source_id,
+            severity="warn",
+            code=f"{entity_type}.email_belongs_to_another_clinic",
+            message=(
+                f"{email} is already an account outside this clinic, so it was not "
+                f"reused. The person was imported under {substitute}; set their real "
+                "address once the other clinic releases it."
+            ),
+        )
+    )
+    return substitute
 
 
 class Mapper(Protocol):

@@ -1,5 +1,25 @@
 {
   "professionals": {
+    "workload": {
+      "title": "Assigned work",
+      "patients": "Patients seen",
+      "appointments": "Appointments",
+      "appointmentsUpcoming": "Upcoming appointments",
+      "plansInProgress": "Plans in progress",
+      "treatmentsPending": "Pending treatments",
+      "treatmentsCompleted": "Completed treatments",
+      "rowPatients": "{n} patients",
+      "rowAppointments": "{n} upcoming appointments",
+      "rowTreatments": "{n} pending treatments",
+      "help": "Distinct patients with an appointment or plan of this professional. Each figure comes from its app and shows only while that app is enabled."
+    },
+    "mine": {
+      "title": "My professional details",
+      "description": "Your details as a professional: those on your appointments, treatments, letterheads and letters.",
+      "notProfessional": "This account is not a professional of this clinic.",
+      "saved": "Details saved",
+      "failed": "Your details could not be saved"
+    },
     "account": {
       "label": "Linked account",
       "help": "The account this person signs in with. It is what lets a clinical entry name who is responsible for it. Leave it on \"No account\" if they do not use the system.",

@@ -95,6 +95,13 @@ export interface CreateDragState {
 export interface SlotGridDragOptions {
   /** Pixel height of one slot. Read live — density can change it. */
   slotHeight: () => number
+  /**
+   * Pixel offset of the top of slot ``index`` (``index`` may be the slot
+   * count, the bottom edge). For grids whose rows are not all one height —
+   * a row grows to fit the appointment in it. Defaults to
+   * ``index * slotHeight()``.
+   */
+  slotTop?: (index: number) => number
   /** Highest addressable slot index, i.e. slots per day minus one. */
   maxSlotIndex: () => number
   /** Number of data columns (days, or professionals). */
@@ -184,8 +191,28 @@ export function useSlotGridDrag(options: SlotGridDragOptions) {
     el.setPointerCapture(event.pointerId)
   }
 
-  function snapSlots(px: number): number {
-    return Math.round(px / options.slotHeight())
+  function top(index: number): number {
+    return options.slotTop ? options.slotTop(index) : index * options.slotHeight()
+  }
+
+  /** The slot boundary nearest to ``px``. */
+  function nearestSlot(px: number): number {
+    if (!options.slotTop) return Math.round(px / options.slotHeight())
+    const last = options.maxSlotIndex() + 1
+    let best = 0
+    for (let i = 1; i <= last; i++) {
+      if (Math.abs(top(i) - px) < Math.abs(top(best) - px)) best = i
+    }
+    return best
+  }
+
+  /** The slot that contains ``px``. */
+  function slotAt(px: number): number {
+    if (!options.slotTop) return Math.floor(px / options.slotHeight())
+    const last = options.maxSlotIndex()
+    let slot = 0
+    while (slot < last && top(slot + 1) <= px) slot++
+    return slot
   }
 
   // ---------------------------------------------------------------- create
@@ -241,18 +268,18 @@ export function useSlotGridDrag(options: SlotGridDragOptions) {
    * where they do not.
    */
   function beginAppointmentDrag(intent: DragIntent, event: PointerEvent) {
-    const h = options.slotHeight()
-    const height = Math.max(1, intent.endSlot - intent.startSlot) * h
+    const startTop = top(intent.startSlot)
+    const height = top(Math.max(intent.startSlot + 1, intent.endSlot)) - startTop
     dragState.value = {
       type: intent.type,
       appointmentId: intent.appointmentId,
       startX: event.clientX,
       startY: event.clientY,
-      originalTop: intent.startSlot * h,
+      originalTop: startTop,
       originalHeight: height,
       originalColumnIndex: intent.columnIndex,
       currentColumnIndex: intent.columnIndex,
-      currentTop: intent.startSlot * h,
+      currentTop: startTop,
       currentHeight: height
     }
     capture(event)
@@ -323,14 +350,12 @@ export function useSlotGridDrag(options: SlotGridDragOptions) {
       if (moved > LONG_PRESS_SLOP_PX) cancelLongPress()
     }
 
-    const h = options.slotHeight()
-
     if (createDragState.value) {
       const deltaY = event.clientY - createDragState.value.startY
-      const slotDelta = Math.floor(deltaY / h)
+      const under = slotAt(top(createDragState.value.startSlot) + Math.max(0, deltaY))
       createDragState.value.currentSlot = Math.max(
         createDragState.value.startSlot,
-        Math.min(options.maxSlotIndex(), createDragState.value.startSlot + slotDelta)
+        Math.min(options.maxSlotIndex(), under)
       )
       return
     }
@@ -345,15 +370,23 @@ export function useSlotGridDrag(options: SlotGridDragOptions) {
       hasMoved.value = true
     }
 
+    const startSlot = nearestSlot(state.originalTop)
     if (state.type === 'resize') {
-      const newHeight = Math.max(h, state.originalHeight + deltaY)
-      state.currentHeight = snapSlots(newHeight) * h
+      const endSlot = Math.max(
+        startSlot + 1,
+        nearestSlot(state.originalTop + state.originalHeight + deltaY)
+      )
+      state.currentHeight = top(endSlot) - state.originalTop
       return
     }
 
-    const newTop = Math.max(0, state.originalTop + deltaY)
-    const maxSlots = options.maxSlotIndex() + 1 - snapSlots(state.currentHeight)
-    state.currentTop = Math.min(snapSlots(newTop), maxSlots) * h
+    const duration = nearestSlot(state.originalTop + state.originalHeight) - startSlot
+    const newStart = Math.min(
+      nearestSlot(Math.max(0, state.originalTop + deltaY)),
+      options.maxSlotIndex() + 1 - duration
+    )
+    state.currentTop = top(newStart)
+    state.currentHeight = top(newStart + duration) - state.currentTop
 
     const container = options.containerRef.value
     const columns = options.columnCount()
@@ -397,20 +430,17 @@ export function useSlotGridDrag(options: SlotGridDragOptions) {
     dragState.value = null
     if (!state) return
 
-    const startSlot = snapSlots(state.originalTop)
-
     if (state.type === 'resize') {
-      options.onResize(state.appointmentId, startSlot + snapSlots(state.currentHeight))
+      options.onResize(state.appointmentId, nearestSlot(state.originalTop + state.currentHeight))
       return
     }
 
-    const newStartSlot = snapSlots(state.currentTop)
-    const durationSlots = snapSlots(state.currentHeight)
+    const newStartSlot = nearestSlot(state.currentTop)
     options.onMove(
       state.appointmentId,
       state.currentColumnIndex,
       newStartSlot,
-      newStartSlot + durationSlots
+      nearestSlot(state.currentTop + state.currentHeight)
     )
   }
 

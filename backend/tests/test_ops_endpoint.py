@@ -43,6 +43,21 @@ def ops_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "CONTROL_PLANE_SECRET", SECRET)
 
 
+@pytest.fixture
+def record_requires_recalls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An optional App that requires another optional App.
+
+    The shipped catalog has none left — each one integrates the others
+    (ADR 0037) — so the rule for one that does is exercised on the Clinical
+    record made to require Recalls for the test. A module's requirements
+    are read from its manifest on every call.
+    """
+    from app.core.plugins.registry import module_registry
+
+    record = module_registry.get("record")
+    monkeypatch.setitem(record.manifest, "depends", ["patients", "recalls"])
+
+
 async def test_absent_without_a_secret(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -150,13 +165,17 @@ HOLDER = {
     "holder_email": "aurelia@example.com",
     "holder_professional_id": "1234567",
     "holder_password": "Temporal1234",
-    "apps": ["workspace", "agenda", "patients", "treatments"],
+    # Professionals is core for every tier: the holder of a practice is its
+    # professional.
+    "apps": ["workspace", "agenda", "patients", "treatments", "professionals"],
 }
+#: Every mandatory App but Professionals: a set no tier may have.
+WITHOUT_PROFESSIONALS = ["workspace", "agenda", "patients", "treatments"]
 CLINIC = HOLDER | {
     "account_tier": "clinic",
     "tax_id": "CDS200101XY9",
     "clinic_name": "Clínica Dental del Sur",
-    "apps": [*HOLDER["apps"], "professionals"],
+    "apps": HOLDER["apps"],
 }
 
 
@@ -289,18 +308,16 @@ async def test_apps_say_for_whom_each_is_mandatory(client: AsyncClient, ops_enab
     apps = {app["name"]: app for app in response.json()["data"]}
 
     everyone = {"basic", "medium", "advanced", "clinic", "clinic_pro", "hospital"}
-    for name in ("workspace", "agenda", "patients", "treatments"):
+    # Professionals too: the holder of an individual practice is its
+    # professional, and patients and treatments are assigned to them.
+    for name in ("workspace", "agenda", "patients", "treatments", "professionals"):
         assert set(apps[name]["mandatory_for"]) == everyone, name
-    # A clinic has professionals; one professional's practice need not.
-    assert set(apps["professionals"]["mandatory_for"]) == {"clinic", "clinic_pro", "hospital"}
     assert apps["recalls"]["mandatory_for"] == []
     # These only integrate other Apps (ADR 0037); the Clinical record
-    # still requires Professionals.
+    # requires the Patients App alone.
     for name in ("budgets_payments", "cash", "communications", "reports"):
         assert apps[name]["requires"] == [], name
-    assert set(apps["clinical_record"]["requires"]) == {"patients", "professionals"} | set(
-        apps["professionals"]["requires"]
-    )
+    assert apps["clinical_record"]["requires"] == ["patients"]
 
 
 async def test_the_chosen_apps_are_kept_in_catalog_order(
@@ -308,13 +325,28 @@ async def test_the_chosen_apps_are_kept_in_catalog_order(
 ) -> None:
     payload = HOLDER | {
         "account_tier": "basic",
-        "apps": ["recalls", "treatments", "patients", "agenda", "workspace", "agenda"],
+        "apps": [
+            "professionals",
+            "recalls",
+            "treatments",
+            "patients",
+            "agenda",
+            "workspace",
+            "agenda",
+        ],
     }
     response = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
     assert response.status_code == 201, response.text
 
     clinic = await db_session.get(Clinic, UUID(response.json()["data"]["clinic_id"]))
-    assert clinic.apps == ["workspace", "agenda", "patients", "recalls", "treatments"]
+    assert clinic.apps == [
+        "workspace",
+        "agenda",
+        "patients",
+        "recalls",
+        "treatments",
+        "professionals",
+    ]
 
     usage = await client.get("/api/v1/ops/usage?refresh=true", headers=_token())
     [listed] = usage.json()["data"]["clinics"]
@@ -326,7 +358,7 @@ async def test_the_chosen_apps_are_kept_in_catalog_order(
     [
         ("basic", ["workspace", "agenda", "patients"]),
         ("clinic", ["workspace", "agenda", "patients", "treatments"]),
-        # The Clinical record requires Professionals, left out here.
+        # The Clinical record, made to require Recalls, without it.
         ("basic", [*HOLDER["apps"], "clinical_record"]),
         ("basic", [*HOLDER["apps"], "ai"]),
         ("basic", [*HOLDER["apps"], "no_such_app"]),
@@ -340,7 +372,11 @@ async def test_the_chosen_apps_are_kept_in_catalog_order(
     ],
 )
 async def test_a_set_of_apps_a_clinic_cannot_have_is_refused(
-    client: AsyncClient, ops_enabled: None, tier: str, apps: list[str]
+    client: AsyncClient,
+    ops_enabled: None,
+    record_requires_recalls: None,
+    tier: str,
+    apps: list[str],
 ) -> None:
     payload = CLINIC | {"account_tier": tier, "apps": apps}
     response = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
@@ -624,7 +660,7 @@ async def test_a_clinic_reads_back_everything_it_was_created_with(
         "CDS200101XY9",
         "6641234567",
     )
-    assert clinic["apps"] == [*HOLDER["apps"], "professionals"]
+    assert clinic["apps"] == HOLDER["apps"]
     assert clinic["specialties"] == ["general", "radiologia"]
     assert (clinic["holder"]["email"], clinic["holder"]["professional_id"]) == (
         "aurelia@example.com",
@@ -664,7 +700,7 @@ async def test_a_clinic_can_be_changed_under_the_rules_of_creation(
     # The rules of creation still hold: a clinic keeps Professionals.
     refused = await client.patch(
         f"/api/v1/ops/clinics/{clinic_id}",
-        json=change | {"apps": HOLDER["apps"]},
+        json=change | {"apps": WITHOUT_PROFESSIONALS},
         headers=_token(),
     )
     assert refused.status_code == 422
@@ -744,7 +780,7 @@ async def test_a_clinic_is_deleted_whole_in_development_and_not_at_all_in_produc
 async def test_a_clinic_only_has_the_apps_chosen_for_it(
     client: AsyncClient, ops_enabled: None, test_clinic: Clinic, auth_headers: dict[str, str]
 ) -> None:
-    """Created with the four mandatory Apps: Recalls is not one of them."""
+    """Created with the five mandatory Apps: Recalls is not one of them."""
     created = await client.post(
         "/api/v1/ops/clinics", json=HOLDER | {"account_tier": "basic"}, headers=_token()
     )
@@ -762,7 +798,7 @@ async def test_a_clinic_only_has_the_apps_chosen_for_it(
     # (The list is empty here either way — the suite installs no module in
     # ``core_module`` — so this only pins that nothing extra slips in.)
     names = {module["name"] for module in active.json()["data"]}
-    assert not names & {"recalls", "budget", "professionals", "reports"}
+    assert not names & {"recalls", "budget", "reports"}
     # …those Apps' routes are not there for it, the ones it has are…
     assert (await client.get("/api/v1/recalls/stats/dashboard", headers=holder)).status_code == 404
     assert (await client.get("/api/v1/patients", headers=holder)).status_code == 200
@@ -772,7 +808,7 @@ async def test_a_clinic_only_has_the_apps_chosen_for_it(
     assert not any(p.startswith(("recalls.", "budget.", "reports.")) for p in me["permissions"])
     apps = (await client.get("/api/v1/apps", headers=holder)).json()["data"]
     enabled = {app["name"] for app in apps if app["enabled"]}
-    assert enabled == {"workspace", "agenda", "patients", "treatments"}
+    assert enabled == {"workspace", "agenda", "patients", "treatments", "professionals"}
 
     # A clinic nobody chose for keeps everything the deployment runs.
     assert (
@@ -781,13 +817,13 @@ async def test_a_clinic_only_has_the_apps_chosen_for_it(
 
 
 async def test_a_clinic_switches_on_the_apps_it_was_offered_and_no_others(
-    client: AsyncClient, ops_enabled: None
+    client: AsyncClient, ops_enabled: None, record_requires_recalls: None
 ) -> None:
-    """Given the four mandatory Apps and offered Professionals and the
-    Clinical record (which needs Professionals); Recalls was not offered."""
+    """Given the mandatory Apps and offered Recalls and the Clinical record
+    (made to need Recalls); Reports was not offered."""
     payload = HOLDER | {
         "account_tier": "basic",
-        "available_apps": ["clinical_record", "professionals", "agenda"],
+        "available_apps": ["clinical_record", "recalls", "agenda"],
     }
     created = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
     assert created.status_code == 201, created.text
@@ -806,21 +842,21 @@ async def test_a_clinic_switches_on_the_apps_it_was_offered_and_no_others(
 
     listed = await apps()
     # An App it already has is not "available"; the two offered ones are.
-    assert {n for n, a in listed.items() if a["available"]} == {"clinical_record", "professionals"}
-    assert not listed["recalls"]["enabled"] and not listed["recalls"]["available"]
+    assert {n for n, a in listed.items() if a["available"]} == {"clinical_record", "recalls"}
+    assert not listed["reports"]["enabled"] and not listed["reports"]["available"]
     assert (await client.get("/api/v1/consents/templates", headers=holder)).status_code == 404
 
     # Not offered: refused. Unknown: not found.
-    refused = await client.post("/api/v1/apps/recalls/enable", headers=holder)
+    refused = await client.post("/api/v1/apps/reports/enable", headers=holder)
     assert refused.status_code == 403
     assert (await client.post("/api/v1/apps/nope/enable", headers=holder)).status_code == 404
 
     # Offered: on at once, and what it requires with it.
     enabled = await client.post("/api/v1/apps/clinical_record/enable", headers=holder)
     assert enabled.status_code == 200, enabled.text
-    assert enabled.json()["data"]["also_enabled"] == ["professionals"]
+    assert enabled.json()["data"]["also_enabled"] == ["recalls"]
     listed = await apps()
-    assert listed["clinical_record"]["enabled"] and listed["professionals"]["enabled"]
+    assert listed["clinical_record"]["enabled"] and listed["recalls"]["enabled"]
     assert not any(app["available"] for app in listed.values())
     assert (await client.get("/api/v1/consents/templates", headers=holder)).status_code == 200
 
@@ -829,6 +865,7 @@ async def test_a_clinic_switches_on_the_apps_it_was_offered_and_no_others(
         "workspace",
         "agenda",
         "patients",
+        "recalls",
         "treatments",
         "professionals",
         "clinical_record",
@@ -837,7 +874,7 @@ async def test_a_clinic_switches_on_the_apps_it_was_offered_and_no_others(
 
 
 async def test_an_app_that_needs_one_not_offered_cannot_be_switched_on(
-    client: AsyncClient, ops_enabled: None
+    client: AsyncClient, ops_enabled: None, record_requires_recalls: None
 ) -> None:
     payload = HOLDER | {"account_tier": "basic", "available_apps": ["clinical_record"]}
     await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
@@ -915,7 +952,9 @@ async def test_a_clinics_apps_are_changed_on_their_own_and_at_once(
 
     # What its tier makes mandatory cannot be taken away.
     refused = await client.put(
-        f"/api/v1/ops/clinics/{clinic_id}/apps", json={"apps": HOLDER["apps"]}, headers=_token()
+        f"/api/v1/ops/clinics/{clinic_id}/apps",
+        json={"apps": WITHOUT_PROFESSIONALS},
+        headers=_token(),
     )
     assert refused.status_code == 422
 

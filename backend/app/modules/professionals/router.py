@@ -18,12 +18,19 @@ from app.modules.media.storage import get_storage_backend
 from app.modules.media.validation import validate_file_size, validate_mime_type
 
 from .models import Professional
-from .schemas import ProfessionalCreate, ProfessionalResponse, ProfessionalUpdate
+from .schemas import (
+    MyProfessionalUpdate,
+    ProfessionalCreate,
+    ProfessionalResponse,
+    ProfessionalUpdate,
+    ProfessionalWorkloadResponse,
+)
 from .service import (
     ProfessionalService,
     UnknownSpecialtyError,
     UnknownUserLinkError,
     UserLinkTakenError,
+    WorkloadService,
 )
 
 router = APIRouter()
@@ -83,6 +90,73 @@ async def list_professionals(
         page=page,
         page_size=page_size,
     )
+
+
+# Literal paths before `/{professional_id}`: FastAPI resolves in
+# registration order and "me" would be parsed as an id.
+
+
+@router.get("/me", response_model=ApiResponse[ProfessionalResponse])
+async def get_my_profile(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[ProfessionalResponse]:
+    """The caller's own profile in this clinic — the one linked to their
+    account. 404 for an account that is no professional here."""
+    professional = await _my_profile(db, ctx)
+    return ApiResponse(data=await _to_response(db, ctx.clinic_id, professional))
+
+
+@router.put("/me", response_model=ApiResponse[ProfessionalResponse])
+async def update_my_profile(
+    data: MyProfessionalUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[ProfessionalResponse]:
+    """A professional keeps their own data: name, licence, specialties,
+    contact. Nothing else — who the profile is stays the clinic's call."""
+    professional = await _my_profile(db, ctx)
+    try:
+        updated = await ProfessionalService.update(
+            db, professional, data.model_dump(exclude_unset=True)
+        )
+    except UnknownSpecialtyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ApiResponse(data=await _to_response(db, ctx.clinic_id, updated))
+
+
+@router.get("/workload", response_model=ApiResponse[list[ProfessionalWorkloadResponse]])
+async def list_workload(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("professionals.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    professional_id: Annotated[list[UUID] | None, Query()] = None,
+) -> ApiResponse[list[ProfessionalWorkloadResponse]]:
+    """What is assigned to each professional: patients seen, appointments,
+    plans and treatments, as told by the Apps that are running. The
+    clinic's active professionals unless ``professional_id`` names some."""
+    rows = await WorkloadService.for_clinic(db, ctx.clinic_id, professional_id)
+    return ApiResponse(
+        data=[
+            ProfessionalWorkloadResponse(professional_id=pid, patients=patients, counts=counts)
+            for pid, patients, counts in rows
+        ]
+    )
+
+
+async def _my_profile(db: AsyncSession, ctx: ClinicContext) -> Professional:
+    professional_id = await ProfessionalService.for_user(db, ctx.clinic_id, ctx.user_id)
+    professional = (
+        await ProfessionalService.get(db, ctx.clinic_id, professional_id)
+        if professional_id
+        else None
+    )
+    if professional is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This account has no professional profile in this clinic",
+        )
+    return professional
 
 
 @router.get("/{professional_id}", response_model=ApiResponse[ProfessionalResponse])

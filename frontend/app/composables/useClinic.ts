@@ -1,5 +1,8 @@
 import type { Cabinet, CabinetCreate, CabinetUpdate, Clinic, ClinicMembership, ClinicUpdate, PaginatedResponse, ApiResponse } from '~/types'
 
+/** Account tiers of one professional's practice (`INDIVIDUAL_TIERS`). */
+const INDIVIDUAL_TIERS = ['basic', 'medium', 'advanced']
+
 export function useClinic() {
   const api = useApi()
   const auth = useAuth()
@@ -15,6 +18,15 @@ export function useClinic() {
   const clinicName = computed(() => currentClinic.value?.name || '')
   const cabinets = computed(() => currentClinic.value?.cabinets || [])
   const slotDuration = computed(() => currentClinic.value?.settings?.slot_duration_min || 15)
+  /**
+   * One professional's practice (basic, medium, advanced) rather than a
+   * clinic: the account holder is its only professional. Mirrors
+   * `INDIVIDUAL_TIERS` on the server. `null` until the clinic is loaded.
+   */
+  const isIndividualPractice = computed<boolean | null>(() => {
+    const tier = currentClinic.value?.account_tier
+    return tier ? INDIVIDUAL_TIERS.includes(tier) : null
+  })
 
   // Actions
   async function fetchClinic(): Promise<void> {
@@ -154,6 +166,7 @@ export function useClinic() {
     clinicName,
     cabinets,
     slotDuration,
+    isIndividualPractice,
     fetchClinic,
     updateClinic,
     createCabinet,
