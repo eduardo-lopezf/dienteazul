@@ -35,6 +35,7 @@ from .models import (
     ImportCreatedRow,
     ImportJob,
     ImportWarning,
+    MappingDecision,
     RawEntity,
 )
 from .router import router
@@ -98,6 +99,13 @@ class MigrationImportModule(BaseModule):
             EntityMapping,
             FileStaging,
             ImportWarning,
+            # Was missing here while its table existed, so the list the
+            # core reads off this method was one short of the branch: the
+            # pre-drop backup (`processor._tables_for`) left the
+            # operator's catalog decisions out of the dump, and the
+            # foreign-key check that blocks a removal could not see a
+            # reference to them.
+            MappingDecision,
             RawEntity,
             ExportJob,
             ImportCreatedRow,

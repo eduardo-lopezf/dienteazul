@@ -11,6 +11,10 @@ Two scenarios:
   ``alembic upgrade schedules@head`` restores them. This exercises the
   combined Bug #1 (right downgrade target) + Bug #2 (branch isolation)
   fix.
+* **Migration import roundtrip** — the same, for the module that is
+  actually uninstalled in anger: a clinic imports its old program once
+  and then switches the App off. Its eight staging tables are read from
+  its own models rather than listed here (see ``_declared_tables``).
 * **pg_dump hard-fail** — monkeypatches ``pg_dump`` out of ``PATH`` and
   asserts that ``PendingProcessor._dump_tables`` raises ``RuntimeError``
   instead of returning ``None`` silently.
@@ -29,6 +33,7 @@ import asyncpg
 import pytest
 
 from app.config import settings
+from app.core.plugins.loader import discover_modules
 from app.core.plugins.processor import _count_owned_revisions
 
 pytestmark = pytest.mark.alembic_roundtrip
@@ -49,6 +54,25 @@ PERIODONTOGRAM_TABLES = {
     "periodontogram_teeth",
     "periodontogram_sites",
 }
+
+
+def _declared_tables(module_name: str) -> set[str]:
+    """The tables a module's own models declare, asked of the module.
+
+    The two sets above are written out because they are short and old.
+    ``migration_import`` owns eight tables and is under active work, and
+    a list copied into a test is exactly the kind that goes stale while
+    still passing — the same reason this file computes
+    ``_count_owned_revisions`` instead of hardcoding it.
+
+    It covers what the models declare. A table some migration creates
+    with no model behind it would go unwatched here, which under-asserts
+    rather than fails wrongly.
+    """
+    module = next(m for m in discover_modules() if m.name == module_name)
+    tables = {model.__tablename__ for model in module.get_models()}
+    assert tables, f"{module_name} declares no models"
+    return tables
 
 
 def _alembic(*args: str) -> None:
@@ -137,6 +161,44 @@ def test_periodontogram_uninstall_roundtrip_is_branch_scoped() -> None:
     )
 
     _alembic("upgrade", "periodontogram@head")
+    after_up = _list_tables()
+    assert before <= after_up, (
+        f"reinstall did not restore every table; missing: {before - after_up}"
+    )
+
+
+def test_migration_import_uninstall_roundtrip_is_branch_scoped() -> None:
+    """install → uninstall → reinstall drops only migration_import's tables.
+
+    The module whose uninstall is not hypothetical: a clinic imports its
+    previous program once and switches the App off afterwards, and what
+    is left behind belongs to `patients`, `payments` and the rest — this
+    branch owns only the staging of the import itself (its CLAUDE.md
+    says so; this is what holds it to it).
+    """
+    tables = _declared_tables("migration_import")
+
+    _alembic("upgrade", "heads")
+    before = _list_tables()
+    assert tables.issubset(before), (
+        f"expected migration_import tables at heads; missing: {tables - before}"
+    )
+    baseline_others = before - tables
+
+    _alembic("downgrade", f"migration_import@-{_count_owned_revisions('migration_import')}")
+
+    after_down = _list_tables()
+    assert tables.isdisjoint(after_down), (
+        f"migration_import tables survived downgrade: {tables & after_down}"
+    )
+    # The point of the module: the imported rows are other modules', and
+    # they stay. Nothing here may take a patient, a payment or an
+    # appointment with it.
+    assert baseline_others <= after_down, (
+        f"downgrade leaked into other modules; missing tables: {baseline_others - after_down}"
+    )
+
+    _alembic("upgrade", "migration_import@head")
     after_up = _list_tables()
     assert before <= after_up, (
         f"reinstall did not restore every table; missing: {before - after_up}"

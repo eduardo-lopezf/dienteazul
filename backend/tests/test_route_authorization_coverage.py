@@ -104,7 +104,10 @@ UNAUTHENTICATED: dict[str, str] = {
 
 # Routes that require a valid user but no particular permission: what
 # they return is either the caller's own context or already filtered by
-# the caller's permissions.
+# the caller's permissions. A route that *writes* belongs here only when
+# what it writes is the caller themselves — their own password, their own
+# activity — and its payload cannot reach anything the clinic decides
+# about them.
 AUTHENTICATED_ONLY: dict[str, str] = {
     "GET /api/v1/auth/me": "the caller's own profile",
     "POST /api/v1/auth/activity": "the caller's own session-family activity timestamp",
@@ -112,6 +115,19 @@ AUTHENTICATED_ONLY: dict[str, str] = {
     "GET /api/v1/auth/clinics": "returns the caller's own clinic, taken from the context",
     "GET /api/v1/auth/clinics/{clinic_id}": "403s when the id is not the caller's clinic",
     "GET /api/v1/modules/-/active": "sidebar inventory; nav entries filtered by permission",
+    "GET /api/v1/professionals/me": (
+        "the caller's own profile, found from their account; 404 for an "
+        "account that is no professional in this clinic"
+    ),
+    "PUT /api/v1/professionals/me": (
+        "that same row and nothing else: `MyProfessionalUpdate` carries name, "
+        "licence, specialties and contact, not the account link, the type or "
+        "the active flag — who the profile is stays the clinic's, through "
+        "`PUT /{id}` and `professionals.write` (ADR 0058). Held by "
+        "`test_professionals_core.py::test_a_professional_keeps_their_own_"
+        "details_and_nothing_else`, which sends `is_active` and `user_id` "
+        "and asserts both are ignored"
+    ),
     "GET /api/v1/auth/clinic/settings/letterheads/mine": (
         "the caller's own letterhead, resolved from their own professional profile"
     ),
