@@ -348,8 +348,8 @@ watch(canRead, (ok) => {
           </template>
           <div class="space-y-3 text-sm">
             <UAlert
-              color="warning"
-              icon="i-lucide-triangle-alert"
+              color="info"
+              icon="i-lucide-info"
               :title="t('catalog.packs.restoreWarning')"
               :description="restoring.customised_count
                 ? t('catalog.packs.restoreCustomised', { count: restoring.customised_count })
@@ -371,7 +371,7 @@ watch(canRead, (ok) => {
                 {{ t('common.cancel') }}
               </UButton>
               <UButton
-                color="warning"
+                color="primary"
                 icon="i-lucide-rotate-ccw"
                 data-testid="specialty-pack-restore-go"
                 @click="confirmRestore"

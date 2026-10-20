@@ -540,9 +540,9 @@ class PlanTemplateService:
         the first time, so this doubles as the repair path when the catalog
         was seeded after the templates.
 
-        Without ``restore`` a template the clinic already has is never
-        overwritten. With it, the template is put back to the reference —
-        name, description, order and lines — and shown again.
+        A template the clinic already has is never overwritten. With
+        ``restore`` one the clinic deleted (hidden) is shown again as it
+        left it; missing ones are created either way.
         """
         enabled = set(
             (
@@ -598,11 +598,12 @@ class PlanTemplateService:
                 )
                 db.add(template)
                 await db.flush()
-            elif restore:
-                template.name = spec["name"]
-                template.description = spec["description"]
-                template.display_order = spec["display_order"]
+            elif restore and not template.is_active:
+                # Brought back as the clinic left it: a restore never
+                # overwrites what the clinic made of a template.
                 template.is_active = True
+                touched += 1
+                continue
             elif len(template.items) >= len(specs):
                 # Already complete (or edited by the clinic). Never overwrite.
                 continue

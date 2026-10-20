@@ -12,10 +12,11 @@ catalogue, and can **restore** one to the reference.
 - *Disable* deactivates the treatments that belong to no other enabled
   discipline. Nothing is deleted — plans, budgets and the chart point at
   them — and a treatment the clinic created itself is left alone.
-- *Restore* puts every reference treatment of the discipline back to the
-  reference: names, prices, durations, pricing, chart drawing. What the
-  clinic changed on them is lost; what the clinic added is kept. The
-  caller is told how many are customised, so it can warn first.
+- *Restore* brings back the reference treatments the clinic lacks or
+  deleted or retired — the deleted and retired ones as the clinic left
+  them. It **never overwrites** a treatment the clinic has: the reference
+  files stay the reference, and what the clinic made of its copy is its
+  own. Plans and budgets already made are not touched either.
 
 Plan templates are the treatment-plan module's. This module only says
 what happened (``catalog.specialty_enabled`` / ``_restored``) and that

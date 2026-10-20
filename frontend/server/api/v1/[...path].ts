@@ -38,11 +38,16 @@ function clearAuthCookies(event: Parameters<typeof deleteCookie>[0], secure: boo
 
 function safePath(event: Parameters<typeof getRouterParam>[0]): string {
   const path = getRouterParam(event, 'path') ?? ''
-  const segments = path.split('/')
+  // One trailing slash is part of a route, not an empty segment: FastAPI
+  // tells `recalls/` (the list, `@router.get("/")`) from `recalls`, so it
+  // is kept on the way up. Empty segments elsewhere, `.` and `..` are not.
+  // The router param loses it, so it is read off the request's own path.
+  const trailingSlash = getRequestURL(event).pathname.endsWith('/')
+  const segments = path.replace(/\/$/, '').split('/')
   if (!path || segments.some(part => !part || part === '.' || part === '..' || !/^[\w.~%-]+$/.test(part))) {
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
   }
-  return segments.join('/')
+  return segments.join('/') + (trailingSlash ? '/' : '')
 }
 
 function safeUpstreamHeaders(event: Parameters<typeof getRequestHeaders>[0], accessToken?: string): Headers {

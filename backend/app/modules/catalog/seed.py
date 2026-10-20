@@ -19,7 +19,7 @@ default rules for clinical_type.
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import (
@@ -409,11 +409,13 @@ async def upsert_reference_item(
 ) -> tuple[str, int]:
     """Bring one reference item into a clinic's catalogue.
 
-    Returns ``(outcome, specialty links added)``. Without ``restore`` an
-    item the clinic already has is left as the clinic made it — only its
-    missing discipline links and phase are filled in. With ``restore`` it
-    is put back to the reference: what the clinic changed on it is lost,
-    which is the point and why the caller asks first.
+    Returns ``(outcome, specialty links added)``. An item the clinic
+    already has is **never overwritten**: the reference files are the
+    reference, and the clinic's copy is the clinic's — what it changed is
+    its own. Without ``restore`` only its missing discipline links and
+    phase are filled in. With ``restore`` an item the clinic deleted or
+    retired comes back as it left it (outcome ``restored``); one it still
+    has is left alone (``existing``).
     """
     data, extras = _reference_fields(treatment_raw)
     vat_type_id = vat_type_map.get(extras["vat_type"], vat_type_map.get("exempt"))
@@ -426,38 +428,19 @@ async def upsert_reference_item(
         )
     )
     already = existing.scalar_one_or_none()
-    if already is not None and not restore:
+    if already is not None:
         # The item predates the specialty and phase axes, so those may
         # still be missing even though the item itself is not.
         linked = await _link_item_specialties(db, already, category_key, specialty_map)
+        if restore and (already.deleted_at is not None or not already.is_active):
+            already.deleted_at = None
+            already.is_active = True
+            already.disabled_by_specialty = False
+            return "restored", linked
         if already.default_phase is None:
             already.default_phase = phase
             return "phase", linked
         return "existing", linked
-
-    if already is not None:
-        for column, value in REFERENCE_DEFAULTS.items():
-            setattr(already, column, data.get(column, value))
-        already.category_id = category_id
-        already.vat_type_id = vat_type_id
-        already.default_phase = phase
-        already.is_system = True
-        already.is_active = True
-        already.is_visible = True
-        already.deleted_at = None
-        already.disabled_by_specialty = False
-        await db.execute(
-            delete(TreatmentOdontogramMapping).where(
-                TreatmentOdontogramMapping.catalog_item_id == already.id
-            )
-        )
-        await db.execute(
-            delete(CatalogItemSession).where(CatalogItemSession.catalog_item_id == already.id)
-        )
-        await db.flush()
-        await _write_dependents(db, clinic_id, already, category_key, extras)
-        linked = await _link_item_specialties(db, already, category_key, specialty_map)
-        return "restored", linked
 
     item = TreatmentCatalogItem(
         clinic_id=clinic_id,
@@ -472,25 +455,6 @@ async def upsert_reference_item(
     await _write_dependents(db, clinic_id, item, category_key, extras)
     linked = await _link_item_specialties(db, item, category_key, specialty_map)
     return "created", linked
-
-
-#: The columns a reference item may set, with what one that does not set
-#: them has — so a restore also clears what the clinic added.
-REFERENCE_DEFAULTS: dict[str, Any] = {
-    "names": {},
-    "descriptions": {},
-    "default_price": None,
-    "cost_price": None,
-    "default_duration_minutes": None,
-    "requires_appointment": True,
-    "pricing_strategy": "flat",
-    "pricing_config": None,
-    "surface_prices": None,
-    "treatment_scope": "tooth",
-    "is_diagnostic": False,
-    "requires_surfaces": False,
-    "material_notes": None,
-}
 
 
 async def ensure_categories(db: AsyncSession, clinic_id: UUID) -> tuple[dict[str, UUID], int]:

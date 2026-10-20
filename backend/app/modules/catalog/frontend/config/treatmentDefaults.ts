@@ -150,7 +150,9 @@ export const DEFAULTS_BY_TYPE: Readonly<Record<string, TypeDefaults>> = {
     chartTypesTooth: [
       'extraction',
       'implant',
-      'apicoectomy'
+      'apicoectomy',
+      'biopsy_soft_tissue',
+      'biopsy_hard_tissue'
     ],
     allowsSessions: true
   },

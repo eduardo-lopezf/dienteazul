@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import AuthSession, Clinic, ClinicMembership
 from app.core.auth.privacy_agreement import PRIVACY_AGREEMENT_VERSION
+from app.core.plugins.apps import clinic_apps
 from app.core.tenancy.usage import FileUsage, cached_file_usage, file_usage
 
 #: How long a measurement is good for. Counting every clinic's rows in
@@ -237,6 +238,49 @@ def _clinic_folders(root: Path, clinic_ids: list[UUID]) -> dict[UUID, FileUsage]
     return {clinic_id: file_usage(root / str(clinic_id)) for clinic_id in clinic_ids}
 
 
+@dataclass(frozen=True, slots=True)
+class ClinicProfile:
+    """What a clinic is and has, read now — unlike its sizes, which are
+    measured at most every ``USAGE_TTL``. What the clinic switches on
+    itself, or a clinic made a minute ago, shows at once."""
+
+    id: UUID
+    name: str
+    created_at: datetime
+    account_tier: str
+    limits: dict[str, int | None]
+    #: What it has, the tier's mandatory Apps included; ``None`` is all.
+    apps: list[str] | None
+    #: What it may still switch on itself.
+    available_apps: list[str]
+    users: int
+
+
+async def clinic_profiles(db: AsyncSession) -> list[ClinicProfile]:
+    users = dict(
+        (
+            await db.execute(
+                select(ClinicMembership.clinic_id, func.count()).group_by(
+                    ClinicMembership.clinic_id
+                )
+            )
+        ).all()
+    )
+    return [
+        ClinicProfile(
+            id=clinic.id,
+            name=clinic.name,
+            created_at=clinic.created_at,
+            account_tier=clinic.account_tier,
+            limits=clinic.limits or {},
+            apps=clinic_apps(clinic.apps, clinic.account_tier),
+            available_apps=clinic.available_apps or [],
+            users=users.get(clinic.id, 0),
+        )
+        for clinic in await db.scalars(select(Clinic).order_by(Clinic.name))
+    ]
+
+
 async def measure(db: AsyncSession, storage_root: Path, *, refresh: bool) -> DeploymentUsage:
     clinics = list(await db.scalars(select(Clinic).order_by(Clinic.name)))
     users = dict(
@@ -266,7 +310,7 @@ async def measure(db: AsyncSession, storage_root: Path, *, refresh: bool) -> Dep
                 created_at=clinic.created_at,
                 account_tier=clinic.account_tier,
                 limits=clinic.limits or {},
-                apps=clinic.apps,
+                apps=clinic_apps(clinic.apps, clinic.account_tier),
                 users=users.get(clinic.id, 0),
                 database_bytes=shares.get(clinic.id, (0, 0))[0],
                 database_rows=shares.get(clinic.id, (0, 0))[1],

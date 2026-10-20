@@ -357,6 +357,20 @@ export const TREATMENT_ICONS: Record<string, string> = {
     <circle cx="12" cy="22" r="1.5" fill="currentColor"/>
   `,
 
+  // Soft tissue biopsy - tooth over the gum, a punch taken from the gum
+  biopsy_soft_tissue: `
+    <path d="M7 2H17V8C17 10.5 15 12 12 12C9 12 7 10.5 7 8V2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M2 14C5 12 8 12 12 13C16 14 19 13 22 12V22H2Z" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+    <circle cx="15.5" cy="17" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 1.2"/>
+  `,
+
+  // Hard tissue biopsy - root in bone, a block taken from the bone
+  biopsy_hard_tissue: `
+    <rect x="2" y="9" width="20" height="13" rx="2" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M8.5 2H15.5V8C15.5 13 14 18 12 19C10 18 8.5 13 8.5 8V2Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+    <rect x="16" y="13.5" width="4.5" height="4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2 1"/>
+  `,
+
   // ============================================================================
   // ENDODONCIA
   // ============================================================================

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateOnly } from '~~/app/utils/date'
 import { computed, ref } from 'vue'
 import type { Recall } from '../composables/useRecalls'
 
@@ -34,11 +35,8 @@ const phoneHref = computed(() =>
 )
 
 const monthLabel = computed(() => {
-  const date = new Date(props.recall.due_month)
-  return new Intl.DateTimeFormat(locale.value, {
-    year: 'numeric',
-    month: 'long'
-  }).format(date)
+  // A calendar month: never through `new Date()`, which reads it as UTC.
+  return formatDateOnly(props.recall.due_month, locale.value, { year: 'numeric', month: 'long' })
 })
 
 async function quickNoAnswer() {

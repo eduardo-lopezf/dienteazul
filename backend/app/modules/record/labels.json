@@ -126,6 +126,8 @@
       },
       "clinical_type": {
         "apicoectomy": "Apicoectomy",
+        "biopsy_soft_tissue": "Soft tissue biopsy",
+        "biopsy_hard_tissue": "Hard tissue biopsy",
         "attachment": "Attachment",
         "band": "Band",
         "bracket": "Bracket",
@@ -492,6 +494,8 @@
       },
       "clinical_type": {
         "apicoectomy": "Apicectomía",
+        "biopsy_soft_tissue": "Biopsia de tejidos blandos",
+        "biopsy_hard_tissue": "Biopsia de tejidos duros",
         "attachment": "Atache",
         "band": "Banda",
         "bracket": "Bracket",

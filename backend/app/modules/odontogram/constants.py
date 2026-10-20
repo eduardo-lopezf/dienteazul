@@ -204,6 +204,11 @@ class TreatmentType(StrEnum):
     EXTRACTION = "extraction"
     IMPLANT = "implant"
     APICOECTOMY = "apicoectomy"
+    # A biopsy is a surgical act that serves a diagnosis: tissue taken from
+    # beside a tooth for the pathologist. Soft: gingiva / mucosa. Hard: bone
+    # or an intraosseous lesion. Charted on the tooth it is nearest to.
+    BIOPSY_SOFT_TISSUE = "biopsy_soft_tissue"
+    BIOPSY_HARD_TISSUE = "biopsy_hard_tissue"
 
     # Endodoncia (Endodontics)
     ROOT_CANAL_FULL = "root_canal_full"
@@ -314,6 +319,8 @@ TREATMENTS_BY_CATEGORY: Final[dict[str, list[str]]] = {
         TreatmentType.EXTRACTION.value,
         TreatmentType.IMPLANT.value,
         TreatmentType.APICOECTOMY.value,
+        TreatmentType.BIOPSY_SOFT_TISSUE.value,
+        TreatmentType.BIOPSY_HARD_TISSUE.value,
     ],
     TreatmentClinicalCategory.ENDODONCIA.value: [
         TreatmentType.ROOT_CANAL_FULL.value,
@@ -364,6 +371,8 @@ TREATMENT_VISUALIZATION_RULES: Final[dict[str, list[str]]] = {
         TreatmentType.DISPLACED.value,
         TreatmentType.IMPLANT.value,
         TreatmentType.APICOECTOMY.value,
+        TreatmentType.BIOPSY_SOFT_TISSUE.value,
+        TreatmentType.BIOPSY_HARD_TISSUE.value,
         TreatmentType.EXTRACTION.value,
         TreatmentType.POST.value,
         TreatmentType.ROOT_CANAL_OVERFILL.value,  # Also uses PULP_FILL
@@ -417,6 +426,8 @@ WHOLE_TOOTH_TREATMENTS: Final[set[str]] = {
     TreatmentType.EXTRACTION.value,
     TreatmentType.IMPLANT.value,
     TreatmentType.APICOECTOMY.value,
+    TreatmentType.BIOPSY_SOFT_TISSUE.value,
+    TreatmentType.BIOPSY_HARD_TISSUE.value,
     TreatmentType.ROOT_CANAL_FULL.value,
     TreatmentType.ROOT_CANAL_TWO_THIRDS.value,
     TreatmentType.ROOT_CANAL_HALF.value,

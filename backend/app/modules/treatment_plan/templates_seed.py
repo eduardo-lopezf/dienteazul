@@ -827,7 +827,7 @@ PLAN_TEMPLATES: Final[list[TemplateSpec]] = [
         "items": [
             {"code": "DX-CBCT"},
             {"code": "SURG-CYST"},
-            {"code": "SURG-BIOPSY"},
+            {"code": "SURG-BIOPSY-HARD"},
             {"code": "SURG-SUTURE-REMOVE"},
             {"code": "SURG-FOLLOW"},
         ],

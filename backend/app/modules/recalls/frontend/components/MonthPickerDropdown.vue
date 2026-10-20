@@ -15,10 +15,11 @@ const open = ref(false)
 
 const currentDate = computed(() => {
   const value = props.modelValue
-  // Tolerate YYYY-MM input from upstream pickers.
-  const iso = value.length === 7 ? `${value}-01` : value
-  const d = new Date(iso)
-  return isNaN(d.getTime()) ? new Date() : d
+  // `YYYY-MM` or `YYYY-MM-DD`, read as a calendar month — never through
+  // `new Date('2026-10-01')`, which is midnight UTC and, west of
+  // Greenwich, the last day of the month before.
+  const match = /^(\d{4})-(\d{2})/.exec(value)
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, 1) : new Date()
 })
 
 const viewYear = ref(currentDate.value.getFullYear())

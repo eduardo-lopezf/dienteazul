@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateOnly } from '~~/app/utils/date'
 import { computed, onMounted } from 'vue'
 import type { Recall } from '../composables/useRecalls'
 
@@ -31,8 +32,7 @@ const nextRecall = computed(() => patientRecalls?.nextActiveRecall.value ?? null
 const recentHistory = computed(() => recalls.value.slice(0, 5))
 
 function formatMonth(iso: string): string {
-  const date = new Date(iso)
-  return new Intl.DateTimeFormat(locale.value, { year: 'numeric', month: 'long' }).format(date)
+  return formatDateOnly(iso, locale.value, { year: 'numeric', month: 'long' })
 }
 
 function statusColour(status: Recall['status']): 'success' | 'info' | 'warning' | 'neutral' | 'error' {

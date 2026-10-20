@@ -212,7 +212,8 @@ def test_shipped_catalog_opens_with_the_workspace_and_names_the_core_apps() -> N
     assert catalog[0].tier is AppTier.BASE and catalog[0].enabled
     assert catalog[0].modules == ()
     core = {app.name for app in catalog if app.tier is AppTier.CORE}
-    assert core == {"agenda", "patients", "treatments"}
+    # Professionals too: every practice has its professional (ADR 0058).
+    assert core == {"agenda", "patients", "treatments", "professionals"}
 
 
 def test_every_module_belongs_to_an_app() -> None:

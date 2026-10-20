@@ -53,10 +53,28 @@ test.describe('admin sees the apps screen', () => {
       'data-testid',
       'app-card-workspace'
     )
-    await expect(loggedIn.getByTestId('app-tier-agenda')).toHaveText(/App core|Core app/)
-    // Every App not yet classified is an optional App, Communications among them.
-    await expect(loggedIn.getByTestId('app-tier-communications')).toHaveText(/App opcional|Optional app/)
-    await expect(loggedIn.getByTestId('app-tier-professionals')).toHaveText(/App opcional|Optional app/)
+    // Every badge against the catalog, not a tier written in per App.
+    // This line used to name three of them, and it failed when
+    // `professionals` was reclassified from optional to core: the screen
+    // was right and the test was holding last month's answer. What belongs
+    // here is that each card shows the tier it is given, whatever that is.
+    const TIER_LABEL: Record<string, RegExp> = {
+      base: /App principal|Main app/,
+      core: /App core|Core app/,
+      optional: /App opcional|Optional app/
+    }
+    const apps = ((await (await loggedIn.request.get('/api/v1/apps')).json()) as {
+      data: { name: string, tier: string }[]
+    }).data
+    expect(apps.length, 'the catalog came back empty').toBeGreaterThan(5)
+    for (const app of apps) {
+      const label = TIER_LABEL[app.tier]
+      expect(label, `unknown tier "${app.tier}" on ${app.name}`).toBeTruthy()
+      await expect(
+        loggedIn.getByTestId(`app-tier-${app.name}`),
+        `${app.name} is ${app.tier} in the catalog`
+      ).toHaveText(label!)
+    }
 
     // The catalog (`backend/apps.json`): Agenda v0.1, enabled.
     const agenda = loggedIn.getByTestId('app-card-agenda')

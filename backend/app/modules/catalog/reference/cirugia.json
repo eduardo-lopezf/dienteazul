@@ -644,10 +644,10 @@
       "pricing_strategy": "flat"
     },
     {
-      "code": "SURG-BIOPSY",
+      "code": "SURG-BIOPSY-SOFT",
       "names": {
-        "es": "Biopsia",
-        "en": "Biopsy"
+        "es": "Biopsia de tejidos blandos",
+        "en": "Soft tissue biopsy"
       },
       "category": "cirugia",
       "subarea": "tejidos_blandos",
@@ -659,7 +659,47 @@
       "price": "220.00",
       "minutes": 45,
       "vat_type": "exempt",
-      "pricing_strategy": "flat"
+      "pricing_strategy": "flat",
+      "odontogram_treatment_type": "biopsy_soft_tissue",
+      "visualization_rules": [
+        {
+          "layer": "lateral_icon",
+          "icon": "biopsy_soft_tissue",
+          "color": "#DB2777"
+        }
+      ],
+      "visualization_config": {
+        "color": "#DB2777"
+      }
+    },
+    {
+      "code": "SURG-BIOPSY-HARD",
+      "names": {
+        "es": "Biopsia de tejidos duros",
+        "en": "Hard tissue biopsy"
+      },
+      "category": "cirugia",
+      "subarea": "dentoalveolar",
+      "specialties": [
+        "cirugia"
+      ],
+      "phase": "estabilizacion",
+      "scope": "tooth",
+      "price": "320.00",
+      "minutes": 60,
+      "vat_type": "exempt",
+      "pricing_strategy": "flat",
+      "odontogram_treatment_type": "biopsy_hard_tissue",
+      "visualization_rules": [
+        {
+          "layer": "lateral_icon",
+          "icon": "biopsy_hard_tissue",
+          "color": "#B45309"
+        }
+      ],
+      "visualization_config": {
+        "color": "#B45309"
+      }
     },
     {
       "code": "SURG-CYST",

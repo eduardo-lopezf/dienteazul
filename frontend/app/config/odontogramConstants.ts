@@ -56,6 +56,8 @@ export const VISUALIZATION_RULES: Record<VisualizationRule, string[]> = {
     'displaced',
     'implant',
     'apicoectomy',
+    'biopsy_soft_tissue',
+    'biopsy_hard_tissue',
     'extraction',
     'post',
     'root_canal_overfill', // Also uses pulp_fill
@@ -192,6 +194,8 @@ export const WHOLE_TOOTH_TREATMENTS = [
   'extraction',
   'implant',
   'apicoectomy',
+  'biopsy_soft_tissue',
+  'biopsy_hard_tissue',
   'root_canal_full',
   'root_canal_two_thirds',
   'root_canal_half',
@@ -348,6 +352,8 @@ export const TREATMENT_COLORS: Record<string, TreatmentColorConfig> = {
   extraction: { light: '#DC2626', dark: '#EF4444' },
   implant: { light: '#10B981', dark: '#34D399' },
   apicoectomy: { light: '#6366F1', dark: '#818CF8' },
+  biopsy_soft_tissue: { light: '#DB2777', dark: '#F472B6' },
+  biopsy_hard_tissue: { light: '#B45309', dark: '#F59E0B' },
 
   // Endodoncia
   root_canal_full: { light: '#8B5CF6', dark: '#A78BFA' },
@@ -537,7 +543,9 @@ export const TREATMENT_CATEGORIES: Array<{
     treatments: [
       'extraction',
       'implant',
-      'apicoectomy'
+      'apicoectomy',
+      'biopsy_soft_tissue',
+      'biopsy_hard_tissue'
     ]
   },
   {

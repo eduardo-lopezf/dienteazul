@@ -476,6 +476,8 @@ export type ClinicalType
     | 'extraction'
     | 'implant'
     | 'apicoectomy'
+    | 'biopsy_soft_tissue'
+    | 'biopsy_hard_tissue'
     // Endodoncia
     | 'root_canal_full'
     | 'root_canal_two_thirds'

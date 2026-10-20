@@ -353,19 +353,28 @@ async def test_the_chosen_apps_are_kept_in_catalog_order(
     assert listed["apps"] == clinic.apps
 
 
+async def test_a_mandatory_app_left_out_is_added_not_refused(
+    client: AsyncClient, ops_enabled: None, db_session: AsyncSession
+) -> None:
+    # The tier's mandatory Apps are the clinic's whatever the list says: a
+    # list that leaves one out — one stored before it became mandatory,
+    # sent back as it was — gets it added instead of refusing the change.
+    payload = CLINIC | {"apps": ["workspace", "agenda", "patients"]}
+    response = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
+    assert response.status_code == 201, response.text
+    clinic = await db_session.get(Clinic, UUID(response.json()["data"]["clinic_id"]))
+    assert {"treatments", "professionals"} <= set(clinic.apps)
+
+
 @pytest.mark.parametrize(
     "tier,apps",
     [
-        ("basic", ["workspace", "agenda", "patients"]),
-        ("clinic", ["workspace", "agenda", "patients", "treatments"]),
         # The Clinical record, made to require Recalls, without it.
         ("basic", [*HOLDER["apps"], "clinical_record"]),
         ("basic", [*HOLDER["apps"], "ai"]),
         ("basic", [*HOLDER["apps"], "no_such_app"]),
     ],
     ids=[
-        "a mandatory App left out",
-        "a clinic without Professionals",
         "an App without the ones it requires",
         "an App the deployment has switched off",
         "an App that does not exist",
@@ -697,13 +706,15 @@ async def test_a_clinic_can_be_changed_under_the_rules_of_creation(
         clinic["specialties"]
     ) == {"general", "ortodoncia", "radiologia"}
 
-    # The rules of creation still hold: a clinic keeps Professionals.
-    refused = await client.patch(
+    # The rules of creation still hold: a clinic keeps Professionals, even
+    # when the change leaves it out.
+    kept = await client.patch(
         f"/api/v1/ops/clinics/{clinic_id}",
         json=change | {"apps": WITHOUT_PROFESSIONALS},
         headers=_token(),
     )
-    assert refused.status_code == 422
+    assert kept.status_code == 200, kept.text
+    assert "professionals" in kept.json()["data"]["apps"]
 
 
 async def test_a_clinic_moved_to_an_individual_tier_takes_its_holders_name(
@@ -950,13 +961,15 @@ async def test_a_clinics_apps_are_changed_on_their_own_and_at_once(
     assert response.json()["data"]["available_apps"] == []
     assert (await client.get("/api/v1/recalls/stats/dashboard", headers=holder)).status_code == 404
 
-    # What its tier makes mandatory cannot be taken away.
-    refused = await client.put(
+    # What its tier makes mandatory cannot be taken away: left out of the
+    # list, it stays — and the rest of the change goes through.
+    kept = await client.put(
         f"/api/v1/ops/clinics/{clinic_id}/apps",
-        json={"apps": WITHOUT_PROFESSIONALS},
+        json={"apps": [*WITHOUT_PROFESSIONALS, "recalls"]},
         headers=_token(),
     )
-    assert refused.status_code == 422
+    assert kept.status_code == 200, kept.text
+    assert {"professionals", "recalls"} <= set(kept.json()["data"]["apps"])
 
 
 async def test_a_clinic_moves_to_another_tier_and_keeps_its_apps(
@@ -1235,3 +1248,39 @@ async def test_a_clinic_nobody_welcomed_has_no_welcome(
     assert await _privacy(client, str(test_clinic.id)) == "not_asked"
     declined = await client.post("/api/v1/auth/clinic/onboarding/decline", headers=auth_headers)
     assert declined.status_code == 409
+
+
+async def test_the_panel_sees_at_once_what_a_clinic_switches_on_itself(
+    client: AsyncClient, ops_enabled: None
+) -> None:
+    # Measured first: the sizes are kept for ten minutes from here.
+    await client.get("/api/v1/ops/usage?refresh=true", headers=_token())
+
+    payload = HOLDER | {"account_tier": "basic", "available_apps": ["recalls"]}
+    created = await client.post("/api/v1/ops/clinics", json=payload, headers=_token())
+    clinic_id = created.json()["data"]["clinic_id"]
+    holder = await _login(client, HOLDER["holder_password"])
+    await client.post(
+        "/api/v1/auth/password",
+        json={"current_password": HOLDER["holder_password"], "new_password": "Propia5678"},
+        headers=holder,
+    )
+    await client.post("/api/v1/auth/clinic/onboarding/accept", json=ACCEPTED, headers=holder)
+
+    async def listed() -> dict:
+        usage = await client.get("/api/v1/ops/usage", headers=_token())
+        [clinic] = [c for c in usage.json()["data"]["clinics"] if c["id"] == clinic_id]
+        return clinic
+
+    # Newer than the measurement, it is listed all the same, without sizes.
+    before = await listed()
+    assert before["available_apps"] == ["recalls"]
+    assert "recalls" not in before["apps"]
+    assert before["database_bytes"] == 0
+
+    enabled = await client.post("/api/v1/apps/recalls/enable", headers=holder)
+    assert enabled.status_code == 200, enabled.text
+
+    after = await listed()
+    assert "recalls" in after["apps"]
+    assert after["available_apps"] == []

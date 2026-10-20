@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateOnly } from '~~/app/utils/date'
 import { computed, onMounted, ref } from 'vue'
 
 // Slot entry into `patient.summary.actions`. `<ModuleSlot>` passes
@@ -43,10 +44,9 @@ onMounted(() => {
 })
 
 function formatMonth(iso: string): string {
-  return new Intl.DateTimeFormat(locale.value, {
-    year: 'numeric',
-    month: 'long'
-  }).format(new Date(iso))
+  // A calendar month, not an instant: `new Date(iso)` would put it a day
+  // early west of Greenwich, in the previous month.
+  return formatDateOnly(iso, locale.value, { year: 'numeric', month: 'long' })
 }
 
 function statusColour(status: string): 'success' | 'info' | 'warning' | 'neutral' {

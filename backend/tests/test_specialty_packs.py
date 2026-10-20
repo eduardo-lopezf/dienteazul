@@ -3,12 +3,14 @@
 What these pin: every recognised discipline arrives with treatments; a
 clinic only gets the ones it enabled; enabling never touches what the
 clinic made its own; disabling deletes nothing and enabling again brings
-exactly that back; restoring overwrites the reference treatments and keeps
-the clinic's own; and the plan templates of a discipline follow it.
+exactly that back; restoring only puts back what is missing or deleted
+and never overwrites what the clinic has; each clinic's catalogue is its
+own; and the plan templates of a discipline follow it.
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -163,11 +165,11 @@ async def test_a_treatment_two_disciplines_share_stays_while_one_is_enabled(
 
 
 @pytest.mark.asyncio
-async def test_restoring_overwrites_the_reference_and_keeps_what_the_clinic_added(
+async def test_restoring_puts_back_what_is_missing_and_overwrites_nothing(
     client: AsyncClient, auth_headers: dict, db_session: AsyncSession, clinic: UUID
 ) -> None:
     braces = await _item(db_session, clinic, "ORTO-METAL")
-    reference_price, category_id = braces.default_price, braces.category_id
+    category_id = braces.category_id
     braces.default_price = Decimal("9999.00")
     braces.names = {"es": "Brackets de la casa"}
     own = TreatmentCatalogItem(
@@ -180,19 +182,89 @@ async def test_restoring_overwrites_the_reference_and_keeps_what_the_clinic_adde
     )
     db_session.add(own)
     await db_session.commit()
-
-    before = {p["key"]: p for p in (await client.get(PACKS, headers=auth_headers)).json()["data"]}
-    assert before["ortodoncia"]["customised_count"] == 1
+    # A reference treatment the clinic deleted, after editing it.
+    [(_, other)] = [
+        (c, i)
+        for c, i in reference_items("ortodoncia")
+        if i["internal_code"] not in ("ORTO-METAL",)
+    ][:1]
+    deleted = await _item(db_session, clinic, other["internal_code"])
+    deleted.default_price = Decimal("123.00")
+    deleted.is_active = False
+    deleted.deleted_at = datetime.now(UTC)
+    await db_session.commit()
+    templates = await _templates(db_session, clinic)
+    ortho_keys = {t["key"] for t in PLAN_TEMPLATES if t["specialty"] == "ortodoncia"}
+    ortho = next(t for t in templates.values() if t.key in ortho_keys)
+    ortho.name = "Mi plantilla de ortodoncia"
+    await db_session.commit()
 
     restored = await client.post(f"{PACKS}/ortodoncia/restore", headers=auth_headers)
     assert restored.status_code == 200, restored.text
-    assert restored.json()["data"]["customised_count"] == 0
 
+    # What the clinic edited stays as it is.
     braces = await _item(db_session, clinic, "ORTO-METAL")
-    assert braces.default_price == reference_price
-    assert braces.names["es"] == "Ortodoncia brackets metálicos"
+    assert braces.default_price == Decimal("9999.00")
+    assert braces.names["es"] == "Brackets de la casa"
+    # What it created is untouched.
     mine = await _item(db_session, clinic, "MIO-ORTO")
     assert mine is not None and mine.default_price == Decimal("50.00")
+    # What it deleted comes back, as it left it.
+    back = await _item(db_session, clinic, other["internal_code"])
+    assert back.deleted_at is None and back.is_active
+    assert back.default_price == Decimal("123.00")
+    # Its edited plan template is not overwritten.
+    templates = await _templates(db_session, clinic)
+    assert templates[ortho.key].name == "Mi plantilla de ortodoncia"
+
+
+@pytest.mark.asyncio
+async def test_an_admin_edits_the_clinics_own_copy_and_another_clinic_never_sees_it(
+    client: AsyncClient, auth_headers: dict, db_session: AsyncSession, clinic: UUID
+) -> None:
+    other_clinic = Clinic(
+        id=uuid4(), name="Otra", tax_id="B00000000", settings={}, account_tier="clinic"
+    )
+    db_session.add(other_clinic)
+    await db_session.flush()
+    await seed_catalog(db_session, other_clinic.id)
+    await db_session.commit()
+    other_id = other_clinic.id
+    theirs = await _item(db_session, other_id, "ORTO-METAL")
+    their_id, their_price = theirs.id, theirs.default_price
+    my_id = (await _item(db_session, clinic, "ORTO-METAL")).id
+    assert their_id != my_id, "each clinic has its own copy of the reference"
+
+    # The administrator edits the clinic's copy…
+    edited = await client.put(
+        f"/api/v1/catalog/items/{my_id}",
+        json={"default_price": "777.00", "names": {"es": "Brackets A"}},
+        headers=auth_headers,
+    )
+    assert edited.status_code == 200, edited.text
+    # …and the other clinic's copy, and the reference file, are unchanged.
+    theirs = await _item(db_session, other_id, "ORTO-METAL")
+    assert theirs.default_price == their_price
+    [reference] = [
+        i for _, i in reference_items("ortodoncia") if i["internal_code"] == "ORTO-METAL"
+    ]
+    assert reference["names"]["es"] != "Brackets A"
+
+    # The other clinic's catalogue is neither listed, read nor written.
+    listed = await client.get(
+        "/api/v1/catalog/items", params={"search": "ORTO-METAL"}, headers=auth_headers
+    )
+    assert str(their_id) not in {row["id"] for row in listed.json()["data"]}
+    assert str(my_id) in {row["id"] for row in listed.json()["data"]}
+    assert (
+        await client.get(f"/api/v1/catalog/items/{their_id}", headers=auth_headers)
+    ).status_code == 404
+    refused = await client.put(
+        f"/api/v1/catalog/items/{their_id}",
+        json={"default_price": "1.00"},
+        headers=auth_headers,
+    )
+    assert refused.status_code == 404
 
 
 @pytest.mark.asyncio

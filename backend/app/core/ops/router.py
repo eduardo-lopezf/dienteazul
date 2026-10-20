@@ -41,6 +41,7 @@ from app.core.events.types import EventType
 from app.core.plugins.apps import (
     AppCatalogError,
     AppTier,
+    clinic_apps,
     load_app_catalog,
     mandatory_apps,
     read_app_catalog,
@@ -61,7 +62,7 @@ from app.database import get_db
 
 from . import snapshot
 from .purge import purge_clinic
-from .usage import ClinicState, cached_measure, clinic_log, clinic_states
+from .usage import ClinicState, cached_measure, clinic_log, clinic_profiles, clinic_states
 
 #: What a control-plane token must name as its audience, so a token
 #: signed for anything else — a staff session, a budget link — is refused
@@ -104,7 +105,10 @@ class ClinicUsageResponse(BaseModel):
     account_tier: str
     #: Its own limits, over its tier's; a key absent inherits.
     limits: dict[str, int | None]
+    #: What it has, the tier's mandatory Apps included; ``None`` is all.
+    #: Read now, like what it may switch on itself.
     apps: list[str] | None
+    available_apps: list[str] = []
     users: int
     #: ``deactivated`` | ``active`` | ``offline`` | ``inactive``; read now,
     #: unlike the sizes, with the three dates it is worked out from.
@@ -159,6 +163,17 @@ async def get_usage(
     root = Path(settings.STORAGE_LOCAL_PATH) / tenant.storage_prefix
     usage = await cached_measure(db, root, refresh=refresh)
     states = await clinic_states(db)
+    # Who the clinics are and what they have is read now; only the sizes
+    # come from the measurement, and a clinic newer than it has none yet.
+    sizes = {clinic.id: clinic for clinic in usage.clinics}
+    unmeasured = {"database_bytes": 0, "database_rows": 0, "storage_bytes": 0, "storage_files": 0}
+
+    def measured(clinic_id: UUID) -> dict:
+        found = sizes.get(clinic_id)
+        if found is None:
+            return unmeasured
+        return {key: getattr(found, key) for key in unmeasured}
+
     return ApiResponse(
         data=DeploymentUsageResponse(
             database_bytes=usage.database_bytes,
@@ -167,10 +182,11 @@ async def get_usage(
             storage_files=usage.storage_files,
             measured_at=usage.measured_at,
             clinics=[
-                ClinicUsageResponse(**asdict(clinic), **asdict(states[clinic.id]))
-                # One deleted since the sizes were measured has no state.
-                for clinic in usage.clinics
-                if clinic.id in states
+                ClinicUsageResponse(
+                    **asdict(profile), **measured(profile.id), **asdict(states[profile.id])
+                )
+                for profile in await clinic_profiles(db)
+                if profile.id in states
             ],
         )
     )
@@ -352,13 +368,18 @@ def _announce_tier(db: AsyncSession, clinic: Clinic, tier: str) -> None:
 
 
 def _chosen_apps(chosen: list[str], tier: AccountTier) -> list[str]:
-    """``chosen`` in catalog order, once it is a set a clinic can have."""
+    """``chosen`` in catalog order, once it is a set a clinic can have.
+
+    What the tier makes mandatory is added, not asked for: the clinic has
+    it whatever the list says (``clinic_apps``), and a list stored before
+    an App became mandatory — or sent back as it was stored — must not
+    turn every change into a refusal.
+    """
     catalog = {app.name: app for app in load_app_catalog()}
+    chosen = [*chosen, *(name for name in mandatory_apps(tier.value) if name not in chosen)]
     refusal: str | None = None
     if unavailable := [name for name in chosen if name not in catalog or not catalog[name].enabled]:
         refusal = f"not an App of this deployment: {', '.join(unavailable)}"
-    elif missing := [name for name in mandatory_apps(tier.value) if name not in chosen]:
-        refusal = f"mandatory for the '{tier.value}' tier: {', '.join(missing)}"
     else:
         for name in chosen:
             if needs := [other for other in required_apps(catalog[name]) if other not in chosen]:
@@ -710,7 +731,8 @@ async def _detail(
         legal_name=clinic.legal_name,
         phone=clinic.phone,
         email=clinic.email,
-        apps=clinic.apps,
+        # What it has: the mandatory Apps of its tier too.
+        apps=clinic_apps(clinic.apps, clinic.account_tier),
         available_apps=clinic.available_apps or [],
         limits=clinic.limits or {},
         specialties=specialties,

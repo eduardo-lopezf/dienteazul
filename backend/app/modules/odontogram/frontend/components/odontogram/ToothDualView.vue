@@ -647,6 +647,37 @@ const hasPlannedLateralTreatments = computed(() => {
               </g>
             </template>
 
+            <!-- Soft tissue biopsy: a punch at the gum, beside the crown. The
+                 gum sits a quarter of the way from the crown towards the
+                 root, which holds for upper and lower teeth alike. -->
+            <template v-else-if="treatment.treatment_type === 'biopsy_soft_tissue' && iconAnchors">
+              <circle
+                :cx="iconAnchors.besideCrown.x - 4"
+                :cy="iconAnchors.crownCenter.y + (iconAnchors.rootCenter.y - iconAnchors.crownCenter.y) * 0.25"
+                r="6"
+                fill="none"
+                :stroke="getTreatmentColor(treatment.treatment_type)"
+                stroke-width="2.5"
+                stroke-dasharray="3 2"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+              />
+            </template>
+
+            <!-- Hard tissue biopsy: a block from the bone, beside the root -->
+            <template v-else-if="treatment.treatment_type === 'biopsy_hard_tissue' && iconAnchors">
+              <rect
+                :x="iconAnchors.rootCenter.x + 8"
+                :y="iconAnchors.rootCenter.y - 6"
+                width="12"
+                height="12"
+                fill="none"
+                :stroke="getTreatmentColor(treatment.treatment_type)"
+                stroke-width="2.5"
+                stroke-dasharray="3 2"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+              />
+            </template>
+
             <!-- Post in root -->
             <template v-else-if="treatment.treatment_type === 'post' && iconAnchors">
               <rect
