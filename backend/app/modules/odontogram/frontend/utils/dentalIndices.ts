@@ -27,14 +27,20 @@
 import type { Treatment } from '~~/app/types'
 import type { EruptionStatus } from './dentitionLayout'
 
-export interface Cpod {
+// Type aliases, not interfaces, and that is the whole reason: both are
+// handed to `t('odontogram.indices.cpodParts', cpod)` as the message's
+// named values, and `t` wants a `Record<string, unknown>`. TypeScript
+// gives an object type alias an implicit index signature and an
+// interface none, so as interfaces these matched no overload of `t`
+// (TS2769, four call sites between the chart and the printed sheet).
+export type Cpod = {
   decayed: number
   missing: number
   filled: number
   total: number
 }
 
-export interface Ceod {
+export type Ceod = {
   decayed: number
   extraction: number
   filled: number

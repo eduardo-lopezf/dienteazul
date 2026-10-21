@@ -46,6 +46,24 @@ export function useAuth() {
   const requestEvent = import.meta.server ? useRequestEvent() : null
   const requestFetch = import.meta.server ? useRequestFetch() : $fetch
   const csrfCookie = useCookie<string | null>('csrf_token')
+  // Resolved here, in the composable's body: `refreshInsideLock` runs
+  // inside a Web Lock callback, and a composable asked for there is
+  // outside the Nuxt context it needs.
+  const activity = useSessionActivity()
+
+  /**
+   * Why a session the server has just refused ended.
+   *
+   * The backend refuses an idle family on refresh (ADR 0030, ADR 0052),
+   * and whichever call notices first ends up here — a background poll as
+   * readily as the inactivity watch. Saying "expired" then puts the wrong
+   * notice on the login screen, and which of the two wins is a race. The
+   * stamp the middleware reads decides it here too, so both paths agree;
+   * it is a cookie, so every tab agrees as well.
+   */
+  function endedReason(): SessionEndReason {
+    return activity.isExpired() ? 'idle' : 'expired'
+  }
 
   const user = useState<User | null>('auth:user', () => null)
   const permissions = useState<string[]>('auth:permissions', () => [])
@@ -165,7 +183,17 @@ export function useAuth() {
   }
 
   async function goToLogin(end: SessionEnd): Promise<void> {
-    if (import.meta.client) await router.push(loginLocation(end.returnTo, end.reason))
+    if (!import.meta.client) return
+    // Already there: say nothing and change nothing. Two things notice a
+    // session ending — the inactivity watch and the first refused request
+    // — and the second one arrives when the login screen is already up.
+    // `end.returnTo` is then the current route, which is `/login` itself:
+    // `safeRedirect` refuses it, so pushing again replaced a URL carrying
+    // `redirect=/patients?page=1` with one carrying nothing, and signing
+    // in landed on the dashboard instead of the page the session ended
+    // on. It would also relabel an explicit logout as an expiry.
+    if (router.currentRoute.value.path === '/login') return
+    await router.push(loginLocation(end.returnTo, end.reason))
   }
 
   async function endSession(end: SessionEnd = {}): Promise<void> {
@@ -187,7 +215,7 @@ export function useAuth() {
       await bffFetch('/api/v1/auth/refresh', { method: 'POST', body: {} })
     } catch (error) {
       if (!isAuthFailure(error)) throw error
-      await endSession({ returnTo: router.currentRoute.value.fullPath, reason: 'expired' })
+      await endSession({ returnTo: router.currentRoute.value.fullPath, reason: endedReason() })
       return false
     }
 
@@ -226,7 +254,7 @@ export function useAuth() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })
     session.value = true
-    useSessionActivity().touch()
+    activity.touch()
     await fetchUserDirect()
     broadcast('refreshed')
   }
@@ -292,7 +320,7 @@ export function useAuth() {
       if (data?.signal === 'logout' || data?.signal === 'expired') {
         clearSession()
         void goToLogin(data.signal === 'expired'
-          ? { returnTo: router.currentRoute.value.fullPath, reason: 'expired' }
+          ? { returnTo: router.currentRoute.value.fullPath, reason: endedReason() }
           : {})
       }
       if (data?.signal === 'refreshed') {

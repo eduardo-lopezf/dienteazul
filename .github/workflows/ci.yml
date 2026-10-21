@@ -456,6 +456,25 @@ jobs:
           path: /tmp/nuxt.log
           retention-days: 7
 
+      # The backend's side of a failure, which was missing: a run died on
+      # `apiRequestContext.get: socket hang up` — the connection dropped
+      # with no response — and nothing was kept that could say whether the
+      # process had restarted, raised, or been killed. `ps` comes along
+      # because a restart shows there as an uptime of seconds.
+      - name: Collect backend logs on failure
+        if: failure()
+        run: |
+          docker compose logs --no-color --timestamps backend > /tmp/backend.log 2>&1 || true
+          docker compose ps >> /tmp/backend.log 2>&1 || true
+
+      - name: Upload backend log on failure
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-log
+          path: /tmp/backend.log
+          retention-days: 7
+
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v5
