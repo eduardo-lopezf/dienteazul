@@ -110,6 +110,8 @@ class ReferenceTreatment(_Strict):
     #: Stage of care a plan files it under by default.
     phase: Phase
     scope: Scope
+    #: The teeth it can be done on: a primary tooth, a permanent one, or any.
+    dentition: Literal["both", "deciduous", "permanent"] = "both"
     #: A starting point for the clinic to replace, not a tariff.
     price: Decimal | None = None
     cost_price: Decimal | None = None
@@ -202,6 +204,7 @@ def seed_item(treatment: ReferenceTreatment) -> dict[str, Any]:
         "internal_code": treatment.code,
         "names": treatment.names.model_dump(),
         "treatment_scope": treatment.scope,
+        "dentition": treatment.dentition,
         "default_price": treatment.price,
         "default_duration_minutes": treatment.minutes,
         "vat_type": treatment.vat_type,

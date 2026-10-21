@@ -11,7 +11,13 @@ from __future__ import annotations
 
 from app.core.privacy import ChildLink, SubjectContributor, patient_keyed_export
 
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramHistory,
+    OdontogramPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
 
 CLINICAL_RETENTION = (
     "El historial clínico se conserva: la normativa sanitaria fija un "
@@ -36,6 +42,13 @@ def get_subject_contributors() -> list[SubjectContributor]:
         SubjectContributor(
             name="chart_history",
             export=patient_keyed_export(OdontogramHistory),
+            retention_reason=CLINICAL_RETENTION,
+        ),
+        SubjectContributor(
+            # Which dentition the chart shows: part of how the chart reads,
+            # kept with it.
+            name="chart_preferences",
+            export=patient_keyed_export(OdontogramPreference),
             retention_reason=CLINICAL_RETENTION,
         ),
     ]

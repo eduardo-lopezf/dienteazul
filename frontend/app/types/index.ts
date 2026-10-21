@@ -384,6 +384,8 @@ export interface ToothRecord {
   is_displaced?: boolean
   is_rotated?: boolean
   displacement_notes?: string
+  /** Where the tooth is in its life; null when not said. */
+  eruption_status?: 'unerupted' | 'erupting' | 'erupted' | 'exfoliated' | 'congenitally_missing' | 'impacted' | null
   created_at: string
   updated_at: string
 }
@@ -395,6 +397,16 @@ export interface OdontogramData {
   condition_colors: Record<ToothCondition, string>
   available_conditions: ToothCondition[]
   surfaces: Surface[]
+  /** Completed years; null with no birth date. */
+  patient_age?: number | null
+  /** The clinician's choice for this patient; `auto` follows the age. */
+  dentition?: 'auto' | 'deciduous' | 'mixed' | 'permanent'
+  /** What the age suggests. */
+  suggested_dentition?: 'deciduous' | 'mixed' | 'permanent'
+  /** The clinic's eruption chronology: arch → position → age. */
+  eruption_ages?: Record<'upper' | 'lower', Record<string, number>>
+  /** Years past the usual age before warning. */
+  eruption_tolerance?: number
 }
 
 export interface SurfaceUpdate {
@@ -818,6 +830,8 @@ export interface TreatmentCatalogItem {
   treatment_scope: 'tooth' | 'multi_tooth' | 'global_mouth' | 'global_arch'
   is_diagnostic: boolean
   requires_surfaces: boolean
+  /** The teeth it can be done on. */
+  dentition?: TreatmentDentition
   // Material
   material_notes?: string
   // Status
@@ -837,6 +851,9 @@ export interface TreatmentCatalogItem {
   /** Search hits only: the one discipline the treatment is shown under. */
   specialty?: SpecialtyBrief | null
 }
+
+/** The teeth a treatment can be done on: a primary tooth, a permanent one, or any. */
+export type TreatmentDentition = 'both' | 'deciduous' | 'permanent'
 
 export interface TreatmentCatalogItemCreate {
   internal_code: string
@@ -858,6 +875,7 @@ export interface TreatmentCatalogItemCreate {
   treatment_scope?: 'tooth' | 'multi_tooth' | 'global_mouth' | 'global_arch'
   is_diagnostic?: boolean
   requires_surfaces?: boolean
+  dentition?: TreatmentDentition
   // Material
   material_notes?: string
   // Odontogram mapping
@@ -888,6 +906,7 @@ export interface TreatmentCatalogItemUpdate {
   treatment_scope?: 'tooth' | 'multi_tooth' | 'global_mouth' | 'global_arch'
   is_diagnostic?: boolean
   requires_surfaces?: boolean
+  dentition?: TreatmentDentition
   material_notes?: string
   is_active?: boolean
   /** Listed on the clinical /treatments page. Independent of is_active. */
@@ -918,6 +937,8 @@ export interface OdontogramTreatment {
   treatment_scope: 'tooth' | 'multi_tooth' | 'global_mouth' | 'global_arch'
   requires_surfaces: boolean
   is_diagnostic: boolean
+  /** The teeth it can be done on; the bar hides it where it cannot be. */
+  dentition?: TreatmentDentition
   // Pricing
   pricing_strategy: PricingStrategy
   pricing_config?: Record<string, number> | null

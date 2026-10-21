@@ -27,6 +27,7 @@ export const APP_ROUTES: AppRoute[] = [
   // More specific first: `appRouteFor` returns the first match.
   { prefix: '/treatments/plans', module: 'treatment_plan', app: 'treatments' },
   { prefix: '/treatments', module: 'catalog', app: 'treatments' },
+  { prefix: '/odontogram', module: 'odontogram', app: 'treatments' },
   { prefix: '/settings/catalog', module: 'catalog', app: 'treatments' },
   { prefix: '/settings/vat-types', module: 'catalog', app: 'treatments' },
   { prefix: '/budgets', module: 'budget', app: 'budgets_payments' },

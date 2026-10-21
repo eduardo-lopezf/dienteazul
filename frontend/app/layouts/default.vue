@@ -370,9 +370,11 @@ function isActive(to: string): boolean {
               name="i-lucide-building-2"
               class="w-4 h-4 text-subtle shrink-0"
             />
-            <span class="text-ui text-muted truncate">
+            <span class="text-ui text-muted truncate shrink-0 max-w-[45vw]">
               {{ clinic.clinicName.value || 'Clínica' }}
             </span>
+            <!-- The operator's notice, if one is in force: deliberately quiet. -->
+            <WorkspaceAnnouncement />
           </div>
         </ClientOnly>
 

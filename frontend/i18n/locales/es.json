@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "kind": {
+      "maintenance": "Mantenimiento",
+      "feature": "Novedad"
+    },
+    "until": "Hasta el {date}",
+    "dismiss": "Ocultar"
+  },
   "onboarding": {
     "progress": "Paso {current} de {total}",
     "back": "Atrás",
@@ -575,10 +583,138 @@
     "toothPosition": "Posición del diente",
     "displaced": "Desplazado",
     "rotated": "Rotado",
+    "eruption": {
+      "title": "Diente {tooth} · {name}",
+      "legend": "Erupción",
+      "notSaid": "Sin indicar",
+      "notSaidHelp": "Se sigue la cronología de erupción según la edad.",
+      "status": {
+        "unerupted": "No erupcionado",
+        "erupting": "En erupción",
+        "erupted": "Erupcionado",
+        "exfoliated": "Exfoliado (se cayó)",
+        "congenitally_missing": "Ausente congénito (agenesia)",
+        "impacted": "Retenido (incluido en el hueso)"
+      },
+      "short": {
+        "unerupted": "Sin erupcionar",
+        "erupting": "En erupción",
+        "exfoliated": "Exfoliado",
+        "congenitally_missing": "Agenesia",
+        "impacted": "Retenido"
+      },
+      "exchange": "Registrar recambio {tooth} → {successor}",
+      "exchangeHelp": "Si el {tooth} se cayó, el recambio lo marca como exfoliado y al {successor} en erupción, en un solo paso.",
+      "exchanged": "Recambio registrado: {tooth} → {successor}",
+      "saveFailed": "No se pudo guardar la erupción del diente",
+      "alertsTitle": "Erupción a revisar",
+      "alerts": {
+        "retainedPrimary": "El {tooth} sigue en boca y el {successor} suele erupcionar a los {age} años: posible retención prolongada.",
+        "delayedEruption": "El {tooth} no ha erupcionado y suele hacerlo a los {age} años: posible erupción retrasada."
+      },
+      "settings": {
+        "title": "Cronología de erupción",
+        "description": "Edad habitual a la que erupciona cada diente permanente. Decide qué se ve en la dentición mixta y cuándo avisar de un retraso.",
+        "upper": "Superior",
+        "lower": "Inferior",
+        "position": "Posición",
+        "age": "Edad (años)",
+        "reset": "Volver a la cronología habitual",
+        "saved": "Cronología guardada",
+        "saveFailed": "No se pudo guardar la cronología",
+        "positions": {
+          "1": "Incisivo central",
+          "2": "Incisivo lateral",
+          "3": "Canino",
+          "4": "Primer premolar",
+          "5": "Segundo premolar",
+          "6": "Primer molar",
+          "7": "Segundo molar",
+          "8": "Tercer molar"
+        }
+      }
+    },
     "dentition": {
       "permanent": "Permanente",
       "deciduous": "Temporal",
-      "toggle": "Cambiar dentición"
+      "toggle": "Cambiar dentición",
+      "auto": "Según edad",
+      "mixed": "Mixta",
+      "byAge": "{age} años · dentición {dentition}",
+      "noBirthDate": "Sin fecha de nacimiento: se muestra la permanente",
+      "saveFailed": "No se pudo guardar la dentición del paciente",
+      "deciduousOnly": "{treatment} es solo para dientes temporales; el {tooth} es permanente",
+      "permanentOnly": "{treatment} es solo para dientes permanentes; el {tooth} es temporal"
+    },
+    "boxes": {
+      "viewAnatomical": "Anatómica",
+      "viewBoxes": "Casillas",
+      "legend": {
+        "todo": "Caries / por hacer",
+        "done": "Hecho",
+        "cross": "Ausente o extracción",
+        "ring": "Corona"
+      },
+      "codes": {
+        "root_canal_full": "TC",
+        "root_canal_two_thirds": "TC",
+        "root_canal_half": "Pp",
+        "root_canal_overfill": "TC",
+        "post": "Pe",
+        "implant": "Im",
+        "crown_on_implant": "Im",
+        "provisional_crown_on_implant": "Im",
+        "veneer": "Ca",
+        "bridge": "Pt",
+        "splint": "Fe",
+        "fracture": "Fx",
+        "pulpitis": "Pu",
+        "periapical_small": "Pa",
+        "periapical_medium": "Pa",
+        "periapical_large": "Pa",
+        "apicoectomy": "Ap",
+        "unerupted": "SE",
+        "rotated": "Gi",
+        "displaced": "Ds",
+        "bracket": "Br",
+        "tube": "Tb",
+        "band": "Bd",
+        "attachment": "At",
+        "retainer": "Rt",
+        "pigmentation": "Pg",
+        "biopsy_soft_tissue": "Bx",
+        "biopsy_hard_tissue": "Bx",
+        "sealant": "S"
+      }
+    },
+    "print": {
+      "open": "Imprimir",
+      "print": "Imprimir",
+      "title": "Odontograma",
+      "failed": "No se pudo cargar el odontograma",
+      "patient": "Paciente",
+      "birthDate": "Fecha de nacimiento",
+      "age": "{age} años",
+      "dentition": "Dentición",
+      "date": "Fecha",
+      "specifications": "Especificaciones",
+      "nothingCharted": "No hay nada registrado en el odontograma.",
+      "tooth": "Diente",
+      "finding": "Hallazgo o tratamiento",
+      "surfaces": "Caras",
+      "status": "Estado",
+      "recorded": "Registrado",
+      "observations": "Observaciones",
+      "signature": "Firma del odontólogo",
+      "wholeMouth": "Boca completa"
+    },
+    "indices": {
+      "cpod": "CPO-D",
+      "ceod": "ceo-d",
+      "cpodParts": "C {decayed} · P {missing} · O {filled}",
+      "ceodParts": "c {decayed} · e {extraction} · o {filled}",
+      "cpodHelp": "Dientes permanentes cariados (C), perdidos (P) y obturados (O), contados desde el odontograma",
+      "ceodHelp": "Dientes temporales cariados (c), con extracción indicada (e) y obturados (o), contados desde el odontograma"
     },
     "quadrants": {
       "upper": "Arcada Superior",
@@ -2114,6 +2250,13 @@
     "isDiagnostic": "Es diagnóstico",
     "requiresSurfaces": "Requiere superficies",
     "materialNotes": "Notas de materiales",
+    "dentition": "Dentición",
+    "dentitionHelp": "En qué dientes se puede hacer. El odontograma no lo ofrece en la otra dentición y lo rechaza sobre un diente de ella.",
+    "dentitions": {
+      "both": "Temporal y permanente",
+      "deciduous": "Solo temporal",
+      "permanent": "Solo permanente"
+    },
     "materialNotesPlaceholder": "Materiales o insumos necesarios...",
     "active": "Activo",
     "vatTypes": {

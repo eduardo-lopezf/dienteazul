@@ -6,7 +6,14 @@ from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
 
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramClinicSettings,
+    OdontogramHistory,
+    OdontogramPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
 from .router import router
 
 logger = logging.getLogger(__name__)
@@ -39,7 +46,14 @@ class OdontogramModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        return [ToothRecord, OdontogramHistory, Treatment, TreatmentTooth]
+        return [
+            ToothRecord,
+            OdontogramHistory,
+            Treatment,
+            TreatmentTooth,
+            OdontogramPreference,
+            OdontogramClinicSettings,
+        ]
 
     def get_router(self) -> APIRouter:
         return router

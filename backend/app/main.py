@@ -407,6 +407,11 @@ from app.core.privacy.router import router as privacy_router  # noqa: E402
 
 app.include_router(privacy_router, prefix="/api/v1")
 
+# The operator's notices, as each clinic's members read them.
+from app.core.announcements.router import router as announcements_router  # noqa: E402
+
+app.include_router(announcements_router, prefix="/api/v1")
+
 # What the control plane reads: usage and access per clinic (ADR 0049).
 from app.core.ops.router import router as ops_router  # noqa: E402
 

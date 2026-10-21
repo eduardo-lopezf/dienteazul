@@ -564,6 +564,7 @@
       ],
       "phase": "estabilizacion",
       "scope": "tooth",
+      "dentition": "permanent",
       "price": "90.00",
       "minutes": 45,
       "vat_type": "exempt",

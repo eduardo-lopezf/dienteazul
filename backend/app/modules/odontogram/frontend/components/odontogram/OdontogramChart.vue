@@ -18,10 +18,24 @@ import type {
   TreatmentCreate,
   TreatmentStatus
 } from '~~/app/types'
-import { PERMANENT_TEETH, DECIDUOUS_TEETH, TREATMENT_SHORTCUTS } from '~~/app/constants/odontogram'
+import { TREATMENT_SHORTCUTS } from '~~/app/constants/odontogram'
 import { calculateToothRange, getMultiToothConfig, isSameArch } from '~~/app/config/odontogramConstants'
 import { viewsForTooth } from '~~/app/utils/treatmentView'
 import { isSurfaceTreatment } from './TreatmentIcons'
+import {
+  dimmedTeeth as dimmedForDentition,
+  eruptionAlerts,
+  fitsTooth,
+  offeredOn,
+  shownDentition,
+  teethLayout as layoutForDentition,
+  type ChartFacts,
+  type Dentition,
+  type EruptionStatus,
+  type ShownDentition
+} from '../../utils/dentitionLayout'
+import { dentalIndices } from '../../utils/dentalIndices'
+import { boxDimmedTeeth as boxDimmed } from '../../utils/boxChart'
 
 export type OdontogramMode = 'full' | 'view-only' | 'diagnosis' | 'planning'
 
@@ -65,8 +79,9 @@ const emit = defineEmits<{
   readonlyInteraction: [toothNumber: number]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
+const treatmentCatalog = useTreatmentCatalog()
 
 // ============================================================================
 // Composables
@@ -75,6 +90,7 @@ const toast = useToast()
 const {
   loading,
   error,
+  odontogramData,
   fetchOdontogram,
   fetchPatientHistory,
   getToothRecord,
@@ -102,7 +118,63 @@ const treatmentPlansApi = useTreatmentPlans()
 // State
 // ============================================================================
 
-const dentitionMode = ref<'permanent' | 'deciduous'>('permanent')
+// ----------------------------------------------------------------------------
+// Dentition: what the patient's age suggests, unless the clinician chose
+// another for this patient (kept on the server). See `utils/dentitionLayout`.
+// ----------------------------------------------------------------------------
+
+const api = useApi()
+/** The clinician's choice for this patient; `auto` follows the age. */
+const chosenDentition = ref<Dentition>('auto')
+watch(odontogramData, (data) => {
+  chosenDentition.value = data?.dentition ?? 'auto'
+}, { immediate: true })
+const patientAge = computed(() => odontogramData.value?.patient_age ?? null)
+const suggestedDentition = computed<ShownDentition>(
+  () => odontogramData.value?.suggested_dentition ?? 'permanent'
+)
+const dentitionMode = computed<ShownDentition>(
+  () => shownDentition(chosenDentition.value, suggestedDentition.value)
+)
+const dentitionOptions = computed(() => [
+  { value: 'auto', label: t('odontogram.dentition.auto') },
+  { value: 'deciduous', label: t('odontogram.dentition.deciduous') },
+  { value: 'mixed', label: t('odontogram.dentition.mixed') },
+  { value: 'permanent', label: t('odontogram.dentition.permanent') }
+])
+/** "8 años · Mixta", or why the age cannot decide. */
+const dentitionHint = computed(() =>
+  patientAge.value === null
+    ? t('odontogram.dentition.noBirthDate')
+    : t('odontogram.dentition.byAge', {
+        age: patientAge.value,
+        dentition: t(`odontogram.dentition.${suggestedDentition.value}`).toLowerCase()
+      })
+)
+
+/** Something is charted on the tooth: it is in the mouth, whatever the age. */
+function isCharted(tooth: number): boolean {
+  if (displayTreatments.value.some(tr => tr.teeth?.some(tt => tt.tooth_number === tooth))) {
+    return true
+  }
+  const record = getToothRecord(tooth)
+  return !!record && record.general_condition !== 'healthy'
+}
+
+async function chooseDentition(value: Dentition) {
+  const previous = chosenDentition.value
+  chosenDentition.value = value
+  // A read-only chart may be looked at another way, not changed for everyone.
+  if (isReadonly.value) return
+  try {
+    await api.put(`/api/v1/odontogram/patients/${props.patientId}/odontogram/dentition`, {
+      dentition: value
+    })
+  } catch {
+    chosenDentition.value = previous
+    toast.add({ title: t('odontogram.dentition.saveFailed'), color: 'error' })
+  }
+}
 const selectedTooth = ref<number | null>(null)
 const showSurfaceSelector = ref(false)
 const hoveredTooth = ref<number | null>(null)
@@ -173,9 +245,74 @@ const multiToothConfig = computed(() => {
 
 const isMultiToothMode = computed(() => multiToothConfig.value !== null)
 
-const teethLayout = computed(() =>
-  dentitionMode.value === 'permanent' ? PERMANENT_TEETH : DECIDUOUS_TEETH
+/** What the chart knows of the patient's teeth, for the layout and warnings. */
+const chartFacts = computed<ChartFacts>(() => ({
+  age: patientAge.value,
+  charted: isCharted,
+  statusOf: tooth => (getToothRecord(tooth)?.eruption_status ?? null) as EruptionStatus | null,
+  ages: odontogramData.value?.eruption_ages
+}))
+// ----------------------------------------------------------------------------
+// View: the anatomical chart (crown and root) or the box chart of the paper
+// forms. A matter of taste per person, so it is kept in this browser only.
+// ----------------------------------------------------------------------------
+
+type ChartView = 'anatomical' | 'boxes'
+const CHART_VIEW_KEY = 'odontogram:view'
+const chartView = ref<ChartView>('anatomical')
+onMounted(() => {
+  try {
+    if (localStorage.getItem(CHART_VIEW_KEY) === 'boxes') chartView.value = 'boxes'
+  } catch {
+    // No storage (private window): the default view it is.
+  }
+})
+function chooseChartView(value: ChartView) {
+  chartView.value = value
+  try {
+    localStorage.setItem(CHART_VIEW_KEY, value)
+  } catch {
+    // Nothing to remember it in; it holds for this visit.
+  }
+}
+const chartViewOptions = computed(() => [
+  { value: 'anatomical', label: t('odontogram.boxes.viewAnatomical') },
+  { value: 'boxes', label: t('odontogram.boxes.viewBoxes') }
+])
+/** In a mixed dentition the box chart draws every row: see `boxDimmedTeeth`. */
+const boxDimmedTeeth = computed(() => boxDimmed(dentitionMode.value, chartFacts.value))
+
+/** CPO-D and ceo-d of the chart as shown — the history view's in the past. */
+const indices = computed(() =>
+  dentalIndices({
+    treatments: displayTreatments.value,
+    conditionOf: tooth => getToothRecord(tooth)?.general_condition,
+    statusOf: chartFacts.value.statusOf
+  })
 )
+const showCpod = computed(() => dentitionMode.value !== 'deciduous')
+const showCeod = computed(() => dentitionMode.value !== 'permanent')
+const teethLayout = computed(() => layoutForDentition(dentitionMode.value, chartFacts.value))
+const dimmedTeeth = computed(() => dimmedForDentition(dentitionMode.value, chartFacts.value))
+const alerts = computed(() =>
+  isViewingHistory.value
+    ? []
+    : eruptionAlerts(chartFacts.value, odontogramData.value?.eruption_tolerance)
+)
+
+// ----------------------------------------------------------------------------
+// Eruption: clicking a tooth with no treatment armed opens its eruption card.
+// ----------------------------------------------------------------------------
+
+const eruptionTooth = ref<number | null>(null)
+
+function openEruption(toothNumber: number) {
+  eruptionTooth.value = toothNumber
+}
+
+async function onEruptionChanged() {
+  await fetchOdontogram(props.patientId)
+}
 
 const pendingTreatment = computed(() => {
   if (!selectedTreatmentType.value) return null
@@ -354,6 +491,7 @@ function handleKeydown(e: KeyboardEvent) {
 
 function handleSurfaceClick(toothNumber: number, surface: Surface) {
   if (isReadonly.value || !isClickToApplyMode.value) return
+  if (!treatmentFits(toothNumber)) return
 
   // In multi-tooth mode, surface clicks collapse to tooth-level selection.
   if (isMultiToothMode.value) {
@@ -383,7 +521,11 @@ function handleToothClick(toothNumber: number) {
     }
     return
   }
-  if (!isClickToApplyMode.value) return
+  if (!isClickToApplyMode.value) {
+    openEruption(toothNumber)
+    return
+  }
+  if (!treatmentFits(toothNumber)) return
 
   if (isMultiToothMode.value) {
     handleMultiToothClick(toothNumber)
@@ -396,6 +538,36 @@ function handleToothClick(toothNumber: number) {
   } else {
     applyTreatment(toothNumber)
   }
+}
+
+// Switching the view to a dentition the armed treatment is not offered on
+// disarms it, as the bar no longer shows it.
+watch(dentitionMode, (shown) => {
+  const id = selectedCatalogItemId.value
+  const item = id ? treatmentCatalog.treatments.value.find(c => c.id === id) : undefined
+  if (item && !offeredOn(item.dentition, shown)) cancelClickToApplyMode()
+})
+
+/**
+ * Whether the armed catalog treatment can be done on the tooth — a mixed
+ * dentition shows primary and permanent teeth side by side, and the bar
+ * offers both kinds. A treatment for the other one is refused with a word
+ * instead of a server error (the server refuses it too).
+ */
+function treatmentFits(toothNumber: number): boolean {
+  const id = selectedCatalogItemId.value
+  if (!id) return true
+  const item = treatmentCatalog.treatments.value.find(c => c.id === id)
+  if (!item || fitsTooth(item.dentition, toothNumber)) return true
+  const name = item.names[locale.value] || item.names.es || item.names.en || item.internal_code
+  toast.add({
+    title: t(
+      item.dentition === 'deciduous' ? 'odontogram.dentition.deciduousOnly' : 'odontogram.dentition.permanentOnly',
+      { treatment: name, tooth: toothNumber }
+    ),
+    color: 'warning'
+  })
+  return false
 }
 
 // ============================================================================
@@ -533,7 +705,7 @@ function resetMultiToothSelection() {
 function handleToothContextMenu(toothNumber: number, event: MouseEvent) {
   if (isReadonly.value) return
   event.preventDefault()
-  // Context menu could be implemented here if needed
+  openEruption(toothNumber)
 }
 
 async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
@@ -780,7 +952,8 @@ defineExpose({
 <template>
   <div class="odontogram-chart">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
+    <!-- Wraps: four dentitions do not fit beside the title in a card. -->
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
       <div class="flex items-center gap-2">
         <h3 class="text-h1 text-default">
           {{ t('odontogram.title') }}
@@ -842,15 +1015,94 @@ defineExpose({
       </div>
 
       <!-- Dentition toggle -->
-      <SegmentedControl
-        :model-value="dentitionMode"
-        :options="[
-          { value: 'permanent', label: t('odontogram.dentition.permanent') },
-          { value: 'deciduous', label: t('odontogram.dentition.deciduous') }
-        ]"
-        @update:model-value="(v) => (dentitionMode = v as 'permanent' | 'deciduous')"
-      />
+      <div class="flex flex-col items-start gap-1 max-w-full overflow-x-auto">
+        <SegmentedControl
+          :model-value="chosenDentition"
+          :options="dentitionOptions"
+          data-testid="odontogram-dentition"
+          @update:model-value="(v) => chooseDentition(v as Dentition)"
+        />
+        <span
+          class="text-caption text-subtle"
+          data-testid="odontogram-dentition-hint"
+        >
+          {{ dentitionHint }}
+        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            :model-value="chartView"
+            :options="chartViewOptions"
+            data-testid="odontogram-view"
+            @update:model-value="(v) => chooseChartView(v as ChartView)"
+          />
+          <UButton
+            icon="i-lucide-printer"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            :to="`/odontogram/${patientId}/print`"
+            target="_blank"
+            data-testid="odontogram-print"
+          >
+            {{ t('odontogram.print.open') }}
+          </UButton>
+        </div>
+        <div
+          class="flex flex-wrap items-center gap-2"
+          data-testid="odontogram-indices"
+        >
+          <UTooltip
+            v-if="showCpod"
+            :text="t('odontogram.indices.cpodHelp')"
+          >
+            <span
+              class="inline-flex items-baseline gap-1.5 rounded-token-md border border-subtle px-2 py-0.5 text-caption"
+              data-testid="odontogram-index-cpod"
+            >
+              <span class="font-semibold text-default">{{ t('odontogram.indices.cpod') }} {{ indices.cpod.total }}</span>
+              <span class="text-subtle">{{ t('odontogram.indices.cpodParts', indices.cpod) }}</span>
+            </span>
+          </UTooltip>
+          <UTooltip
+            v-if="showCeod"
+            :text="t('odontogram.indices.ceodHelp')"
+          >
+            <span
+              class="inline-flex items-baseline gap-1.5 rounded-token-md border border-subtle px-2 py-0.5 text-caption"
+              data-testid="odontogram-index-ceod"
+            >
+              <span class="font-semibold text-default">{{ t('odontogram.indices.ceod') }} {{ indices.ceod.total }}</span>
+              <span class="text-subtle">{{ t('odontogram.indices.ceodParts', indices.ceod) }}</span>
+            </span>
+          </UTooltip>
+        </div>
+      </div>
     </div>
+
+    <!-- What the eruption charted so far warns of: a primary tooth kept too
+         long, a permanent one late. Advice, never a stop. -->
+    <UAlert
+      v-if="alerts.length"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-baby"
+      class="mb-4"
+      :title="t('odontogram.eruption.alertsTitle')"
+      data-testid="odontogram-eruption-alerts"
+    >
+      <template #description>
+        <ul class="list-disc pl-4 space-y-0.5">
+          <li
+            v-for="alert in alerts"
+            :key="`${alert.kind}-${alert.tooth}`"
+          >
+            {{ alert.kind === 'retained_primary'
+              ? t('odontogram.eruption.alerts.retainedPrimary', { tooth: alert.tooth, successor: alert.successor, age: alert.usualAge })
+              : t('odontogram.eruption.alerts.delayedEruption', { tooth: alert.tooth, age: alert.usualAge }) }}
+          </li>
+        </ul>
+      </template>
+    </UAlert>
 
     <!-- Timeline Slider (only in standalone 'full' mode; HistoryMode renders its own) -->
     <TimelineSlider
@@ -903,6 +1155,7 @@ defineExpose({
              44 px, so the small target leads somewhere finger-sized
              rather than being the end of the interaction. -->
         <div
+          v-if="chartView === 'anatomical'"
           data-dense
           class="odontogram-grid bg-surface rounded-lg border border-default p-4"
           :class="{ 'cursor-crosshair': isClickToApplyMode }"
@@ -935,6 +1188,8 @@ defineExpose({
                 :get-group-status="getToothGroupStatus"
                 :get-group-type="getToothGroupType"
                 :multi-selected-teeth="multiToothSelection.teeth"
+                :dimmed-teeth="dimmedTeeth"
+                :get-eruption-status="chartFacts.statusOf"
                 @surface-click="handleSurfaceClick"
                 @tooth-click="handleToothClick"
                 @tooth-context-menu="handleToothContextMenu"
@@ -958,6 +1213,8 @@ defineExpose({
                 :get-group-status="getToothGroupStatus"
                 :get-group-type="getToothGroupType"
                 :multi-selected-teeth="multiToothSelection.teeth"
+                :dimmed-teeth="dimmedTeeth"
+                :get-eruption-status="chartFacts.statusOf"
                 @surface-click="handleSurfaceClick"
                 @tooth-click="handleToothClick"
                 @tooth-context-menu="handleToothContextMenu"
@@ -994,6 +1251,8 @@ defineExpose({
                 :get-group-status="getToothGroupStatus"
                 :get-group-type="getToothGroupType"
                 :multi-selected-teeth="multiToothSelection.teeth"
+                :dimmed-teeth="dimmedTeeth"
+                :get-eruption-status="chartFacts.statusOf"
                 @surface-click="handleSurfaceClick"
                 @tooth-click="handleToothClick"
                 @tooth-context-menu="handleToothContextMenu"
@@ -1017,6 +1276,8 @@ defineExpose({
                 :get-group-status="getToothGroupStatus"
                 :get-group-type="getToothGroupType"
                 :multi-selected-teeth="multiToothSelection.teeth"
+                :dimmed-teeth="dimmedTeeth"
+                :get-eruption-status="chartFacts.statusOf"
                 @surface-click="handleSurfaceClick"
                 @tooth-click="handleToothClick"
                 @tooth-context-menu="handleToothContextMenu"
@@ -1028,6 +1289,30 @@ defineExpose({
               {{ t('odontogram.quadrants.lower') }}
             </div>
           </div>
+        </div>
+        <!-- data-dense: the same reasoning as the anatomical arch — a box is a
+             tooth, and a tap on it leads to finger-sized panels. -->
+        <div
+          v-else
+          data-dense
+          class="bg-surface rounded-lg border border-default p-4"
+          :class="{ 'cursor-crosshair': isClickToApplyMode }"
+          data-testid="odontogram-box-chart"
+        >
+          <ToothBoxChart
+            :dentition="dentitionMode"
+            :get-treatments="getFilteredTreatments"
+            :get-condition="(tooth: number) => getToothRecord(tooth)?.general_condition"
+            :dimmed-teeth="boxDimmedTeeth"
+            :readonly="isReadonly"
+            :selected-tooth="selectedTooth"
+            :hovered-tooth="hoveredTooth"
+            :highlighted-teeth="[...highlightedTeeth, ...multiToothSelection.teeth]"
+            @surface-click="handleSurfaceClick"
+            @tooth-click="handleToothClick"
+            @tooth-context-menu="handleToothContextMenu"
+            @tooth-hover="hoveredTooth = $event"
+          />
         </div>
       </div>
 
@@ -1051,6 +1336,8 @@ defineExpose({
         :plan-context-title="planTitle"
         :patient-id="patientId"
         :mode="treatmentBarMode"
+        :hidden-categories="dentitionMode === 'permanent' ? ['pediatrica'] : []"
+        :shown-dentition="dentitionMode"
         :disabled="isReadonly"
         @update:selected-status="selectedTreatmentStatus = $event"
         @treatment-select="selectedTreatmentType = $event"
@@ -1189,6 +1476,14 @@ defineExpose({
         </UCard>
       </template>
     </UModal>
+
+    <ToothEruptionModal
+      :tooth-number="eruptionTooth"
+      :patient-id="patientId"
+      :status="eruptionTooth === null ? null : (chartFacts.statusOf?.(eruptionTooth) ?? null)"
+      @close="eruptionTooth = null"
+      @changed="onEruptionChanged"
+    />
   </div>
 </template>
 

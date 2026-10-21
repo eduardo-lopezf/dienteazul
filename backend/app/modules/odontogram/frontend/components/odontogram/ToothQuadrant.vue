@@ -39,12 +39,30 @@ const props = withDefaults(defineProps<{
   getGroupType?: (toothNumber: number) => string | null
   /** Teeth currently in an in-progress multi-tooth selection (range/free). */
   multiSelectedTeeth?: number[]
+  /**
+   * Teeth drawn faded: expected later (third molars of a teenager). Still
+   * clickable — a third molar that is there can be charted.
+   */
+  dimmedTeeth?: number[]
+  /** The tooth's eruption status, when charted: shown as a tag under it. */
+  getEruptionStatus?: (toothNumber: number) => string | null | undefined
 }>(), {
   getGroupId: () => () => null,
   getGroupStatus: () => () => null,
   getGroupType: () => () => null,
-  multiSelectedTeeth: () => []
+  multiSelectedTeeth: () => [],
+  dimmedTeeth: () => [],
+  getEruptionStatus: () => () => null
 })
+
+const { t } = useI18n()
+
+/** Short tag for a status that changes how the tooth is read; none when erupted. */
+function eruptionTag(toothNumber: number): string | null {
+  const status = props.getEruptionStatus(toothNumber)
+  if (!status || status === 'erupted') return null
+  return t(`odontogram.eruption.short.${status}`)
+}
 
 const emit = defineEmits<{
   surfaceClick: [toothNumber: number, surface: Surface]
@@ -111,7 +129,8 @@ function isUpperTooth(toothNumber: number): boolean {
           :class="[
             { 'tooth-cell-dual': showLateral },
             getGroupId(toothNum) && getGroupType(toothNum) !== 'bridge' ? 'in-group' : '',
-            isInMultiSelection(toothNum) ? 'in-multi-selection' : ''
+            isInMultiSelection(toothNum) ? 'in-multi-selection' : '',
+            dimmedTeeth.includes(toothNum) ? 'tooth-dimmed' : ''
           ]"
         >
           <ToothDualView
@@ -132,6 +151,11 @@ function isUpperTooth(toothNumber: number): boolean {
             @mouseenter="emit('toothHover', toothNum)"
             @mouseleave="emit('toothHover', null)"
           />
+          <span
+            v-if="eruptionTag(toothNum)"
+            class="eruption-tag"
+            data-testid="tooth-eruption-tag"
+          >{{ eruptionTag(toothNum) }}</span>
         </div>
 
         <template #content>
@@ -190,6 +214,33 @@ function isUpperTooth(toothNumber: number): boolean {
 
 .tooth-cell-dual {
   height: 160px;
+}
+
+.tooth-cell {
+  position: relative;
+}
+
+.eruption-tag {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 4px;
+  white-space: nowrap;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted, currentColor);
+  pointer-events: none;
+}
+
+.tooth-dimmed {
+  opacity: 0.35;
+}
+
+.tooth-dimmed:hover {
+  opacity: 0.7;
 }
 
 /* Subtle underline for any tooth that belongs to a group */

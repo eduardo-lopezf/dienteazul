@@ -10,7 +10,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.events import event_bus
 from app.core.events.types import EventType
-from app.modules.catalog.models import TreatmentCatalogItem, TreatmentOdontogramMapping
+from app.modules.catalog.models import (
+    TreatmentCatalogItem,
+    TreatmentOdontogramMapping,
+    dentition_fits,
+)
 from app.modules.catalog.pricing import (
     PricingTooth,
     compute_duration_snapshot,
@@ -19,12 +23,30 @@ from app.modules.catalog.pricing import (
 
 from .constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
+    DEFAULT_ERUPTION_AGES,
+    Dentition,
+    EruptionStatus,
     ToothCondition,
     TreatmentStatus,
     TreatmentType,
     get_tooth_type,
+    successor_of,
 )
-from .models import OdontogramHistory, ToothRecord, Treatment, TreatmentTooth
+from .models import (
+    OdontogramClinicSettings,
+    OdontogramHistory,
+    OdontogramPreference,
+    ToothRecord,
+    Treatment,
+    TreatmentTooth,
+)
+
+
+class _Unset:
+    """No value sent: leave the field as it is (``None`` clears it)."""
+
+
+UNSET = _Unset()
 
 
 def build_treatment_response(treatment: Treatment) -> dict:
@@ -147,8 +169,13 @@ class OdontogramService:
         is_displaced: bool | None = None,
         is_rotated: bool | None = None,
         displacement_notes: str | None = None,
+        eruption_status: str | None | _Unset = UNSET,
     ) -> ToothRecord:
-        """Create or update a tooth record with history tracking."""
+        """Create or update a tooth record with history tracking.
+
+        ``eruption_status`` left ``UNSET`` is not touched; ``None`` clears it
+        (the chart goes back to the eruption chronology).
+        """
         existing = await OdontogramService.get_tooth_record(db, clinic_id, patient_id, tooth_number)
         tooth_type = get_tooth_type(tooth_number)
         now = datetime.now(UTC)
@@ -238,6 +265,25 @@ class OdontogramService:
                     )
                 )
 
+            if (
+                not isinstance(eruption_status, _Unset)
+                and eruption_status != record.eruption_status
+            ):
+                db.add(
+                    OdontogramHistory(
+                        clinic_id=clinic_id,
+                        patient_id=patient_id,
+                        tooth_number=tooth_number,
+                        change_type="eruption",
+                        surface=None,
+                        old_condition=record.eruption_status,
+                        new_condition=eruption_status,
+                        changed_by=user_id,
+                        changed_at=now,
+                    )
+                )
+                record.eruption_status = eruption_status
+
             if is_displaced is not None:
                 record.is_displaced = is_displaced
             if is_rotated is not None:
@@ -260,6 +306,7 @@ class OdontogramService:
                 is_displaced=is_displaced or False,
                 is_rotated=is_rotated or False,
                 displacement_notes=displacement_notes,
+                eruption_status=None if isinstance(eruption_status, _Unset) else eruption_status,
             )
             db.add(record)
             db.add(
@@ -275,6 +322,20 @@ class OdontogramService:
                     changed_at=now,
                 )
             )
+            if isinstance(eruption_status, str):
+                db.add(
+                    OdontogramHistory(
+                        clinic_id=clinic_id,
+                        patient_id=patient_id,
+                        tooth_number=tooth_number,
+                        change_type="eruption",
+                        surface=None,
+                        old_condition=None,
+                        new_condition=eruption_status,
+                        changed_by=user_id,
+                        changed_at=now,
+                    )
+                )
             event_bus.publish_after_commit(
                 db,
                 OdontogramEventType.TOOTH_UPDATED,
@@ -674,6 +735,21 @@ class TreatmentService:
         teeth_inputs = TreatmentService._build_teeth_inputs(tooth_numbers, teeth, common_surfaces)
         teeth_inputs = TreatmentService._assign_roles(teeth_inputs, resolved_clinical_type)
 
+        # 2b. A treatment for one dentition is refused on a tooth of the other:
+        # no implant on a primary tooth, no primary pulpotomy on a permanent one.
+        if catalog_item is not None:
+            wrong = [
+                t["tooth_number"]
+                for t in teeth_inputs
+                if not dentition_fits(catalog_item.dentition, t["tooth_number"])
+            ]
+            if wrong:
+                kind = "primary" if catalog_item.dentition == "deciduous" else "permanent"
+                raise ValueError(
+                    f"{catalog_item.internal_code} is for {kind} teeth only; "
+                    f"not on tooth {', '.join(str(n) for n in wrong)}"
+                )
+
         # 3. Validate atomic multi-tooth minimums (only for tooth-level scopes).
         if scope in ("tooth", "multi_tooth") and (
             resolved_clinical_type in ATOMIC_MULTI_TOOTH_TYPES and len(teeth_inputs) < 2
@@ -899,3 +975,105 @@ class TreatmentService:
         await db.flush()
         event_bus.publish_after_commit(db, EventType.ODONTOGRAM_TREATMENT_DELETED, event_data)
         return True
+
+
+class DentitionService:
+    """Which dentition a patient's chart shows (``Dentition``)."""
+
+    @staticmethod
+    async def get(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> Dentition:
+        chosen = await db.scalar(
+            select(OdontogramPreference.dentition).where(
+                OdontogramPreference.clinic_id == clinic_id,
+                OdontogramPreference.patient_id == patient_id,
+            )
+        )
+        return Dentition(chosen) if chosen else Dentition.AUTO
+
+    @staticmethod
+    async def set(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, dentition: Dentition
+    ) -> Dentition:
+        """Keep a clinician's choice; ``AUTO`` goes back to following the age."""
+        row = await db.scalar(
+            select(OdontogramPreference).where(
+                OdontogramPreference.clinic_id == clinic_id,
+                OdontogramPreference.patient_id == patient_id,
+            )
+        )
+        if row is None:
+            db.add(
+                OdontogramPreference(
+                    clinic_id=clinic_id, patient_id=patient_id, dentition=dentition.value
+                )
+            )
+        else:
+            row.dentition = dentition.value
+        await db.flush()
+        return dentition
+
+
+class EruptionService:
+    """The eruption side of the chart: a clinic's chronology and the exchange
+    of a primary tooth for its successor."""
+
+    @staticmethod
+    async def ages(db: AsyncSession, clinic_id: UUID) -> dict[str, dict[str, int]]:
+        """The clinic's eruption chronology, the default where it set none."""
+        own = await db.scalar(
+            select(OdontogramClinicSettings.eruption_ages).where(
+                OdontogramClinicSettings.clinic_id == clinic_id
+            )
+        )
+        return {
+            arch: {**positions, **((own or {}).get(arch) or {})}
+            for arch, positions in DEFAULT_ERUPTION_AGES.items()
+        }
+
+    @staticmethod
+    async def set_ages(
+        db: AsyncSession, clinic_id: UUID, ages: dict[str, dict[str, int]] | None
+    ) -> dict[str, dict[str, int]]:
+        """Keep the clinic's chronology; ``None`` goes back to the default."""
+        row = await db.scalar(
+            select(OdontogramClinicSettings).where(OdontogramClinicSettings.clinic_id == clinic_id)
+        )
+        if row is None:
+            db.add(OdontogramClinicSettings(clinic_id=clinic_id, eruption_ages=ages))
+        else:
+            row.eruption_ages = ages
+        await db.flush()
+        return await EruptionService.ages(db, clinic_id)
+
+    @staticmethod
+    async def exchange(
+        db: AsyncSession, clinic_id: UUID, patient_id: UUID, primary: int, user_id: UUID
+    ) -> tuple[ToothRecord, ToothRecord]:
+        """A primary tooth fell out and its successor is coming through.
+
+        The primary tooth is marked exfoliated and the permanent one erupting
+        — unless it was already said to be in the mouth. Both land in the
+        tooth history. Raises ``ValueError`` for a tooth with no successor.
+        """
+        successor = successor_of(primary)
+        if successor is None:
+            raise ValueError(f"Tooth {primary} is not a primary tooth")
+        fallen = await OdontogramService.create_or_update_tooth(
+            db,
+            clinic_id,
+            patient_id,
+            primary,
+            user_id,
+            eruption_status=EruptionStatus.EXFOLIATED.value,
+        )
+        current = await OdontogramService.get_tooth_record(db, clinic_id, patient_id, successor)
+        already_in = current is not None and current.eruption_status == EruptionStatus.ERUPTED.value
+        coming = await OdontogramService.create_or_update_tooth(
+            db,
+            clinic_id,
+            patient_id,
+            successor,
+            user_id,
+            eruption_status=UNSET if already_in else EruptionStatus.ERUPTING.value,
+        )
+        return fallen, coming

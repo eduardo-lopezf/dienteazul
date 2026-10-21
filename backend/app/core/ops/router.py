@@ -17,7 +17,7 @@ import tempfile
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 import jwt
@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
 from app.config import settings
+from app.core.announcements.models import Announcement
 from app.core.auth.models import Clinic, ClinicMembership, TierLimit, User
 from app.core.auth.schemas import _validate_iana_timezone
 from app.core.auth.service import hash_password, validate_password_strength
@@ -1067,3 +1068,123 @@ async def import_snapshot(
             taken_at=str(manifest.get("taken_at", "")),
         )
     )
+
+
+# --- Notices to clinics ------------------------------------------------------
+
+
+class AnnouncementWrite(BaseModel):
+    """A notice as the operator writes it."""
+
+    kind: Literal["maintenance", "feature"]
+    message: str = Field(min_length=1, max_length=280)
+    #: Left out, it shows from now.
+    starts_at: datetime | None = None
+    #: Left out, it shows until it is taken down.
+    ends_at: datetime | None = None
+    #: The clinics it is for; left out or empty, every clinic.
+    clinic_ids: list[UUID] | None = None
+
+    @field_validator("message")
+    @classmethod
+    def trimmed(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("The message is empty")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def ends_after_it_starts(self) -> AnnouncementWrite:
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must come after starts_at")
+        return self
+
+
+class OpsAnnouncementResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    kind: str
+    message: str
+    starts_at: datetime
+    ends_at: datetime | None
+    clinic_ids: list[UUID] | None
+    created_at: datetime
+    #: ``scheduled`` (not yet), ``active`` or ``ended``, read now.
+    status: str = "active"
+
+
+def _announcement(row: Announcement) -> OpsAnnouncementResponse:
+    now = datetime.now(UTC)
+    status_now = (
+        "scheduled"
+        if row.starts_at > now
+        else "ended"
+        if row.ends_at is not None and row.ends_at <= now
+        else "active"
+    )
+    return OpsAnnouncementResponse.model_validate(row).model_copy(update={"status": status_now})
+
+
+def _apply(row: Announcement, data: AnnouncementWrite) -> None:
+    row.kind = data.kind
+    row.message = data.message
+    row.starts_at = data.starts_at or datetime.now(UTC)
+    row.ends_at = data.ends_at
+    row.clinic_ids = [str(c) for c in data.clinic_ids] if data.clinic_ids else None
+    if row.ends_at is not None and row.ends_at <= row.starts_at:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "ends_at must come after starts_at"
+        )
+
+
+@router.get("/announcements", response_model=ApiResponse[list[OpsAnnouncementResponse]])
+async def list_ops_announcements(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[list[OpsAnnouncementResponse]]:
+    """Every notice, newest first, with whether it shows now."""
+    rows = await db.scalars(select(Announcement).order_by(Announcement.starts_at.desc()))
+    return ApiResponse(data=[_announcement(row) for row in rows])
+
+
+@router.post(
+    "/announcements",
+    response_model=ApiResponse[OpsAnnouncementResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_announcement(
+    data: AnnouncementWrite, db: Annotated[AsyncSession, Depends(get_db)]
+) -> ApiResponse[OpsAnnouncementResponse]:
+    """Publish a notice. It shows from ``starts_at`` (now when left out) at
+    the clinics' next page load, beside their name."""
+    row = Announcement()
+    _apply(row, data)
+    db.add(row)
+    await db.flush()
+    return ApiResponse(data=_announcement(row))
+
+
+async def _found(db: AsyncSession, announcement_id: UUID) -> Announcement:
+    row = await db.get(Announcement, announcement_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Announcement not found")
+    return row
+
+
+@router.put("/announcements/{announcement_id}", response_model=ApiResponse[OpsAnnouncementResponse])
+async def update_announcement(
+    announcement_id: UUID,
+    data: AnnouncementWrite,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[OpsAnnouncementResponse]:
+    row = await _found(db, announcement_id)
+    _apply(row, data)
+    await db.flush()
+    return ApiResponse(data=_announcement(row))
+
+
+@router.delete("/announcements/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_announcement(
+    announcement_id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
+) -> None:
+    """Take a notice down for good."""
+    await db.delete(await _found(db, announcement_id))

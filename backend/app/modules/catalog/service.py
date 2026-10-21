@@ -1172,6 +1172,7 @@ class OdontogramCatalogService:
                         "treatment_scope": item.treatment_scope,
                         "requires_surfaces": item.requires_surfaces,
                         "is_diagnostic": item.is_diagnostic,
+                        "dentition": item.dentition,
                         "pricing_strategy": item.pricing_strategy or "flat",
                         "pricing_config": item.pricing_config,
                         "surface_prices": item.surface_prices,

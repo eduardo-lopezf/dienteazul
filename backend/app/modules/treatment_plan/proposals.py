@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.catalog.models import TreatmentCatalogItem
+from app.modules.catalog.models import TreatmentCatalogItem, dentition_fits
 from app.modules.odontogram.models import Treatment, TreatmentTooth
 
 from .models import PlanDismissedFinding, PlannedTreatmentItem, TreatmentPlan
@@ -44,8 +44,9 @@ FINDING_TYPES: Final[tuple[str, ...]] = (
 )
 
 # Preferred catalog codes per finding, most specific first. The first code
-# present in the clinic's catalog wins; a clinic that renamed everything gets
-# no proposal for that finding rather than a wrong one.
+# present in the clinic's catalog, and fit for the tooth's dentition, wins; a
+# clinic that renamed everything gets no proposal for that finding rather than
+# a wrong one — and so does a missing primary tooth, which no implant answers.
 #
 # Deliberately conservative. Where the honest answer depends on how much tooth
 # is left (a fracture) the least invasive option is proposed, because a
@@ -55,11 +56,13 @@ SUGGESTIONS: Final[dict[str, tuple[str, ...]]] = {
     "caries": ("REST-COMP", "REST-AMAL"),
     "incipient_caries": ("REST-COMP",),
     # An inflamed pulp needs the canal treated; the root count decides which
-    # code, which is why this one is resolved per tooth in `_suggest`.
-    "pulpitis": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI"),
-    "periapical_small": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI"),
-    "periapical_medium": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI"),
-    "periapical_large": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI"),
+    # code, which is why this one is resolved per tooth in `_suggest`. The
+    # adult codes are for permanent teeth only, so a primary tooth falls
+    # through to its own: a pulpotomy, or a pulpectomy once the apex is hit.
+    "pulpitis": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI", "PED-PULPOTOMY"),
+    "periapical_small": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI", "PED-PULPECTOMY"),
+    "periapical_medium": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI", "PED-PULPECTOMY"),
+    "periapical_large": ("ENDO-MULTI", "ENDO-BI", "ENDO-UNI", "PED-PULPECTOMY"),
     "fracture": ("REST-RECONSTR", "REST-COMP"),
     "missing": ("SURG-IMP-TI", "REST-BRIDGE-MC"),
 }
@@ -167,6 +170,10 @@ class PlanProposalService:
                     catalog[code]
                     for code in _preferred_codes(finding.clinical_type, tooth_number)
                     if code in catalog
+                    and (
+                        tooth_number is None
+                        or dentition_fits(catalog[code].dentition, tooth_number)
+                    )
                 ),
                 None,
             )

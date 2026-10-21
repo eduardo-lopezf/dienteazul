@@ -71,6 +71,14 @@ UNAUTHENTICATED: dict[str, str] = {
     "PUT /api/v1/ops/snapshot": (
         "control plane only, by signed token; replaces the whole deployment, confirm required"
     ),
+    "GET /api/v1/ops/announcements": "control plane only, by signed token; the notices",
+    "POST /api/v1/ops/announcements": "control plane only, by signed token; publishes a notice",
+    "PUT /api/v1/ops/announcements/{announcement_id}": (
+        "control plane only, by signed token; changes a notice"
+    ),
+    "DELETE /api/v1/ops/announcements/{announcement_id}": (
+        "control plane only, by signed token; takes a notice down"
+    ),
     "GET /api/v1/ops/limits": "control plane only, by signed token; what each tier is allowed",
     "PUT /api/v1/ops/limits": "control plane only, by signed token; sets what each tier is allowed",
     "GET /api/v1/ops/apps": "control plane only, by signed token; the App catalog",
@@ -109,6 +117,10 @@ UNAUTHENTICATED: dict[str, str] = {
 # activity — and its payload cannot reach anything the clinic decides
 # about them.
 AUTHENTICATED_ONLY: dict[str, str] = {
+    "GET /api/v1/announcements": (
+        "the operator's notices in force for the caller's own clinic; about the "
+        "system, never about anyone, so every member reads them"
+    ),
     "GET /api/v1/auth/me": "the caller's own profile",
     "POST /api/v1/auth/activity": "the caller's own session-family activity timestamp",
     "POST /api/v1/auth/password": "replaces the caller's own password, proven by the current one",

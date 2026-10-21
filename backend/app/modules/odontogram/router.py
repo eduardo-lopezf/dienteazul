@@ -1,6 +1,6 @@
 """FastAPI router for odontogram module."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -9,12 +9,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
+from app.core.utils.clinic_time import clinic_date
 from app.database import get_db
 from app.modules.patients.models import Patient
 
-from .constants import CONDITION_COLORS, SURFACES, ToothCondition, is_valid_tooth_number
+from .constants import (
+    CONDITION_COLORS,
+    SURFACES,
+    ToothCondition,
+    age_in_years,
+    dentition_for_age,
+    is_valid_tooth_number,
+)
 from .schemas import (
     BulkUpdateRequest,
+    DentitionResponse,
+    DentitionUpdate,
+    EruptionAgesUpdate,
+    ExchangeRequest,
+    ExchangeResponse,
     HistoricalOdontogramResponse,
     HistoricalToothRecordResponse,
     HistoricalTreatmentResponse,
@@ -30,7 +43,14 @@ from .schemas import (
     TreatmentResponse,
     TreatmentUpdate,
 )
-from .service import OdontogramService, TreatmentService, build_treatment_response
+from .service import (
+    UNSET,
+    DentitionService,
+    EruptionService,
+    OdontogramService,
+    TreatmentService,
+    build_treatment_response,
+)
 
 router = APIRouter()
 
@@ -66,11 +86,12 @@ async def get_odontogram(
     _: Annotated[None, Depends(require_permission("odontogram.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[OdontogramResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    patient = await validate_patient_access(db, ctx.clinic_id, patient_id)
     teeth = await OdontogramService.get_patient_odontogram(db, ctx.clinic_id, patient_id)
     treatments, _total = await TreatmentService.list_patient_treatments(
         db=db, clinic_id=ctx.clinic_id, patient_id=patient_id, page=1, page_size=500
     )
+    age = _patient_age(patient, ctx)
     response = OdontogramResponse(
         patient_id=patient_id,
         teeth=[ToothRecordResponse.model_validate(t) for t in teeth],
@@ -80,8 +101,95 @@ async def get_odontogram(
         condition_colors=CONDITION_COLORS,
         available_conditions=[c.value for c in ToothCondition],
         surfaces=SURFACES,
+        patient_age=age,
+        dentition=await DentitionService.get(db, ctx.clinic_id, patient_id),
+        suggested_dentition=dentition_for_age(age),
+        eruption_ages=await EruptionService.ages(db, ctx.clinic_id),
     )
     return ApiResponse(data=response)
+
+
+def _patient_age(patient: Patient, ctx: ClinicContext) -> int | None:
+    """Completed years today, by the clinic's calendar."""
+    today = clinic_date(datetime.now(UTC), ctx.clinic.timezone)
+    return age_in_years(patient.date_of_birth, today)
+
+
+@router.post(
+    "/patients/{patient_id}/odontogram/exchange",
+    response_model=ApiResponse[ExchangeResponse],
+)
+async def exchange_tooth(
+    patient_id: UUID,
+    data: ExchangeRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("odontogram.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[ExchangeResponse]:
+    """A primary tooth fell out and its successor is coming through: the
+    first is marked exfoliated, the second erupting (unless already in)."""
+    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    try:
+        primary, successor = await EruptionService.exchange(
+            db, ctx.clinic_id, patient_id, data.primary_tooth, ctx.user_id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return ApiResponse(
+        data=ExchangeResponse(
+            primary=ToothRecordResponse.model_validate(primary),
+            successor=ToothRecordResponse.model_validate(successor),
+        )
+    )
+
+
+@router.get(
+    "/settings/eruption-ages",
+    response_model=ApiResponse[dict[str, dict[str, int]]],
+)
+async def get_eruption_ages(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("odontogram.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[dict[str, dict[str, int]]]:
+    """The clinic's eruption chronology (arch → position → age)."""
+    return ApiResponse(data=await EruptionService.ages(db, ctx.clinic_id))
+
+
+@router.put(
+    "/settings/eruption-ages",
+    response_model=ApiResponse[dict[str, dict[str, int]]],
+)
+async def set_eruption_ages(
+    data: EruptionAgesUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[dict[str, dict[str, int]]]:
+    """Set the clinic's eruption chronology; ``null`` restores the default."""
+    return ApiResponse(data=await EruptionService.set_ages(db, ctx.clinic_id, data.ages))
+
+
+@router.put(
+    "/patients/{patient_id}/odontogram/dentition",
+    response_model=ApiResponse[DentitionResponse],
+)
+async def set_dentition(
+    patient_id: UUID,
+    data: DentitionUpdate,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("odontogram.write"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[DentitionResponse]:
+    """Keep which dentition this patient's chart shows; ``auto`` follows the age."""
+    patient = await validate_patient_access(db, ctx.clinic_id, patient_id)
+    dentition = await DentitionService.set(db, ctx.clinic_id, patient_id, data.dentition)
+    age = _patient_age(patient, ctx)
+    return ApiResponse(
+        data=DentitionResponse(
+            dentition=dentition, patient_age=age, suggested_dentition=dentition_for_age(age)
+        )
+    )
 
 
 @router.get(
@@ -136,6 +244,9 @@ async def create_or_update_tooth(
         is_displaced=data.is_displaced,
         is_rotated=data.is_rotated,
         displacement_notes=data.displacement_notes,
+        eruption_status=(data.eruption_status.value if data.eruption_status else None)
+        if "eruption_status" in data.model_fields_set
+        else UNSET,
     )
     return ApiResponse(data=ToothRecordResponse.model_validate(tooth))
 

@@ -21,7 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.modules.catalog.models import Specialty, TreatmentCatalogItem
+from app.modules.catalog.models import Specialty, TreatmentCatalogItem, dentition_fits
 from app.modules.odontogram.models import Treatment
 from app.modules.odontogram.service import TreatmentService
 
@@ -39,10 +39,13 @@ _TOOTH_SCOPES = ("tooth", "multi_tooth")
 class SkippedLine:
     """A template line that could not be applied, and why.
 
-    ``not_in_catalog`` is the only reason today: the clinic never had that
-    treatment, or retired it. It is not an error — a clinic that refers its
-    orthodontics out still wants the rest of an orthognathic plan — but it
-    must not be silent.
+    ``not_in_catalog``: the clinic never had that treatment, or retired it.
+    It is not an error — a clinic that refers its orthodontics out still
+    wants the rest of an orthognathic plan — but it must not be silent.
+
+    ``wrong_dentition``: the treatment is for primary teeth only (or
+    permanent only) and some of the teeth given are of the other dentition.
+    The teeth it fits still get it; the name carries the ones left out.
     """
 
     name: str
@@ -358,8 +361,11 @@ class PlanTemplateService:
                 skipped.append(SkippedLine(name=name, reason="not_in_catalog"))
                 continue
 
+            fitting = _fitting_teeth(catalog_item, teeth, skipped)
+            if fitting is None:
+                continue
             for treatment in await PlanTemplateService._create_treatments(
-                db, clinic_id, plan, user_id, catalog_item, teeth
+                db, clinic_id, plan, user_id, catalog_item, fitting
             ):
                 item = await TreatmentPlanService.add_item(
                     db,
@@ -425,7 +431,9 @@ class PlanTemplateService:
                 skipped.append(SkippedLine(name=str(line.catalog_item_id), reason="not_in_catalog"))
                 continue
 
-            teeth = sorted(set(line.tooth_numbers))
+            teeth = _fitting_teeth(catalog_item, sorted(set(line.tooth_numbers)), skipped)
+            if teeth is None:
+                continue
             for treatment in await PlanTemplateService._create_treatments(
                 db,
                 clinic_id,
@@ -637,6 +645,34 @@ class PlanTemplateService:
             template.is_active = active
         await db.flush()
         return len(templates)
+
+
+def _fitting_teeth(
+    catalog_item: TreatmentCatalogItem, teeth: list[int], skipped: list[SkippedLine]
+) -> list[int] | None:
+    """The teeth a per-tooth treatment can be done on; ``None`` when the line
+    is left out altogether. Those left out are reported in ``skipped``.
+
+    A per-tooth item goes on the teeth it fits. A multi-tooth one (a bridge,
+    a splint) is one piece of work, so a single tooth of the wrong dentition
+    leaves out the whole line. Whole-mouth and whole-arch items read the
+    teeth only for their arch and are never left out.
+    """
+    if catalog_item.treatment_scope not in _TOOTH_SCOPES:
+        return teeth
+    wrong = [n for n in teeth if not dentition_fits(catalog_item.dentition, n)]
+    if not wrong:
+        return teeth
+    skipped.append(
+        SkippedLine(
+            name=f"{_catalog_name(catalog_item)} ({', '.join(str(n) for n in wrong)})",
+            reason="wrong_dentition",
+        )
+    )
+    fitting = [n for n in teeth if n not in wrong]
+    if catalog_item.treatment_scope == "multi_tooth" or not fitting:
+        return None
+    return fitting
 
 
 def _catalog_name(catalog_item: TreatmentCatalogItem) -> str:

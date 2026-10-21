@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -52,6 +53,21 @@ TREATMENT_PHASES = (
     "estetica",
     "mantenimiento",
 )
+
+# The teeth a treatment can be done on. Most suit any tooth; some only a
+# primary one (a pulpotomy with formocresol, a Hall crown) and some only a
+# permanent one (an implant, a veneer). The odontogram offers a treatment
+# only where it fits and refuses it on a tooth of the other dentition.
+TREATMENT_DENTITIONS = ("both", "deciduous", "permanent")
+
+
+def dentition_fits(dentition: str, tooth_number: int) -> bool:
+    """Whether a treatment of this dentition can be done on the tooth (FDI:
+    quadrants 5–8 are primary teeth)."""
+    if dentition == "both":
+        return True
+    return (tooth_number // 10 >= 5) == (dentition == "deciduous")
+
 
 if TYPE_CHECKING:
     from app.core.auth.models import Clinic
@@ -275,6 +291,8 @@ class TreatmentCatalogItem(Base, TimestampMixin):
     treatment_scope: Mapped[str] = mapped_column(String(20), default="tooth")
     is_diagnostic: Mapped[bool] = mapped_column(Boolean, default=False)
     requires_surfaces: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Which teeth it can be done on (see TREATMENT_DENTITIONS).
+    dentition: Mapped[str] = mapped_column(String(20), default="both", server_default="both")
 
     # Billing configuration
     billing_mode: Mapped[str] = mapped_column(
@@ -322,6 +340,10 @@ class TreatmentCatalogItem(Base, TimestampMixin):
 
     __table_args__ = (
         UniqueConstraint("clinic_id", "internal_code", name="uq_catalog_item_clinic_code"),
+        CheckConstraint(
+            "dentition IN ('both', 'deciduous', 'permanent')",
+            name="ck_catalog_items_dentition",
+        ),
         Index("idx_catalog_items_clinic", "clinic_id"),
         Index("idx_catalog_items_category", "category_id"),
         Index("idx_catalog_items_active", "clinic_id", "is_active"),

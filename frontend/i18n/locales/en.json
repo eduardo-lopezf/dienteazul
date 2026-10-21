@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "kind": {
+      "maintenance": "Maintenance",
+      "feature": "What's new"
+    },
+    "until": "Until {date}",
+    "dismiss": "Hide"
+  },
   "onboarding": {
     "progress": "Step {current} of {total}",
     "back": "Back",
@@ -575,10 +583,138 @@
     "toothPosition": "Tooth position",
     "displaced": "Displaced",
     "rotated": "Rotated",
+    "eruption": {
+      "title": "Tooth {tooth} · {name}",
+      "legend": "Eruption",
+      "notSaid": "Not said",
+      "notSaidHelp": "The eruption chronology for the age is followed.",
+      "status": {
+        "unerupted": "Unerupted",
+        "erupting": "Erupting",
+        "erupted": "Erupted",
+        "exfoliated": "Exfoliated (fell out)",
+        "congenitally_missing": "Congenitally missing (agenesis)",
+        "impacted": "Impacted (in the bone)"
+      },
+      "short": {
+        "unerupted": "Unerupted",
+        "erupting": "Erupting",
+        "exfoliated": "Exfoliated",
+        "congenitally_missing": "Agenesis",
+        "impacted": "Impacted"
+      },
+      "exchange": "Record exchange {tooth} → {successor}",
+      "exchangeHelp": "If {tooth} fell out, the exchange marks it exfoliated and {successor} erupting, in one step.",
+      "exchanged": "Exchange recorded: {tooth} → {successor}",
+      "saveFailed": "The tooth's eruption could not be saved",
+      "alertsTitle": "Eruption to review",
+      "alerts": {
+        "retainedPrimary": "{tooth} is still in the mouth and {successor} usually erupts at {age}: possibly retained too long.",
+        "delayedEruption": "{tooth} has not erupted and usually does at {age}: possibly delayed eruption."
+      },
+      "settings": {
+        "title": "Eruption chronology",
+        "description": "Usual age each permanent tooth erupts. Decides what a mixed dentition shows and when to warn of a delay.",
+        "upper": "Upper",
+        "lower": "Lower",
+        "position": "Position",
+        "age": "Age (years)",
+        "reset": "Back to the usual chronology",
+        "saved": "Chronology saved",
+        "saveFailed": "The chronology could not be saved",
+        "positions": {
+          "1": "Central incisor",
+          "2": "Lateral incisor",
+          "3": "Canine",
+          "4": "First premolar",
+          "5": "Second premolar",
+          "6": "First molar",
+          "7": "Second molar",
+          "8": "Third molar"
+        }
+      }
+    },
     "dentition": {
       "permanent": "Permanent",
       "deciduous": "Primary",
-      "toggle": "Toggle dentition"
+      "toggle": "Toggle dentition",
+      "auto": "By age",
+      "mixed": "Mixed",
+      "byAge": "{age} years · {dentition} dentition",
+      "noBirthDate": "No birth date: showing the permanent dentition",
+      "saveFailed": "The patient's dentition could not be saved",
+      "deciduousOnly": "{treatment} is for primary teeth only; {tooth} is permanent",
+      "permanentOnly": "{treatment} is for permanent teeth only; {tooth} is primary"
+    },
+    "boxes": {
+      "viewAnatomical": "Anatomical",
+      "viewBoxes": "Boxes",
+      "legend": {
+        "todo": "Caries / to do",
+        "done": "Done",
+        "cross": "Missing or extraction",
+        "ring": "Crown"
+      },
+      "codes": {
+        "root_canal_full": "RCT",
+        "root_canal_two_thirds": "RCT",
+        "root_canal_half": "Pp",
+        "root_canal_overfill": "RCT",
+        "post": "Po",
+        "implant": "Im",
+        "crown_on_implant": "Im",
+        "provisional_crown_on_implant": "Im",
+        "veneer": "Ve",
+        "bridge": "Br",
+        "splint": "Sp",
+        "fracture": "Fx",
+        "pulpitis": "Pu",
+        "periapical_small": "Pa",
+        "periapical_medium": "Pa",
+        "periapical_large": "Pa",
+        "apicoectomy": "Ap",
+        "unerupted": "UE",
+        "rotated": "Ro",
+        "displaced": "Ds",
+        "bracket": "Bk",
+        "tube": "Tb",
+        "band": "Bd",
+        "attachment": "At",
+        "retainer": "Rt",
+        "pigmentation": "Pg",
+        "biopsy_soft_tissue": "Bx",
+        "biopsy_hard_tissue": "Bx",
+        "sealant": "S"
+      }
+    },
+    "print": {
+      "open": "Print",
+      "print": "Print",
+      "title": "Odontogram",
+      "failed": "The odontogram could not be loaded",
+      "patient": "Patient",
+      "birthDate": "Date of birth",
+      "age": "{age} years",
+      "dentition": "Dentition",
+      "date": "Date",
+      "specifications": "Specifications",
+      "nothingCharted": "Nothing is charted on the odontogram.",
+      "tooth": "Tooth",
+      "finding": "Finding or treatment",
+      "surfaces": "Surfaces",
+      "status": "Status",
+      "recorded": "Recorded",
+      "observations": "Observations",
+      "signature": "Dentist's signature",
+      "wholeMouth": "Whole mouth"
+    },
+    "indices": {
+      "cpod": "DMFT",
+      "ceod": "deft",
+      "cpodParts": "D {decayed} · M {missing} · F {filled}",
+      "ceodParts": "d {decayed} · e {extraction} · f {filled}",
+      "cpodHelp": "Permanent teeth decayed (D), missing (M) and filled (F), counted from the odontogram",
+      "ceodHelp": "Primary teeth decayed (d), with extraction indicated (e) and filled (f), counted from the odontogram"
     },
     "quadrants": {
       "upper": "Upper Arch",
@@ -2114,6 +2250,13 @@
     "isDiagnostic": "Is diagnostic",
     "requiresSurfaces": "Requires surfaces",
     "materialNotes": "Material notes",
+    "dentition": "Dentition",
+    "dentitionHelp": "Which teeth it can be done on. The odontogram does not offer it on the other dentition and refuses it on a tooth of it.",
+    "dentitions": {
+      "both": "Primary and permanent",
+      "deciduous": "Primary only",
+      "permanent": "Permanent only"
+    },
     "materialNotesPlaceholder": "Required materials or supplies...",
     "active": "Active",
     "vatTypes": {

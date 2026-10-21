@@ -20,6 +20,7 @@ import type {
   TreatmentCatalogItem,
   TreatmentCatalogItemUpdate,
   TreatmentCatalogItemCreate,
+  TreatmentDentition,
   TreatmentPhase
 } from '~~/app/types'
 import { getVisualizationRuleLayers } from '~~/app/config/odontogramConstants'
@@ -184,6 +185,7 @@ function populate() {
       treatment_scope: newItem.treatment_scope,
       is_diagnostic: newItem.is_diagnostic,
       requires_surfaces: newItem.requires_surfaces,
+      dentition: newItem.dentition ?? 'both',
       default_phase: newItem.default_phase,
       material_notes: newItem.material_notes,
       is_active: newItem.is_active
@@ -222,6 +224,7 @@ function populate() {
       treatment_scope: 'tooth',
       is_diagnostic: false,
       requires_surfaces: false,
+      dentition: 'both',
       is_active: true
     }
     placement.value = DEFAULTS_BY_TYPE[
@@ -448,6 +451,12 @@ const PHASES: readonly TreatmentPhase[] = [
 
 const phaseOptions = computed(() =>
   PHASES.map(p => ({ value: p, label: t(`catalog.phases.${p}`) }))
+)
+
+const DENTITIONS: readonly TreatmentDentition[] = ['both', 'deciduous', 'permanent']
+
+const dentitionOptions = computed(() =>
+  DENTITIONS.map(d => ({ value: d, label: t(`catalog.dentitions.${d}`) }))
 )
 
 // `default_phase` is nullable in the API, and the select has no notion of
@@ -896,6 +905,19 @@ function handleClose() {
                   value-key="value"
                   class="w-full"
                   @update:model-value="odontogramType = String($event)"
+                />
+              </UFormField>
+
+              <UFormField
+                :label="t('catalog.dentition')"
+                :help="t('catalog.dentitionHelp')"
+              >
+                <USelect
+                  v-model="formData.dentition"
+                  :items="dentitionOptions"
+                  value-key="value"
+                  class="w-full"
+                  data-testid="catalog-item-dentition"
                 />
               </UFormField>
 

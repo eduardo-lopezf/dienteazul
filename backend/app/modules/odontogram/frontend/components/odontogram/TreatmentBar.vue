@@ -13,6 +13,7 @@ import {
   supportsBothModes,
   type TreatmentClinicalCategory
 } from '~~/app/config/odontogramConstants'
+import { offeredOn, type ShownDentition } from '../../utils/dentitionLayout'
 
 export type TreatmentBarMode = 'diagnosis' | 'planning' | 'full'
 
@@ -34,6 +35,16 @@ const props = withDefaults(defineProps<{
   mode?: TreatmentBarMode
   /** When set (fixed-plan context), shows a"Adding to: {title}" banner instead of the plan selector. */
   planContextTitle?: string
+  /**
+   * Category tabs left out: those that do not apply to the dentition on
+   * the chart — paediatric dentistry on an adult's.
+   */
+  hiddenCategories?: string[]
+  /**
+   * Dentition drawn on the chart: treatments for the other one only are left
+   * out (an implant on a child's primary teeth). Absent, all are offered.
+   */
+  shownDentition?: ShownDentition
 }>(), {
   mode: 'full'
 })
@@ -84,13 +95,14 @@ const categories = computed(() => {
   if (props.mode === 'planning') {
     const therapeutic = allCategories.filter(cat =>
       THERAPEUTIC_CATEGORIES.includes(cat as TreatmentClinicalCategory)
+      && !props.hiddenCategories?.includes(cat)
     )
     if (hasGlobalItems.value) therapeutic.push(GLOBALS_CATEGORY)
     return therapeutic
   }
 
   // 'full' and 'diagnosis' modes show all categories
-  return allCategories
+  return allCategories.filter(cat => !props.hiddenCategories?.includes(cat))
 })
 
 // Active category tab - default based on mode
@@ -217,8 +229,10 @@ function globalItemToBarItem(
 const currentTreatments = computed<TreatmentBarItem[]>(() => {
   if (activeCategory.value === GLOBALS_CATEGORY) {
     // Globals flow — render boca-completa first, then arcada.
-    const mouth = treatmentCatalog.globalMouthItems.value.map(c => globalItemToBarItem(c, 'mouth'))
-    const arch = treatmentCatalog.globalArchItems.value.map(c => globalItemToBarItem(c, 'arch'))
+    const offered = (c: OdontogramTreatment) =>
+      !props.shownDentition || offeredOn(c.dentition, props.shownDentition)
+    const mouth = treatmentCatalog.globalMouthItems.value.filter(offered).map(c => globalItemToBarItem(c, 'mouth'))
+    const arch = treatmentCatalog.globalArchItems.value.filter(offered).map(c => globalItemToBarItem(c, 'arch'))
     return [...mouth, ...arch]
   }
 
@@ -227,6 +241,7 @@ const currentTreatments = computed<TreatmentBarItem[]>(() => {
   if (catalogTreatments.length > 0) {
     return catalogTreatments
       .filter(c => !isMultiToothOnlyType(c.odontogram_treatment_type))
+      .filter(c => !props.shownDentition || offeredOn(c.dentition, props.shownDentition))
       .map((c) => {
         const oType = c.odontogram_treatment_type
         const isAtomic = ATOMIC_MULTI_TOOTH_TYPES.has(oType)

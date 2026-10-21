@@ -58,6 +58,10 @@ class ToothRecord(Base, TimestampMixin):
     is_rotated: Mapped[bool] = mapped_column(Boolean, default=False)
     displacement_notes: Mapped[str | None] = mapped_column(Text)
 
+    # Where the tooth is in its life (`EruptionStatus`); NULL = not said,
+    # and the chart goes by the eruption chronology.
+    eruption_status: Mapped[str | None] = mapped_column(String(24))
+
     # Relationships
     clinic: Mapped["Clinic"] = relationship()
     patient: Mapped["Patient"] = relationship()
@@ -67,9 +71,55 @@ class ToothRecord(Base, TimestampMixin):
 
     __table_args__ = (
         UniqueConstraint("patient_id", "tooth_number", name="uq_patient_tooth"),
+        CheckConstraint(
+            "eruption_status IS NULL OR eruption_status IN ('unerupted', 'erupting', "
+            "'erupted', 'exfoliated', 'congenitally_missing', 'impacted')",
+            name="ck_tooth_records_eruption_status",
+        ),
         Index("idx_tooth_records_patient", "patient_id"),
         Index("idx_tooth_records_clinic_patient", "clinic_id", "patient_id"),
     )
+
+
+class OdontogramPreference(Base, TimestampMixin):
+    """How a patient's chart is shown: which dentition.
+
+    One row per patient, only once a clinician picks a dentition; with no
+    row the chart follows the patient's age (``Dentition.AUTO``).
+    """
+
+    __tablename__ = "odontogram_preferences"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    clinic_id: Mapped[UUID] = mapped_column(ForeignKey("clinics.id"), nullable=False, index=True)
+    patient_id: Mapped[UUID] = mapped_column(ForeignKey("patients.id"), nullable=False)
+    dentition: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="auto", server_default="auto"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("clinic_id", "patient_id", name="uq_odontogram_preference_patient"),
+        CheckConstraint(
+            "dentition IN ('auto', 'deciduous', 'mixed', 'permanent')",
+            name="ck_odontogram_preference_dentition",
+        ),
+    )
+
+
+class OdontogramClinicSettings(Base, TimestampMixin):
+    """A clinic's own eruption chronology, when it sets one.
+
+    ``eruption_ages`` has the shape of ``DEFAULT_ERUPTION_AGES`` (arch →
+    position → age); with no row the default applies.
+    """
+
+    __tablename__ = "odontogram_clinic_settings"
+
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    clinic_id: Mapped[UUID] = mapped_column(
+        ForeignKey("clinics.id"), nullable=False, unique=True, index=True
+    )
+    eruption_ages: Mapped[dict | None] = mapped_column(JSONB)
 
 
 class Treatment(Base, TimestampMixin):

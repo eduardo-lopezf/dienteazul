@@ -18,6 +18,9 @@ TreatmentPhase = Literal[
     "mantenimiento",
 ]
 
+# Teeth a treatment can be done on; mirrors models.TREATMENT_DENTITIONS.
+TreatmentDentition = Literal["both", "deciduous", "permanent"]
+
 # ============================================================================
 # VAT Type Schemas
 # ============================================================================
@@ -334,6 +337,7 @@ class CatalogItemCreate(BaseModel):
     treatment_scope: Literal["tooth", "multi_tooth", "global_mouth", "global_arch"] = "tooth"
     is_diagnostic: bool = False
     requires_surfaces: bool = False
+    dentition: TreatmentDentition = "both"
 
     # Material
     material_notes: str | None = None
@@ -385,6 +389,7 @@ class CatalogItemUpdate(BaseModel):
     treatment_scope: Literal["tooth", "multi_tooth", "global_mouth", "global_arch"] | None = None
     is_diagnostic: bool | None = None
     requires_surfaces: bool | None = None
+    dentition: TreatmentDentition | None = None
 
     # Material
     material_notes: str | None = None
@@ -440,6 +445,7 @@ class CatalogItemResponse(BaseModel):
     treatment_scope: str
     is_diagnostic: bool
     requires_surfaces: bool
+    dentition: str = "both"
 
     # Material
     material_notes: str | None
@@ -510,6 +516,8 @@ class OdontogramTreatmentResponse(BaseModel):
     treatment_scope: str
     requires_surfaces: bool
     is_diagnostic: bool
+    #: Which teeth it can be done on: the bar hides it where it cannot be.
+    dentition: str = "both"
 
     # Pricing strategy (for multi-tooth price preview).
     pricing_strategy: str

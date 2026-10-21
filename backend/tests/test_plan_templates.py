@@ -816,3 +816,83 @@ async def test_dismissing_binds_to_the_plan_not_to_the_finding(
         f"{BASE}/treatment-plans/patient/{patient_id}/proposals", headers=auth_headers
     )
     assert [p["finding_id"] for p in fresh.json()["data"]] == [finding_id]
+
+
+# ---------------------------------------------------------------------------
+# Dentition: a treatment for primary teeth is not planned on a permanent one
+# ---------------------------------------------------------------------------
+
+
+async def _dentition_item(
+    db_session: AsyncSession, setup: dict, code: str, dentition: str, scope: str = "tooth"
+) -> str:
+    category = (
+        (
+            await db_session.execute(
+                select(TreatmentCategory).where(TreatmentCategory.clinic_id == setup["clinic_id"])
+            )
+        )
+        .scalars()
+        .first()
+    )
+    item = TreatmentCatalogItem(
+        clinic_id=setup["clinic_id"],
+        category_id=category.id,
+        internal_code=code,
+        names={"es": code},
+        default_price=Decimal("80.00"),
+        pricing_strategy="flat",
+        treatment_scope=scope,
+        default_phase="estabilizacion",
+        dentition=dentition,
+    )
+    db_session.add(item)
+    await db_session.commit()
+    return str(item.id)
+
+
+@pytest.mark.asyncio
+async def test_a_line_goes_on_the_teeth_its_dentition_fits(client, auth_headers, setup, db_session):
+    """A paediatric pulpotomy drawn on 84 and 16 lands on 84; 16 is reported."""
+    pulpotomy = await _dentition_item(db_session, setup, "PED-PULPOTOMY", "deciduous")
+    splint = await _dentition_item(db_session, setup, "T-BRIDGE", "permanent", "multi_tooth")
+    plan_id = await _plan(client, auth_headers, setup)
+
+    r = await client.post(
+        f"{BASE}/treatment-plans/{plan_id}/catalog-items",
+        headers=auth_headers,
+        json={
+            "lines": [
+                {"catalog_item_id": pulpotomy, "tooth_numbers": [84, 16]},
+                # One piece of work: a primary tooth in it leaves it all out.
+                {"catalog_item_id": splint, "tooth_numbers": [13, 53]},
+            ]
+        },
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()["data"]
+    assert [i["treatment"]["teeth"][0]["tooth_number"] for i in data["items"]] == [84]
+    assert data["skipped"] == [
+        {"name": "PED-PULPOTOMY (16)", "reason": "wrong_dentition"},
+        {"name": "T-BRIDGE (53)", "reason": "wrong_dentition"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_primary_tooth_is_proposed_its_own_pulp_treatment(
+    client, auth_headers, setup, db_session
+):
+    """Pulpitis on a primary molar is not an adult molar endodontics."""
+    await _dentition_item(db_session, setup, "ENDO-MULTI", "permanent")
+    await _dentition_item(db_session, setup, "PED-PULPOTOMY", "deciduous")
+    await _finding(client, auth_headers, setup, "pulpitis", 84)
+    await _finding(client, auth_headers, setup, "pulpitis", 46)
+
+    r = await client.get(
+        f"{BASE}/treatment-plans/patient/{setup['patient_id']}/proposals", headers=auth_headers
+    )
+    assert r.status_code == 200, r.text
+    suggested = {
+        p["tooth_number"]: p["suggested_catalog_item"]["internal_code"] for p in r.json()["data"]
+    }
+    assert suggested == {84: "PED-PULPOTOMY", 46: "ENDO-MULTI"}

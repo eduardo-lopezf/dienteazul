@@ -10,7 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .constants import (
     ATOMIC_MULTI_TOOTH_TYPES,
     CONDITION_COLORS,
+    DEFAULT_ERUPTION_AGES,
+    ERUPTION_TOLERANCE_YEARS,
     SURFACES,
+    Dentition,
+    EruptionStatus,
     ToothCondition,
     TreatmentStatus,
     TreatmentType,
@@ -85,6 +89,9 @@ class ToothRecordUpdate(BaseModel):
     is_displaced: bool | None = None
     is_rotated: bool | None = None
     displacement_notes: str | None = None
+    #: Sent as ``null`` it clears the status (the chronology decides again);
+    #: left out, it is not touched.
+    eruption_status: EruptionStatus | None = None
 
     @field_validator("general_condition")
     @classmethod
@@ -134,6 +141,7 @@ class ToothRecordResponse(BaseModel):
     is_displaced: bool = False
     is_rotated: bool = False
     displacement_notes: str | None = None
+    eruption_status: EruptionStatus | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -439,6 +447,61 @@ class OdontogramResponse(BaseModel):
         default_factory=lambda: [c.value for c in ToothCondition]
     )
     surfaces: list[str] = Field(default_factory=lambda: SURFACES)
+    #: The patient's age in completed years; ``None`` with no birth date.
+    patient_age: int | None = None
+    #: What the clinician chose for this patient; ``auto`` follows the age.
+    dentition: Dentition = Dentition.AUTO
+    #: What the age suggests (``dentition_for_age``).
+    suggested_dentition: Dentition = Dentition.PERMANENT
+    #: The clinic's eruption chronology (arch → position → age).
+    eruption_ages: dict[str, dict[str, int]] = Field(default_factory=lambda: DEFAULT_ERUPTION_AGES)
+    #: Years past the usual age before warning.
+    eruption_tolerance: int = ERUPTION_TOLERANCE_YEARS
+
+
+class ExchangeRequest(BaseModel):
+    """A primary tooth fell out; its successor is coming through."""
+
+    primary_tooth: int
+
+
+class ExchangeResponse(BaseModel):
+    primary: ToothRecordResponse
+    successor: ToothRecordResponse
+
+
+class EruptionAgesUpdate(BaseModel):
+    """A clinic's eruption chronology; ``null`` goes back to the default.
+
+    Only what differs need be sent: positions left out keep the default.
+    """
+
+    ages: dict[str, dict[str, int]] | None
+
+    @field_validator("ages")
+    @classmethod
+    def validate_ages(cls, v: dict[str, dict[str, int]] | None) -> dict | None:
+        if v is None:
+            return v
+        for arch, positions in v.items():
+            if arch not in DEFAULT_ERUPTION_AGES:
+                raise ValueError(f"Unknown arch: {arch}")
+            for position, age in positions.items():
+                if position not in DEFAULT_ERUPTION_AGES[arch]:
+                    raise ValueError(f"Unknown position: {position}")
+                if not 0 <= age <= 30:
+                    raise ValueError(f"Age out of range for {arch} {position}: {age}")
+        return v
+
+
+class DentitionUpdate(BaseModel):
+    dentition: Dentition
+
+
+class DentitionResponse(BaseModel):
+    dentition: Dentition
+    patient_age: int | None = None
+    suggested_dentition: Dentition
 
 
 class HistoricalOdontogramResponse(BaseModel):

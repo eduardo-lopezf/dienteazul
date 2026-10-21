@@ -1,5 +1,6 @@
 """Constants for the odontogram module."""
 
+from datetime import date
 from enum import StrEnum
 from typing import Final
 
@@ -87,6 +88,84 @@ class ToothType(StrEnum):
 
     PERMANENT = "permanent"
     DECIDUOUS = "deciduous"
+
+
+class Dentition(StrEnum):
+    """Which teeth a patient's chart shows.
+
+    ``AUTO`` follows the patient's age (:func:`dentition_for_age`); the
+    others are a clinician's choice for that patient, kept until changed.
+    """
+
+    AUTO = "auto"
+    DECIDUOUS = "deciduous"
+    MIXED = "mixed"
+    PERMANENT = "permanent"
+
+
+#: Ages (completed years) where the chart's dentition changes: below the
+#: first, deciduous; below the second, mixed; from it on, permanent. Third
+#: molars are shown dimmed below the third.
+MIXED_FROM_AGE: Final[int] = 6
+PERMANENT_FROM_AGE: Final[int] = 13
+THIRD_MOLARS_FROM_AGE: Final[int] = 18
+
+
+class EruptionStatus(StrEnum):
+    """Where a tooth is in its life, charted by the clinician.
+
+    ``None`` on a tooth record means "not said": the chart then goes by the
+    eruption chronology.
+    """
+
+    UNERUPTED = "unerupted"  # not in the mouth yet
+    ERUPTING = "erupting"  # coming through
+    ERUPTED = "erupted"  # in the mouth
+    EXFOLIATED = "exfoliated"  # a primary tooth that fell out
+    CONGENITALLY_MISSING = "congenitally_missing"  # agenesis: it will not come
+    IMPACTED = "impacted"  # retained in the bone
+
+
+ERUPTION_STATUSES: Final[tuple[str, ...]] = tuple(status.value for status in EruptionStatus)
+
+#: Usual age (completed years, lower bound) a permanent tooth erupts, by arch
+#: and position 1–8. A clinic may set its own (``OdontogramClinicSettings``).
+DEFAULT_ERUPTION_AGES: Final[dict[str, dict[str, int]]] = {
+    "upper": {"1": 7, "2": 8, "3": 11, "4": 10, "5": 10, "6": 6, "7": 12, "8": 17},
+    "lower": {"1": 6, "2": 7, "3": 9, "4": 10, "5": 11, "6": 6, "7": 11, "8": 17},
+}
+
+#: Years past the usual age before the chart warns of a late eruption or a
+#: primary tooth kept too long.
+ERUPTION_TOLERANCE_YEARS: Final[int] = 2
+
+
+def successor_of(primary: int) -> int | None:
+    """The permanent tooth that replaces a primary one (54 → 14)."""
+    if primary not in DECIDUOUS_TEETH:
+        return None
+    return (primary // 10 - 4) * 10 + primary % 10
+
+
+def age_in_years(birth_date: date | None, on: date) -> int | None:
+    """Completed years on ``on``; ``None`` when the birth date is unknown."""
+    if birth_date is None:
+        return None
+    before_birthday = (on.month, on.day) < (birth_date.month, birth_date.day)
+    return on.year - birth_date.year - before_birthday
+
+
+def dentition_for_age(age: int | None) -> Dentition:
+    """The dentition a patient of ``age`` is expected to have.
+
+    A suggestion — what is charted tooth by tooth is what counts. With no
+    known age, permanent: the chart every adult needs.
+    """
+    if age is None or age >= PERMANENT_FROM_AGE:
+        return Dentition.PERMANENT
+    if age >= MIXED_FROM_AGE:
+        return Dentition.MIXED
+    return Dentition.DECIDUOUS
 
 
 class Surface(StrEnum):
