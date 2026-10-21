@@ -56,6 +56,7 @@ from app.core.privacy.tiers import (
     validate_tier_custody,
 )
 from app.core.schemas import ApiResponse
+from app.core.server_errors.models import ServerError
 from app.core.tenancy import TenantContext
 from app.core.tenancy.dependencies import get_tenant
 from app.core.tenancy.usage import BACKUPS_FOLDER
@@ -1188,3 +1189,42 @@ async def delete_announcement(
 ) -> None:
     """Take a notice down for good."""
     await db.delete(await _found(db, announcement_id))
+
+
+# --- Server errors -----------------------------------------------------------
+
+
+class ServerErrorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    occurred_at: datetime
+    method: str
+    path: str
+    status_code: int
+    error_type: str
+    message: str
+    frames: str
+    request_id: str | None
+    clinic_id: str | None
+    user_id: str | None
+
+
+@router.get("/errors", response_model=ApiResponse[list[ServerErrorResponse]])
+async def list_server_errors(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(default=200, ge=1, le=1000),
+) -> ApiResponse[list[ServerErrorResponse]]:
+    """The requests that ended in a server error, newest first: where each
+    failed — route, exception, message without its values, the chain of
+    calls — and the request, clinic and user ids. Kept thirty days."""
+    rows = await db.scalars(
+        select(ServerError).order_by(ServerError.occurred_at.desc()).limit(limit)
+    )
+    return ApiResponse(data=[ServerErrorResponse.model_validate(row) for row in rows])
+
+
+@router.delete("/errors", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_server_errors(db: Annotated[AsyncSession, Depends(get_db)]) -> None:
+    """Forget every recorded error — once their causes are fixed."""
+    await db.execute(delete(ServerError))

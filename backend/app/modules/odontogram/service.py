@@ -527,6 +527,7 @@ class OdontogramService:
                     "notes": None,
                     "is_displaced": False,
                     "is_rotated": False,
+                    "eruption_status": None,
                 }
             tooth = teeth_state[n]
             if entry.change_type == "created" and entry.new_condition:
@@ -537,11 +538,31 @@ class OdontogramService:
                 tooth["surfaces"][entry.surface] = entry.new_condition
             elif entry.change_type == "note" and entry.notes:
                 tooth["notes"] = entry.notes
+            elif entry.change_type == "eruption":
+                # Every change is recorded, the first included: the last one
+                # up to the date is where the tooth stood. NULL = not said.
+                tooth["eruption_status"] = entry.new_condition
 
         return {
             "teeth": list(teeth_state.values()),
-            "treatments": [build_treatment_response(t) for t in treatments],
+            "treatments": [_as_of(build_treatment_response(t), target_dt) for t in treatments],
         }
+
+
+def _as_of(treatment: dict, moment: datetime) -> dict:
+    """A treatment as it stood at ``moment``: one performed afterwards was
+    still planned then. Without this a past chart showed today's work as
+    already done, and two dates could not be compared."""
+    performed_at = treatment.get("performed_at")
+    if performed_at is not None and performed_at > moment:
+        return {
+            **treatment,
+            "status": TreatmentStatus.PLANNED.value,
+            "performed_at": None,
+            "performed_by": None,
+            "performed_by_name": None,
+        }
+    return treatment
 
 
 class TreatmentService:

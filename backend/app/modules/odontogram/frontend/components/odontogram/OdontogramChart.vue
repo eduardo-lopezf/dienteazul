@@ -107,6 +107,7 @@ const {
   timelineLoading,
   isViewingHistory,
   displayTreatments,
+  displayTeeth,
   fetchTimeline,
   fetchOdontogramAtDate,
   returnToCurrentView
@@ -249,13 +250,22 @@ const isMultiToothMode = computed(() => multiToothConfig.value !== null)
 const chartFacts = computed<ChartFacts>(() => ({
   age: patientAge.value,
   charted: isCharted,
-  statusOf: tooth => (getToothRecord(tooth)?.eruption_status ?? null) as EruptionStatus | null,
+  // In the history view, where the tooth stood on that date (rebuilt by the
+  // server from its eruption history); otherwise today's record.
+  statusOf: tooth => (
+    (isViewingHistory.value
+      ? displayTeeth.value.find(r => r.tooth_number === tooth)
+      : getToothRecord(tooth))?.eruption_status ?? null
+  ) as EruptionStatus | null,
   ages: odontogramData.value?.eruption_ages
 }))
 // ----------------------------------------------------------------------------
 // View: the anatomical chart (crown and root) or the box chart of the paper
 // forms. A matter of taste per person, so it is kept in this browser only.
 // ----------------------------------------------------------------------------
+
+/** The chart on two dates side by side (`OdontogramCompare`). */
+const compareOpen = ref(false)
 
 type ChartView = 'anatomical' | 'boxes'
 const CHART_VIEW_KEY = 'odontogram:view'
@@ -1036,6 +1046,16 @@ defineExpose({
             @update:model-value="(v) => chooseChartView(v as ChartView)"
           />
           <UButton
+            icon="i-lucide-columns-2"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            data-testid="odontogram-compare-open"
+            @click="compareOpen = true"
+          >
+            {{ t('odontogram.compare.open') }}
+          </UButton>
+          <UButton
             icon="i-lucide-printer"
             size="xs"
             color="neutral"
@@ -1368,6 +1388,14 @@ defineExpose({
     </div>
 
     <!-- Surface selector popup -->
+    <OdontogramCompare
+      :open="compareOpen"
+      :patient-id="patientId"
+      :dentition="chosenDentition"
+      :eruption-ages="odontogramData?.eruption_ages"
+      @close="compareOpen = false"
+    />
+
     <SurfaceSelectorPopup
       v-model:open="showSurfaceSelector"
       :tooth-number="selectedTooth || 0"

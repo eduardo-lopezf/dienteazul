@@ -1,5 +1,41 @@
 {
   "periodontogram": {
+    "print": {
+      "title": "Periodontogram",
+      "closedOn": "Session closed on {date}",
+      "bleeding": "Bleeding",
+      "plaque": "Plaque",
+      "cal": "Mean CAL",
+      "deepPockets": "Pockets ≥ 5 mm",
+      "upper": "Upper",
+      "lower": "Lower",
+      "keyRed": "probing > 3 mm or keratinized gingiva ≤ 2 mm",
+      "rows": {
+        "mobility": "Mobility",
+        "keratinized_gingiva_mm": "Keratinized gingiva",
+        "furcation_buccal": "Furcation B",
+        "furcation_lingual": "Furcation L/P",
+        "probing": "Probing",
+        "margin": "Margin",
+        "bleeding": "Bleeding",
+        "suppuration": "Suppuration",
+        "plaque": "Plaque"
+      },
+      "side": {
+        "buccal": "B",
+        "palatal": "P",
+        "lingual": "L"
+      }
+    },
+    "legend": {
+      "title": "Key (SEPA)",
+      "gingivalMargin": "Gingival margin",
+      "probingDepth": "Probing depth",
+      "bleeding": "Bleeding on probing",
+      "suppuration": "Suppuration",
+      "plaque": "Plaque",
+      "redNumbers": "Probing > 3 mm or keratinized gingiva ≤ 2 mm"
+    },
     "tab": {
       "label": "Periodontogram"
     },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Surface, TreatmentStatus, TreatmentType } from '~~/app/types'
-import { TREATMENT_COLORS } from './ToothSVGPaths'
+import { nomColor } from '../../utils/nomColors'
 
 const _props = defineProps<{
   toothNumber: number
@@ -85,8 +85,9 @@ const statusOptions = [
   { value: 'planned' as TreatmentStatus, label: t('odontogram.status.planned'), color: 'warning', icon: 'i-lucide-clock' }
 ]
 
+/** NOM-013 colour for the status being logged (`utils/nomColors`). */
 function getTreatmentColor(type: TreatmentType): string {
-  return TREATMENT_COLORS[type] || '#9CA3AF'
+  return nomColor(type, selectedStatus.value)
 }
 
 function toggleSurface(surface: Surface) {

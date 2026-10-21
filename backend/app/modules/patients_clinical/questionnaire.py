@@ -1,6 +1,9 @@
 """The health questionnaire a patient answers at a visit: what is asked.
 
-The questions and the checklist of conditions, by key. The wording lives
+Two forms: the **adult** one, and the **pediatric** one (odontología
+pediátrica) a parent or guardian answers and signs for a child. The
+questions, the checklist of conditions and — on the pediatric form — the
+data fields, by key. The wording lives
 with the screen (``healthQuestionnaire`` in the frontend locales) and is
 copied for the printed form by ``scripts/generate_record_labels.py``.
 
@@ -110,3 +113,97 @@ CONDITION_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 CONDITIONS: frozenset[str] = frozenset(key for group in CONDITION_GROUPS.values() for key in group)
+
+
+# --- The pediatric form (odontología pediátrica) ------------------------
+#
+# Answered and signed by a parent or guardian. Its own version: it moves
+# on its own, and stored answers keep the version they were given under.
+
+PEDIATRIC_FORM_VERSION = "1"
+
+#: Data written on the form rather than answered yes or no, by block.
+PEDIATRIC_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
+    "child": ("school", "school_grade", "siblings"),
+    "family": ("guardian_name", "guardian_occupation", "guardian_phone", "physician_name"),
+    "exam": ("weight", "height", "blood_pressure", "temperature", "behavior"),
+    "health": ("current_health", "last_physical_exam"),
+}
+
+#: Yes/no questions, by block, in the order the form asks them. Any may
+#: carry a detail ("which one", "when").
+PEDIATRIC_QUESTION_GROUPS: dict[str, tuple[str, ...]] = {
+    "dental": ("prior_dental_visit", "bad_dental_experience", "plays_sport"),
+    "habits": (
+        "thumb_sucking",
+        "nail_biting",
+        "lip_biting",
+        "mouth_breathing",
+        "teeth_grinding",
+        "frequent_headache",
+    ),
+    "medical": (
+        "current_illness",
+        "taking_medication",
+        "head_face_accident",
+        "allergic",
+        "tonsillectomy",
+        "adenoidectomy",
+    ),
+    "history": (
+        "prolonged_illness",
+        "receives_medical_care",
+        "prior_surgery",
+        "prior_dental_treatment",
+        "anesthetized",
+        "anesthesia_reaction",
+    ),
+}
+
+PEDIATRIC_QUESTIONS: tuple[str, ...] = tuple(
+    key for group in PEDIATRIC_QUESTION_GROUPS.values() for key in group
+)
+
+#: Infections and conditions the child has or has had.
+PEDIATRIC_CONDITION_GROUPS: dict[str, tuple[str, ...]] = {
+    "pediatric": (
+        "emotional_disorders",
+        "persistent_bleeding",
+        "hemophilia",
+        "seizures",
+        "hepatitis",
+        "rheumatic_fever",
+        "chronic_nasal_obstruction",
+        "frequent_throat_infections",
+    ),
+}
+
+
+class Form:
+    """What one form asks: its version, questions, conditions and fields."""
+
+    def __init__(
+        self,
+        version: str,
+        questions: tuple[str, ...],
+        condition_groups: dict[str, tuple[str, ...]],
+        fields: tuple[str, ...] = (),
+    ) -> None:
+        self.version = version
+        self.questions = questions
+        self.condition_groups = condition_groups
+        self.conditions = frozenset(k for group in condition_groups.values() for k in group)
+        self.fields = fields
+
+
+FORMS: dict[str, Form] = {
+    "adult": Form(FORM_VERSION, QUESTIONS, CONDITION_GROUPS),
+    "pediatric": Form(
+        PEDIATRIC_FORM_VERSION,
+        PEDIATRIC_QUESTIONS,
+        PEDIATRIC_CONDITION_GROUPS,
+        tuple(key for group in PEDIATRIC_FIELD_GROUPS.values() for key in group),
+    ),
+}
+
+FORM_KINDS: tuple[str, ...] = tuple(FORMS)

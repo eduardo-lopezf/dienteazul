@@ -53,6 +53,8 @@ def _labels(locale: dict) -> dict:
         # The questionnaire's own keys, so the record can name what was ticked.
         "declared_conditions": locale["healthQuestionnaire"]["conditions"],
         "question": locale["healthQuestionnaire"]["questions"],
+        "form_kind": locale["healthQuestionnaire"]["forms"],
+        "form_field": locale["healthQuestionnaire"]["pediatric"]["fields"],
     }
     for key, prefixes in VALUE_KEYS.items():
         merged: dict[str, str] = {}

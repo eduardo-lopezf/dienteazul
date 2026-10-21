@@ -382,13 +382,17 @@ async def get_odontogram_at_date(
     db: Annotated[AsyncSession, Depends(get_db)],
     target_date: date = Query(..., alias="date"),
 ) -> ApiResponse[HistoricalOdontogramResponse]:
-    await validate_patient_access(db, ctx.clinic_id, patient_id)
+    patient = await validate_patient_access(db, ctx.clinic_id, patient_id)
     historical = await OdontogramService.get_odontogram_at_date(
         db, ctx.clinic_id, patient_id, target_date
     )
+    age_then = age_in_years(patient.date_of_birth, target_date)
     return ApiResponse(
         data=HistoricalOdontogramResponse(
             patient_id=str(patient_id),
+            date=target_date,
+            patient_age=age_then,
+            suggested_dentition=dentition_for_age(age_then),
             teeth=[HistoricalToothRecordResponse.model_validate(t) for t in historical["teeth"]],
             treatments=[
                 HistoricalTreatmentResponse.model_validate(t) for t in historical["treatments"]

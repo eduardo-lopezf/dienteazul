@@ -646,13 +646,24 @@
       "deciduousOnly": "{treatment} is for primary teeth only; {tooth} is permanent",
       "permanentOnly": "{treatment} is for permanent teeth only; {tooth} is primary"
     },
+    "nom": {
+      "title": "Colours (NOM-013-SSA2-2015)",
+      "blue": "Blue: work done (composites, amalgams, endodontics, crowns) and missing teeth",
+      "red": "Red: active caries, lesions and pending work",
+      "green": "Green: incipient caries (white spots) and provisional work",
+      "yellow": "Yellow: prevention (pit and fissure sealants)",
+      "cross": "X: missing tooth (blue) or extraction pending (red)"
+    },
     "boxes": {
       "viewAnatomical": "Anatomical",
       "viewBoxes": "Boxes",
       "legend": {
-        "todo": "Caries / to do",
-        "done": "Done",
-        "cross": "Missing or extraction",
+        "red": "Caries / to do",
+        "blue": "Done",
+        "green": "Incipient / provisional",
+        "yellow": "Sealant",
+        "rootLine": "Endodontics",
+        "cross": "Missing (blue) or extraction (red)",
         "ring": "Crown"
       },
       "codes": {
@@ -685,6 +696,23 @@
         "biopsy_soft_tissue": "Bx",
         "biopsy_hard_tissue": "Bx",
         "sealant": "S"
+      }
+    },
+    "compare": {
+      "open": "Compare dates",
+      "title": "Compare two dates",
+      "today": "Today",
+      "date": "Date",
+      "failed": "The odontogram of that date could not be loaded",
+      "changesTitle": "Changes between the two dates",
+      "noChanges": "Nothing changed between these two dates.",
+      "changes": {
+        "added": "{name} charted",
+        "addedPlanned": "{name} planned",
+        "performed": "{name} done",
+        "removed": "{name} withdrawn",
+        "eruption": "Now: {status}",
+        "condition": "Tooth record: {condition}"
       }
     },
     "print": {
@@ -3656,6 +3684,63 @@
     "moved": "The reference regulation is set up in the Workspace:"
   },
   "healthQuestionnaire": {
+    "forms": {
+      "adult": "Adult",
+      "pediatric": "Paediatric dentistry"
+    },
+    "form": "Form",
+    "formHint": "Under 18 the paediatric form is suggested, signed by a parent or guardian.",
+    "pediatric": {
+      "signRequired": "Sign with a finger, a stylus or the mouse. The parent or guardian's signature is required; if they prefer to sign on paper, choose «On paper», print the paediatric form and upload the signed questionnaire.",
+      "title": "Paediatric dentistry",
+      "badge": "Paediatric",
+      "sections": {
+        "child": "The child",
+        "family": "Family and doctor",
+        "exam": "Examination",
+        "dental": "Dental information",
+        "habits": "Habits",
+        "medical": "Medical information",
+        "history": "Clinical history"
+      },
+      "fields": {
+        "school": "School",
+        "school_grade": "School grade",
+        "siblings": "No. of siblings",
+        "guardian_name": "Parent or guardian's name",
+        "guardian_occupation": "Occupation",
+        "guardian_phone": "Guardian's phone",
+        "physician_name": "Their doctor's name",
+        "weight": "Weight",
+        "height": "Height",
+        "blood_pressure": "BP",
+        "temperature": "Temp.",
+        "behavior": "Behaviour",
+        "current_health": "Present state of health",
+        "last_physical_exam": "Last physical examination",
+        "patientName": "Patient's name",
+        "sex": "Sex",
+        "birthDate": "Date of birth",
+        "city": "City",
+        "postalCode": "Postal code"
+      },
+      "detail": {
+        "which": "Which?",
+        "when": "When?",
+        "toWhat": "To what?",
+        "why": "Why?"
+      },
+      "genders": {
+        "male": "Male",
+        "female": "Female"
+      },
+      "conditionsIntro": "Has the child had, or do they have, any of the following infections or conditions?",
+      "consent": "I declare that the information above is true and complete. As the patient's parent or guardian, I authorise the dental examination, diagnosis and treatment of my child at this clinic, and undertake to report any change in their health.",
+      "signature": "Parent or guardian's name and signature",
+      "signTitle": "Parent or guardian's signature",
+      "guardianOnly": "The paediatric questionnaire is signed by a parent, guardian or representative, not by the child.",
+      "paperSteps": "Print the blank paediatric questionnaire, have the parent or guardian fill it in and sign the consent by hand, and upload the signed file here (PDF or photo)."
+    },
     "sign": {
       "title": "Patient's signature",
       "statement": "I declare that the information I gave in this questionnaire is true.",
@@ -3714,6 +3799,24 @@
     "time": "Time",
     "cause": "Cause",
     "questions": {
+      "prior_dental_visit": "Has the child been seen at a dental office?",
+      "bad_dental_experience": "Was their previous dental experience bad?",
+      "plays_sport": "Does the child play any sport?",
+      "thumb_sucking": "Thumb sucking",
+      "nail_biting": "Nail biting",
+      "lip_biting": "Lip biting",
+      "mouth_breathing": "Sleeps with the mouth open",
+      "teeth_grinding": "Teeth grinding",
+      "frequent_headache": "Frequent headaches",
+      "current_illness": "Does the patient have any illness at present?",
+      "head_face_accident": "Has the child had accidents to the head and/or face?",
+      "allergic": "Is the child allergic?",
+      "tonsillectomy": "Has the child had the tonsils removed?",
+      "adenoidectomy": "Has the child had the adenoids removed?",
+      "prolonged_illness": "Has the child had long or debilitating illnesses?",
+      "receives_medical_care": "Is the child under medical care?",
+      "prior_dental_treatment": "Has the child had dental treatment?",
+      "anesthetized": "Has the child ever been anaesthetised?",
       "medical_care_2y": "Have you received medical care in the last 2 years?",
       "hospitalized_5y": "Have you been hospitalised in the last 5 years?",
       "taking_medication": "Are you currently taking any medication?",
@@ -3728,6 +3831,11 @@
       "contraceptive": "If you are a woman, do you use a contraceptive method?"
     },
     "conditions": {
+      "emotional_disorders": "Emotional disorders",
+      "persistent_bleeding": "Persistent bleeding",
+      "hemophilia": "Haemophilia",
+      "chronic_nasal_obstruction": "Chronic nasal obstruction",
+      "frequent_throat_infections": "Frequent throat infections",
       "hypotension": "Low blood pressure",
       "hypertension": "High blood pressure",
       "heart_failure": "Heart failure",
@@ -3923,6 +4031,8 @@
       "imaging": "Radiographs and photographs"
     },
     "field": {
+      "form_kind": "Form",
+      "form_data": "Form data",
       "asa_class": "Class",
       "rationale": "What it rests on",
       "systolic": "Systolic BP (mmHg)",

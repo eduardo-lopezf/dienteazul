@@ -3,7 +3,8 @@
  * The odontogram as a sheet for the printed record, after the paper forms:
  * the box chart with its code rows, the CPO-D / ceo-d indices, the
  * "Especificaciones" — every finding and treatment charted, tooth by tooth —
- * and room for observations and the dentist's signature.
+ * what other Apps add through the `odontogram.print.sections` slot (the
+ * latest periodontogram), and room for observations and the signature.
  *
  * Opened in its own tab from the chart. No app frame (`layout: false`):
  * what is on screen is what goes to paper.
@@ -249,6 +250,13 @@ function print() {
           </tbody>
         </table>
       </section>
+
+      <!-- Other Apps' part of the record (the periodontogram, when its App
+           is on): `odontogram.print.sections`, ctx `{ patientId }`. -->
+      <ModuleSlot
+        name="odontogram.print.sections"
+        :ctx="{ patientId }"
+      />
 
       <section>
         <h2 class="sheet-section">

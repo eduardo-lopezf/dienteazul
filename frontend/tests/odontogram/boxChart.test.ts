@@ -64,14 +64,24 @@ describe('a side of the square is a surface', () => {
   })
 })
 
-describe('what a tooth square shows', () => {
-  it('paints caries red, work done blue and planned work lighter red', () => {
+describe('what a tooth square shows, in the NOM-013 colours', () => {
+  it('paints caries and planned work red, work done blue', () => {
     const state = toothBoxState([
       view('caries', { surfaces: ['M'] }),
       view('filling_composite', { surfaces: ['O'] }),
       view('filling_composite', { surfaces: ['D'], status: 'planned' })
     ])
-    expect(state.surfaces).toEqual({ M: 'caries', O: 'done', D: 'planned' })
+    expect(state.surfaces).toEqual({ M: 'red', O: 'blue', D: 'red' })
+  })
+
+  it('paints incipient caries and provisional work green, sealants yellow', () => {
+    const state = toothBoxState([
+      view('incipient_caries', { surfaces: ['V'] }),
+      view('filling_temporary', { surfaces: ['M'] }),
+      view('sealant', { surfaces: ['O'] })
+    ])
+    expect(state.surfaces).toEqual({ V: 'green', M: 'green', O: 'yellow' })
+    expect(toothBoxState([view('provisional_crown_on_implant')]).ring).toBe('green')
   })
 
   it('shows the later mark on a surface', () => {
@@ -79,35 +89,35 @@ describe('what a tooth square shows', () => {
       view('caries', { surfaces: ['O'] }),
       view('filling_amalgam', { surfaces: ['O'] })
     ])
-    expect(state.surfaces.O).toBe('done')
+    expect(state.surfaces.O).toBe('blue')
   })
 
-  it('crosses out a tooth that is gone, and in red one to extract', () => {
-    expect(toothBoxState([view('missing')]).cross).toBe('existing')
-    expect(toothBoxState([view('extraction', { status: 'planned' })]).cross).toBe('planned')
-    expect(toothBoxState([view('extraction'), view('extraction', { status: 'planned' })]).cross).toBe('existing')
-    expect(toothBoxState([view('bridge', { role: 'pontic' })]).cross).toBe('existing')
+  it('crosses out a tooth that is gone in blue, and in red one to extract', () => {
+    expect(toothBoxState([view('missing')]).cross).toBe('blue')
+    expect(toothBoxState([view('extraction', { status: 'planned' })]).cross).toBe('red')
+    expect(toothBoxState([view('extraction'), view('extraction', { status: 'planned' })]).cross).toBe('blue')
+    expect(toothBoxState([view('bridge', { role: 'pontic' })]).cross).toBe('blue')
+  })
+
+  it('draws endodontics as a line through the tooth', () => {
+    expect(toothBoxState([view('root_canal_full')]).rootLine).toBe('blue')
+    expect(toothBoxState([view('root_canal_half', { status: 'planned' })]).rootLine).toBe('red')
+    expect(toothBoxState([view('root_canal_full')]).codes).toEqual([])
   })
 
   it('rings a crown and writes the rest as codes', () => {
-    const state = toothBoxState([
-      view('crown'),
-      view('root_canal_full'),
-      view('implant', { status: 'planned' })
-    ])
-    expect(state.ring).toBe('existing')
-    expect(state.codes).toEqual([
-      { type: 'root_canal_full', status: 'existing' },
-      { type: 'implant', status: 'planned' }
-    ])
+    const state = toothBoxState([view('crown'), view('implant', { status: 'planned' })])
+    expect(state.ring).toBe('blue')
+    expect(state.codes).toEqual([{ type: 'implant', tone: 'red' }])
   })
 
   it('draws the tooth record first, and what is charted over it', () => {
-    expect(toothBoxState([], 'caries').surfaces.O).toBe('caries')
-    expect(toothBoxState([], 'missing').cross).toBe('existing')
-    expect(toothBoxState([], 'extraction_indicated').cross).toBe('planned')
-    expect(toothBoxState([], 'healthy')).toEqual({ surfaces: {}, cross: null, ring: null, codes: [] })
+    expect(toothBoxState([], 'caries').surfaces.O).toBe('red')
+    expect(toothBoxState([], 'missing').cross).toBe('blue')
+    expect(toothBoxState([], 'extraction_indicated').cross).toBe('red')
+    expect(toothBoxState([], 'root_canal').rootLine).toBe('blue')
+    expect(toothBoxState([], 'healthy')).toEqual({ surfaces: {}, cross: null, ring: null, rootLine: null, codes: [] })
     const restored = toothBoxState([view('filling_composite', { surfaces: ['O'] })], 'caries')
-    expect(restored.surfaces.O).toBe('done')
+    expect(restored.surfaces.O).toBe('blue')
   })
 })

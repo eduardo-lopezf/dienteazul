@@ -94,35 +94,61 @@ export const PATTERN_DEFINITIONS = `
       <line x1="0" y1="0" x2="0" y2="6" stroke="#9CA3AF" stroke-width="1.5" />
     </pattern>
 
-    <!-- Diagonal stripes (crown - amber) -->
+    <!-- Diagonal stripes (crown - blue: done) -->
     <pattern id="pattern-crown" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(-45)">
-      <line x1="0" y1="0" x2="0" y2="6" stroke="#F59E0B" stroke-width="1.5" />
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#1D4ED8" stroke-width="1.5" />
     </pattern>
 
     <!-- Dots (inlay - blue) -->
     <pattern id="pattern-inlay" patternUnits="userSpaceOnUse" width="4" height="4">
-      <circle cx="2" cy="2" r="1" fill="#3B82F6"/>
+      <circle cx="2" cy="2" r="1" fill="#1D4ED8"/>
     </pattern>
 
     <!-- Grid (pontic - blue) -->
     <pattern id="pattern-pontic" patternUnits="userSpaceOnUse" width="6" height="6">
-      <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#3B82F6" stroke-width="1"/>
+      <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#1D4ED8" stroke-width="1"/>
     </pattern>
 
     <!-- Vertical stripes (bridge_abutment - blue) -->
     <pattern id="pattern-bridge-abutment" patternUnits="userSpaceOnUse" width="4" height="4">
-      <line x1="2" y1="0" x2="2" y2="4" stroke="#3B82F6" stroke-width="1.5" />
+      <line x1="2" y1="0" x2="2" y2="4" stroke="#1D4ED8" stroke-width="1.5" />
     </pattern>
 
     <!-- Horizontal stripes (overlay - blue) -->
     <pattern id="pattern-overlay" patternUnits="userSpaceOnUse" width="4" height="4">
-      <line x1="0" y1="2" x2="4" y2="2" stroke="#3B82F6" stroke-width="1.5" />
+      <line x1="0" y1="2" x2="4" y2="2" stroke="#1D4ED8" stroke-width="1.5" />
+    </pattern>
+
+    <!-- The same marks in red, for work still to do (NOM colour convention). -->
+    <!-- Planned (red): Diagonal stripes (crown - blue: done) -->
+    <pattern id="pattern-crown-planned" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(-45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#DC2626" stroke-width="1.5" />
+    </pattern>
+
+    <!-- Planned (red): Dots (inlay - blue) -->
+    <pattern id="pattern-inlay-planned" patternUnits="userSpaceOnUse" width="4" height="4">
+      <circle cx="2" cy="2" r="1" fill="#DC2626"/>
+    </pattern>
+
+    <!-- Planned (red): Grid (pontic - blue) -->
+    <pattern id="pattern-pontic-planned" patternUnits="userSpaceOnUse" width="6" height="6">
+      <path d="M 6 0 L 0 0 0 6" fill="none" stroke="#DC2626" stroke-width="1"/>
+    </pattern>
+
+    <!-- Planned (red): Vertical stripes (bridge_abutment - blue) -->
+    <pattern id="pattern-bridge-abutment-planned" patternUnits="userSpaceOnUse" width="4" height="4">
+      <line x1="2" y1="0" x2="2" y2="4" stroke="#DC2626" stroke-width="1.5" />
+    </pattern>
+
+    <!-- Planned (red): Horizontal stripes (overlay - blue) -->
+    <pattern id="pattern-overlay-planned" patternUnits="userSpaceOnUse" width="4" height="4">
+      <line x1="0" y1="2" x2="4" y2="2" stroke="#DC2626" stroke-width="1.5" />
     </pattern>
   </defs>
 `
 
 // Get pattern ID for a treatment type
-export function getPatternId(treatmentType: string): string | null {
+export function getPatternId(treatmentType: string, status?: string): string | null {
   const normalized = normalizeTreatmentType(treatmentType)
   const patternMap: Record<string, string> = {
     unerupted: 'pattern-unerupted',
@@ -132,7 +158,11 @@ export function getPatternId(treatmentType: string): string | null {
     bridge_abutment: 'pattern-bridge-abutment',
     overlay: 'pattern-overlay'
   }
-  return patternMap[normalized] || null
+  const id = patternMap[normalized]
+  if (!id) return null
+  // Work still to do is drawn in red (`utils/nomColors`); unerupted is a
+  // state of the tooth, not work.
+  return status === 'planned' && id !== 'pattern-unerupted' ? `${id}-planned` : id
 }
 
 // ============================================================================

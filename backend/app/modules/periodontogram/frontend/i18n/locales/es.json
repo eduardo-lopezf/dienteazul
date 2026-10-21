@@ -1,5 +1,41 @@
 {
   "periodontogram": {
+    "print": {
+      "title": "Periodontograma",
+      "closedOn": "Sesión cerrada el {date}",
+      "bleeding": "Sangrado",
+      "plaque": "Placa",
+      "cal": "NIC medio",
+      "deepPockets": "Bolsas ≥ 5 mm",
+      "upper": "Superior",
+      "lower": "Inferior",
+      "keyRed": "sondaje > 3 mm o encía queratinizada ≤ 2 mm",
+      "rows": {
+        "mobility": "Movilidad",
+        "keratinized_gingiva_mm": "Encía queratinizada",
+        "furcation_buccal": "Furca V",
+        "furcation_lingual": "Furca L/P",
+        "probing": "Sondaje",
+        "margin": "Margen",
+        "bleeding": "Sangrado",
+        "suppuration": "Supuración",
+        "plaque": "Placa"
+      },
+      "side": {
+        "buccal": "V",
+        "palatal": "P",
+        "lingual": "L"
+      }
+    },
+    "legend": {
+      "title": "Leyenda (SEPA)",
+      "gingivalMargin": "Margen gingival",
+      "probingDepth": "Profundidad de sondaje",
+      "bleeding": "Sangrado al sondaje",
+      "suppuration": "Supuración",
+      "plaque": "Placa",
+      "redNumbers": "Sondaje > 3 mm o encía queratinizada ≤ 2 mm"
+    },
     "tab": {
       "label": "Periodontograma"
     },

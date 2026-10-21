@@ -71,6 +71,10 @@ UNAUTHENTICATED: dict[str, str] = {
     "PUT /api/v1/ops/snapshot": (
         "control plane only, by signed token; replaces the whole deployment, confirm required"
     ),
+    "GET /api/v1/ops/errors": (
+        "control plane only, by signed token; where requests failed, values scrubbed"
+    ),
+    "DELETE /api/v1/ops/errors": "control plane only, by signed token; forgets them",
     "GET /api/v1/ops/announcements": "control plane only, by signed token; the notices",
     "POST /api/v1/ops/announcements": "control plane only, by signed token; publishes a notice",
     "PUT /api/v1/ops/announcements/{announcement_id}": (

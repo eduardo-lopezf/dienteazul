@@ -210,5 +210,7 @@ const liveIndices = computed<PerioIndices | null>(() => {
         />
       </div>
     </div>
+
+    <PerioLegend />
   </div>
 </template>

@@ -6,6 +6,7 @@
  */
 import type { Surface } from '~~/app/types'
 import { surfaceAt, type BoxSide, type ToothBoxState } from '../../utils/boxChart'
+import { NOM_COLORS, type NomTone } from '../../utils/nomColors'
 
 const props = defineProps<{
   tooth: number
@@ -58,6 +59,11 @@ const codes = computed(() =>
 )
 const codesTitle = computed(() => codes.value.map(c => c.name).join(', '))
 
+/** Light tones always: the colours are the record's, and print the same. */
+function tone(value: NomTone): string {
+  return NOM_COLORS[value].light
+}
+
 function onSurface(surface: Surface) {
   if (props.readonly) return
   emit('surfaceClick', surface)
@@ -86,7 +92,7 @@ function onSurface(surface: Surface) {
       <span
         v-for="(c, i) in codes"
         :key="i"
-        :class="c.status === 'planned' ? 'mark-planned' : 'mark-existing'"
+        :style="{ color: tone(c.tone) }"
       >{{ c.code }}</span>
     </div>
     <button
@@ -110,7 +116,8 @@ function onSurface(surface: Surface) {
         :key="s.side"
         :points="s.points"
         class="box-surface"
-        :class="s.paint ? `paint-${s.paint}` : ''"
+        :class="{ painted: s.paint }"
+        :style="s.paint ? { fill: tone(s.paint) } : undefined"
         :data-surface="s.surface"
         @click="onSurface(s.surface)"
       >
@@ -122,12 +129,21 @@ function onSurface(surface: Surface) {
         cy="20"
         r="23"
         class="box-ring"
-        :class="state.ring === 'planned' ? 'mark-planned' : 'mark-existing'"
+        :stroke="tone(state.ring)"
+      />
+      <line
+        v-if="state.rootLine"
+        x1="20"
+        y1="-4"
+        x2="20"
+        y2="44"
+        class="box-root-line"
+        :stroke="tone(state.rootLine)"
       />
       <g
         v-if="state.cross"
         class="box-cross"
-        :class="state.cross === 'planned' ? 'mark-planned' : 'mark-existing'"
+        :stroke="tone(state.cross)"
       >
         <line
           x1="-2"
@@ -161,7 +177,7 @@ function onSurface(surface: Surface) {
       <span
         v-for="(c, i) in codes"
         :key="i"
-        :class="c.status === 'planned' ? 'mark-planned' : 'mark-existing'"
+        :style="{ color: tone(c.tone) }"
       >{{ c.code }}</span>
     </div>
   </div>
@@ -169,8 +185,6 @@ function onSurface(surface: Surface) {
 
 <style scoped>
 .tooth-box {
-  --box-done: #2563EB;
-  --box-todo: #DC2626;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -214,21 +228,8 @@ function onSurface(surface: Surface) {
   cursor: pointer;
 }
 
-.box-surface:hover {
+.box-surface:not(.painted):hover {
   fill: var(--color-primary-soft);
-}
-
-.box-surface.paint-caries {
-  fill: var(--box-todo);
-}
-
-.box-surface.paint-planned {
-  fill: var(--box-todo);
-  fill-opacity: 0.35;
-}
-
-.box-surface.paint-done {
-  fill: var(--box-done);
 }
 
 .box-ring {
@@ -236,27 +237,10 @@ function onSurface(surface: Surface) {
   stroke-width: 2.5;
 }
 
-.box-ring.mark-existing,
-.box-cross.mark-existing line {
-  stroke: var(--box-done);
-}
-
-.box-ring.mark-planned,
-.box-cross.mark-planned line {
-  stroke: var(--box-todo);
-}
-
-.box-cross line {
+.box-cross line,
+.box-root-line {
   stroke-width: 3;
   pointer-events: none;
-}
-
-.mark-existing {
-  color: var(--box-done);
-}
-
-.mark-planned {
-  color: var(--box-todo);
 }
 
 .tooth-box-dimmed {

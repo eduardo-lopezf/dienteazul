@@ -8,12 +8,14 @@ import {
   THERAPEUTIC_CATEGORIES,
   getAllowedStatusesForTreatment,
   getMultiToothConfig,
-  getTreatmentColor,
   isMultiToothOnlyType,
   supportsBothModes,
   type TreatmentClinicalCategory
 } from '~~/app/config/odontogramConstants'
 import { offeredOn, type ShownDentition } from '../../utils/dentitionLayout'
+// Icons take the colour the treatment is drawn in (NOM-013): what is being
+// logged — done or planned — decides it, so planning shows the bar in red.
+import { nomColor } from '../../utils/nomColors'
 
 export type TreatmentBarMode = 'diagnosis' | 'planning' | 'full'
 
@@ -782,7 +784,7 @@ function handleCreatePlan() {
         >
           <div
             class="treatment-icon"
-            :style="{ color: getTreatmentColor(item.odontogramType) }"
+            :style="{ color: nomColor(item.odontogramType, effectiveStatus) }"
           >
             <svg
               viewBox="0 0 24 24"

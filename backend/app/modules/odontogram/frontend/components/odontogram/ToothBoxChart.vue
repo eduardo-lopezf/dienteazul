@@ -9,6 +9,9 @@
 import type { Surface, ToothTreatmentView } from '~~/app/types'
 import { boxRows, toothBoxState } from '../../utils/boxChart'
 import type { ShownDentition } from '../../utils/dentitionLayout'
+import { NOM_COLORS, type NomTone } from '../../utils/nomColors'
+
+const NOM_TONES: NomTone[] = ['red', 'blue', 'green', 'yellow']
 
 const props = withDefaults(defineProps<{
   dentition: ShownDentition
@@ -108,8 +111,14 @@ const highlighted = computed(() => new Set(props.highlightedTeeth))
         v-if="!hideLegend"
         class="box-legend text-caption text-muted"
       >
-        <span><i class="swatch swatch-todo" />{{ t('odontogram.boxes.legend.todo') }}</span>
-        <span><i class="swatch swatch-done" />{{ t('odontogram.boxes.legend.done') }}</span>
+        <span
+          v-for="tone in NOM_TONES"
+          :key="tone"
+        ><i
+          class="swatch"
+          :style="{ background: NOM_COLORS[tone].light }"
+        />{{ t(`odontogram.boxes.legend.${tone}`) }}</span>
+        <span>│ {{ t('odontogram.boxes.legend.rootLine') }}</span>
         <span>✕ {{ t('odontogram.boxes.legend.cross') }}</span>
         <span>◯ {{ t('odontogram.boxes.legend.ring') }}</span>
       </div>
@@ -182,13 +191,5 @@ const highlighted = computed(() => new Set(props.highlightedTeeth))
   height: 10px;
   margin-right: 4px;
   vertical-align: -1px;
-}
-
-.swatch-todo {
-  background: #DC2626;
-}
-
-.swatch-done {
-  background: #2563EB;
 }
 </style>

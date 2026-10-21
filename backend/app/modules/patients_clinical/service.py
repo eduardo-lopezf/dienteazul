@@ -34,7 +34,7 @@ from .models import (
     SurgicalHistory,
     SystemicDisease,
 )
-from .questionnaire import CONDITION_GROUPS, CONDITIONS, FORM_VERSION, QUESTIONS
+from .questionnaire import FORMS
 
 #: The four history tables that are append-only per ADR 0032. Emergency
 #: contacts and legal guardians are 1:1 rows keyed by ``patient_id`` and are
@@ -342,11 +342,22 @@ class PatientsClinicalService:
 
         Raises ``ValueError`` for an answer to a question the form does not
         ask, a condition it does not list, an empty questionnaire, a scan
-        that is not one of this patient's documents, or one that carries
-        neither the patient's signature nor the scan of the signed sheet.
+        that is not one of this patient's documents, one that carries
+        neither the patient's signature nor the scan of the signed sheet, or
+        a pediatric questionnaire the child is said to sign — a parent,
+        guardian or representative signs that one.
         """
-        unknown = sorted(set(data["answers"]) - set(QUESTIONS)) + sorted(
-            set(data["conditions"]) - CONDITIONS
+        kind = data.get("form_kind") or "adult"
+        form = FORMS[kind]
+        form_data = {
+            key: value.strip()
+            for key, value in (data.get("form_data") or {}).items()
+            if value.strip()
+        }
+        unknown = (
+            sorted(set(data["answers"]) - set(form.questions))
+            + sorted(set(data["conditions"]) - form.conditions)
+            + sorted(set(form_data) - set(form.fields))
         )
         if unknown:
             raise ValueError(f"Not part of the questionnaire: {', '.join(unknown)}")
@@ -356,7 +367,9 @@ class PatientsClinicalService:
             documents = provider(PatientDocuments)
             if documents is None or not await documents.belongs_to(db, clinic_id, patient_id, scan):
                 raise ValueError("The scan is not one of this patient's documents")
-        elif not (data["answers"] or data["conditions"] or data.get("chief_complaint")):
+        elif not (
+            data["answers"] or data["conditions"] or data.get("chief_complaint") or form_data
+        ):
             raise ValueError("An empty questionnaire says nothing")
 
         signature = data.get("signature")
@@ -364,6 +377,14 @@ class PatientsClinicalService:
             # The sheet was signed by hand; a second signature would say
             # the patient signed something they never saw on screen.
             raise ValueError("A questionnaire filled in on paper is signed on the sheet")
+        if (
+            kind == "pediatric"
+            and signature is not None
+            and signature["signer_capacity"] == "patient"
+        ):
+            # A child does not consent for themselves: a parent, a guardian
+            # or a representative answers and signs the pediatric form.
+            raise ValueError("A child's questionnaire is signed by a parent or guardian")
         if signature is None and scan is None:
             # Either is valid; neither is not. What a patient declares is
             # theirs once they sign it — on screen, or on the sheet.
@@ -384,7 +405,9 @@ class PatientsClinicalService:
             signature_data={"png": signature["png"]} if signature else None,
             # What the form named today, kept with what was declared under it.
             regulation=record_regulation(clinic) if clinic is not None else None,
-            form_version=FORM_VERSION,
+            form_version=form.version,
+            form_kind=kind,
+            form_data=form_data,
             chief_complaint=data.get("chief_complaint") or None,
             blood_type=data.get("blood_type") or None,
             declared_allergies=data.get("declared_allergies") or None,
@@ -392,7 +415,7 @@ class PatientsClinicalService:
             # In the form's own order, whatever order they were ticked in.
             conditions=[
                 key
-                for group in CONDITION_GROUPS.values()
+                for group in form.condition_groups.values()
                 for key in group
                 if key in set(data["conditions"])
             ],

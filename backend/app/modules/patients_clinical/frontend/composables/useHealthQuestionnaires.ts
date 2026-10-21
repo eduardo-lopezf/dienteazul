@@ -9,10 +9,20 @@ export interface QuestionAnswer {
   detail?: string | null
 }
 
+/** Which form: the adult one, or the pediatric one a guardian signs. */
+export type FormKind = 'adult' | 'pediatric'
+export const FORM_KINDS: FormKind[] = ['adult', 'pediatric']
+
+/** Under this age the pediatric form is the one offered first. */
+export const PEDIATRIC_UNDER_AGE = 18
+
 export interface HealthQuestionnaire {
   id: string
   patient_id: string
   taken_at: string
+  form_kind: FormKind
+  /** Pediatric form: what it asks to write (`PEDIATRIC_FIELD_GROUPS`). */
+  form_data: Record<string, string>
   chief_complaint: string | null
   blood_type: string | null
   declared_allergies: string | null
@@ -43,7 +53,8 @@ export interface QuestionnaireSignature {
 type Declared = Omit<
   HealthQuestionnaire,
   'id' | 'patient_id' | 'taken_at' | 'signed_at' | 'signed_by_name' | 'signer_capacity' | 'signature_data' | 'regulation'
->
+  | 'form_kind' | 'form_data'
+> & { form_kind?: FormKind, form_data?: Record<string, string> }
 export type HealthQuestionnaireDraft = Partial<Declared> & { signature?: QuestionnaireSignature | null }
 
 /** The questions, in the order they are asked. Mirrors `questionnaire.py`. */
@@ -76,6 +87,45 @@ export const CONDITION_GROUPS: string[][] = [
     'chemotherapy', 'radiotherapy', 'bisphosphonates', 'std', 'hiv_aids'
   ]
 ]
+
+// --- The pediatric form (odontología pediátrica). Mirrors `questionnaire.py`.
+
+/** Data the pediatric form asks to write, by block. */
+export const PEDIATRIC_FIELD_GROUPS: Record<string, string[]> = {
+  child: ['school', 'school_grade', 'siblings'],
+  family: ['guardian_name', 'guardian_occupation', 'guardian_phone', 'physician_name'],
+  exam: ['weight', 'height', 'blood_pressure', 'temperature', 'behavior'],
+  health: ['current_health', 'last_physical_exam']
+}
+
+/** Its yes/no questions, by block, in the order the form asks them. */
+export const PEDIATRIC_QUESTION_GROUPS: Record<string, string[]> = {
+  dental: ['prior_dental_visit', 'bad_dental_experience', 'plays_sport'],
+  habits: ['thumb_sucking', 'nail_biting', 'lip_biting', 'mouth_breathing', 'teeth_grinding', 'frequent_headache'],
+  medical: ['current_illness', 'taking_medication', 'head_face_accident', 'allergic', 'tonsillectomy', 'adenoidectomy'],
+  history: ['prolonged_illness', 'receives_medical_care', 'prior_surgery', 'prior_dental_treatment', 'anesthetized', 'anesthesia_reaction']
+}
+
+export const PEDIATRIC_QUESTIONS: string[] = Object.values(PEDIATRIC_QUESTION_GROUPS).flat()
+
+export const PEDIATRIC_CONDITIONS: string[] = [
+  'emotional_disorders', 'persistent_bleeding', 'hemophilia', 'seizures', 'hepatitis',
+  'rheumatic_fever', 'chronic_nasal_obstruction', 'frequent_throat_infections'
+]
+
+/** The questions a form asks, for reading back what was answered. */
+export function questionsOf(kind: FormKind | undefined): readonly string[] {
+  return kind === 'pediatric' ? PEDIATRIC_QUESTIONS : QUESTIONS
+}
+
+/** The form to offer first: pediatric under 18, adult otherwise or unknown. */
+export function suggestedForm(birthDate: string | null | undefined, today: Date = new Date()): FormKind {
+  if (!birthDate) return 'adult'
+  const [y, m, d] = birthDate.slice(0, 10).split('-').map(Number)
+  let age = today.getFullYear() - y!
+  if (today.getMonth() + 1 < m! || (today.getMonth() + 1 === m && today.getDate() < d!)) age--
+  return age < PEDIATRIC_UNDER_AGE ? 'pediatric' : 'adult'
+}
 
 export function useHealthQuestionnaires() {
   const api = useApi()
@@ -137,14 +187,28 @@ export function useHealthQuestionnaires() {
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
-  /** The blank sheet, to fill in by hand. */
-  function openBlankForm(patientId: string, locale: string, tab: Window | null): Promise<void> {
-    return openFile(`${base(patientId)}/questionnaire-form?locale=${locale === 'en' ? 'en' : 'es'}`, 'cuestionario_de_salud.pdf', tab)
+  /** The blank sheet of a form, to fill in by hand. */
+  function openBlankForm(patientId: string, locale: string, tab: Window | null, kind: FormKind = 'adult'): Promise<void> {
+    return openFile(
+      `${base(patientId)}/questionnaire-form?locale=${locale === 'en' ? 'en' : 'es'}&kind=${kind}`,
+      kind === 'pediatric' ? 'cuestionario_pediatrico.pdf' : 'cuestionario_de_salud.pdf',
+      tab
+    )
+  }
+
+  /** The patient's legal guardian, if one is on file — to fill in who signs. */
+  async function legalGuardian(patientId: string): Promise<{ name: string, phone: string | null } | null> {
+    try {
+      return (await api.get<ApiResponse<{ name: string, phone: string | null } | null>>(`${base(patientId)}/legal-guardian`)).data
+    } catch {
+      // Not allowed to read contacts, or nothing there: the form is typed by hand.
+      return null
+    }
   }
 
   function openScan(documentId: string, tab: Window | null): Promise<void> {
     return openFile(`/api/v1/media/documents/${documentId}/download`, `cuestionario_${documentId.slice(0, 8)}`, tab)
   }
 
-  return { list, create, retract, uploadScan, reserveTab, openBlankForm, openScan }
+  return { list, create, retract, uploadScan, reserveTab, openBlankForm, openScan, legalGuardian }
 }

@@ -271,6 +271,16 @@ class HealthQuestionnaire(Base, TimestampMixin, ClinicalEntryMixin):
 
     taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     form_version: Mapped[str] = mapped_column(String(10))
+    #: Which form was answered: ``adult``, or ``pediatric`` — the one a
+    #: parent or guardian answers and signs for a child
+    #: (``questionnaire.FORMS``).
+    form_kind: Mapped[str] = mapped_column(String(20), default="adult", server_default="adult")
+    #: What the pediatric form asks to write rather than answer yes or no
+    #: (school, guardian, weight…): ``{field_key: text}``. The guardian's
+    #: name and phone are in it, so it is classified like a name.
+    form_data: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}", info=pii(PiiKind.NAME)
+    )
     #: Why the patient came, in their words.
     chief_complaint: Mapped[str | None] = mapped_column(Text)
     blood_type: Mapped[str | None] = mapped_column(String(10))
@@ -301,6 +311,12 @@ class HealthQuestionnaire(Base, TimestampMixin, ClinicalEntryMixin):
     #: The regulation the form named when it was signed — the clinic may
     #: change the line later, and what was signed under must not move.
     regulation: Mapped[str | None] = mapped_column(String(300))
+
+    __table_args__ = (
+        CheckConstraint(
+            "form_kind IN ('adult', 'pediatric')", name="ck_health_questionnaire_form_kind"
+        ),
+    )
 
 
 class AsaAssessment(Base, TimestampMixin, ClinicalEntryMixin):

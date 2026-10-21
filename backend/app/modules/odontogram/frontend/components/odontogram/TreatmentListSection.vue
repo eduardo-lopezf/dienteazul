@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Treatment } from '~~/app/types'
-import { getToothNameKey, getToothPositionKeys, TREATMENT_COLORS } from '~~/app/config/odontogramConstants'
+import { getToothNameKey, getToothPositionKeys } from '~~/app/config/odontogramConstants'
 import { getTreatmentDisplayName, viewForTooth } from '~~/app/utils/treatmentView'
+import { nomColor } from '../../utils/nomColors'
 
 const props = defineProps<{
   treatments: Treatment[]
@@ -43,8 +44,9 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`
 }
 
-function getTreatmentColor(treatmentType: string): string {
-  return TREATMENT_COLORS[treatmentType] || '#9CA3AF'
+/** NOM-013 colour of the treatment in its state (`utils/nomColors`). */
+function getTreatmentColor(treatmentType: string, status: string): string {
+  return nomColor(treatmentType, status)
 }
 
 function getStatusBadgeColor(status: string): 'success' | 'warning' | 'neutral' {
@@ -110,7 +112,7 @@ function getStatusBadgeColor(status: string): 'success' | 'warning' | 'neutral' 
           <!-- Color indicator -->
           <span
             class="w-3 h-3 rounded-full flex-shrink-0 border border-default"
-            :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type) }"
+            :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type, treatment.status) }"
           />
 
           <!-- Treatment info -->

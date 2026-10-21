@@ -1,5 +1,6 @@
 """Pydantic schemas for odontogram module."""
 
+from datetime import date as date_type
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -156,6 +157,8 @@ class HistoricalToothRecordResponse(BaseModel):
     notes: str | None = None
     is_displaced: bool = False
     is_rotated: bool = False
+    #: Where the tooth stood that day, rebuilt from its eruption history.
+    eruption_status: EruptionStatus | None = None
 
 
 class OdontogramHistoryResponse(BaseModel):
@@ -510,6 +513,10 @@ class HistoricalOdontogramResponse(BaseModel):
     patient_id: str
     teeth: list[HistoricalToothRecordResponse]
     treatments: list[HistoricalTreatmentResponse] = Field(default_factory=list)
+    #: The date asked for, and the patient's age and suggested dentition then.
+    date: date_type | None = None
+    patient_age: int | None = None
+    suggested_dentition: Dentition | None = None
     condition_colors: dict[str, str] = Field(default_factory=lambda: CONDITION_COLORS)
     available_conditions: list[str] = Field(
         default_factory=lambda: [c.value for c in ToothCondition]

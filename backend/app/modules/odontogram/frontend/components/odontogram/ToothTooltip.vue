@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ToothTreatmentView, TreatmentStatus } from '~~/app/types'
-import { TREATMENT_COLORS } from '~~/app/config/odontogramConstants'
 import { getTreatmentDisplayName } from '~~/app/utils/treatmentView'
+import { nomColor } from '../../utils/nomColors'
 
 const props = defineProps<{
   toothNumber: number
@@ -113,7 +113,7 @@ function handleEditClick(event: Event, treatment: ToothTreatmentView) {
           <div class="treatment-main">
             <span
               class="treatment-dot"
-              :style="{ backgroundColor: TREATMENT_COLORS[treatment.treatment_type] || '#9CA3AF' }"
+              :style="{ backgroundColor: nomColor(treatment.treatment_type, treatment.status) }"
             />
             <span class="treatment-name">{{ getTreatmentLabel(treatment) }}</span>
             <UBadge
@@ -149,7 +149,7 @@ function handleEditClick(event: Event, treatment: ToothTreatmentView) {
           <div class="treatment-main">
             <span
               class="treatment-dot"
-              :style="{ backgroundColor: TREATMENT_COLORS[treatment.treatment_type] || '#9CA3AF' }"
+              :style="{ backgroundColor: nomColor(treatment.treatment_type, treatment.status) }"
             />
             <span class="treatment-name">{{ getTreatmentLabel(treatment) }}</span>
             <UBadge

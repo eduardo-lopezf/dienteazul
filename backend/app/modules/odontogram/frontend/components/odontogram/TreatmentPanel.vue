@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ToothTreatmentView, Treatment, TreatmentStatus } from '~~/app/types'
-import { TREATMENT_COLORS } from './ToothSVGPaths'
 import { viewForTooth } from '~~/app/utils/treatmentView'
+import { nomColor } from '../../utils/nomColors'
 
 const props = defineProps<{
   treatments: Treatment[]
@@ -48,8 +48,9 @@ function _getStatusColor(status: TreatmentStatus): string {
   return colorMap[status] || 'neutral'
 }
 
-function getTreatmentColor(type: string): string {
-  return TREATMENT_COLORS[type] || '#9CA3AF'
+/** NOM-013 colour of the treatment in its state (`utils/nomColors`). */
+function getTreatmentColor(type: string, status: string): string {
+  return nomColor(type, status)
 }
 
 function formatDate(dateString: string): string {
@@ -124,7 +125,7 @@ function formatDate(dateString: string): string {
             <div class="flex items-center gap-2">
               <div
                 class="w-3 h-3 rounded-full"
-                :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type) }"
+                :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type, treatment.status) }"
               />
               <span class="text-sm font-medium">{{ getTreatmentLabel(treatment.treatment_type) }}</span>
               <UBadge
@@ -179,7 +180,7 @@ function formatDate(dateString: string): string {
             <div class="flex items-center gap-2">
               <div
                 class="w-3 h-3 rounded-full"
-                :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type) }"
+                :style="{ backgroundColor: getTreatmentColor(treatment.treatment_type, treatment.status) }"
               />
               <span class="text-sm">{{ getTreatmentLabel(treatment.treatment_type) }}</span>
               <UBadge

@@ -1,6 +1,9 @@
 /**
  * The box chart: each tooth a square of five surfaces, as on the paper
- * odontogram forms. Red is caries and work to do; blue is work done.
+ * odontogram forms, in the NOM-013 colours (`nomColors.ts`): red caries and
+ * work to do, blue work done, green incipient caries and provisional work,
+ * yellow sealants; a vertical line for endodontics, an X for a tooth absent
+ * (blue) or to extract (red).
  *
  * Rows follow the form: permanent teeth outside, primary teeth inside. A
  * mixed dentition shows all four rows and dims the teeth not in the mouth
@@ -12,6 +15,7 @@
  */
 import type { Surface, ToothTreatmentView } from '~~/app/types'
 import { dimmedTeeth, teethLayout, type ChartFacts, type ShownDentition } from './dentitionLayout'
+import { nomTone, type NomTone } from './nomColors'
 
 /** One half-row: the teeth on each side of the midline, in chart order. */
 export interface BoxRow {
@@ -69,22 +73,29 @@ export function surfaceAt(tooth: number, side: BoxSide): Surface {
   return onChartLeft ? 'D' : 'M'
 }
 
-export type Paint = 'caries' | 'done' | 'planned'
-export type Mark = 'existing' | 'planned'
+/** A colour on the square, after the NOM-013 convention (`nomColors.ts`). */
+export type Paint = NomTone
 
 export interface ToothBoxState {
   surfaces: Partial<Record<Surface, Paint>>
   /** An X over the square: the tooth is gone (blue) or to be extracted (red). */
-  cross: Mark | null
-  /** A ring round the square: a crown, done or planned. */
-  ring: Mark | null
+  cross: Paint | null
+  /** A ring round the square: a crown — done, planned or provisional. */
+  ring: Paint | null
+  /** A vertical line through the tooth: endodontics, done or planned. */
+  rootLine: Paint | null
   /** Whole-tooth work written as a code above or below the square. */
-  codes: Array<{ type: string, status: Mark }>
+  codes: Array<{ type: string, tone: Paint }>
 }
 
 const CARIES = new Set(['caries', 'incipient_caries'])
 const GONE = new Set(['missing', 'extraction'])
 const RING = new Set(['crown', 'crown_on_implant', 'provisional_crown_on_implant'])
+const ENDODONTICS = new Set(['root_canal_full', 'root_canal_two_thirds', 'root_canal_half', 'root_canal_overfill'])
+
+function empty(): ToothBoxState {
+  return { surfaces: {}, cross: null, ring: null, rootLine: null, codes: [] }
+}
 
 /**
  * The tooth record's whole-tooth condition, drawn first: what is charted on
@@ -92,44 +103,45 @@ const RING = new Set(['crown', 'crown_on_implant', 'provisional_crown_on_implant
  */
 const CONDITION_MARKS: Record<string, (state: ToothBoxState) => void> = {
   caries: (state) => {
-    state.surfaces.O = 'caries'
+    state.surfaces.O = 'red'
   },
   filling: (state) => {
-    state.surfaces.O = 'done'
+    state.surfaces.O = 'blue'
   },
   sealant: (state) => {
-    state.surfaces.O = 'done'
+    state.surfaces.O = 'yellow'
   },
   crown: (state) => {
-    state.ring = 'existing'
+    state.ring = 'blue'
   },
   missing: (state) => {
-    state.cross = 'existing'
+    state.cross = 'blue'
   },
   extraction_indicated: (state) => {
-    state.cross = 'planned'
+    state.cross = 'red'
   },
   root_canal: (state) => {
-    state.codes.push({ type: 'root_canal_full', status: 'existing' })
+    state.rootLine = 'blue'
   },
   implant: (state) => {
-    state.codes.push({ type: 'implant', status: 'existing' })
+    state.codes.push({ type: 'implant', tone: 'blue' })
   },
   fracture: (state) => {
-    state.codes.push({ type: 'fracture', status: 'existing' })
+    state.codes.push({ type: 'fracture', tone: 'red' })
   }
 }
 
 function conditionState(condition: string | null | undefined): ToothBoxState {
-  const state: ToothBoxState = { surfaces: {}, cross: null, ring: null, codes: [] }
+  const state = empty()
   if (condition) CONDITION_MARKS[condition]?.(state)
   return state
 }
 
 /**
- * What to draw on a tooth's square. A caries is red; work done blue; work
- * planned red, lighter. On a surface the later mark wins, so a caries
- * restored afterwards shows the restoration.
+ * What to draw on a tooth's square, in the norm's colours: red caries and
+ * work to do, blue work done, green incipient caries and provisional work,
+ * yellow sealants. On a surface the later mark wins, so a caries restored
+ * afterwards shows the restoration.
  */
 export function toothBoxState(
   views: ToothTreatmentView[],
@@ -141,28 +153,32 @@ export function toothBoxState(
   )
   for (const view of ordered) {
     const type = view.clinical_type
-    const status: Mark = view.status === 'planned' ? 'planned' : 'existing'
+    const tone = nomTone(type, view.status)
     if (view.surfaces?.length) {
-      const paint: Paint = status === 'planned' ? 'planned' : CARIES.has(type) ? 'caries' : 'done'
-      for (const surface of view.surfaces) state.surfaces[surface] = paint
+      for (const surface of view.surfaces) state.surfaces[surface] = tone
       continue
     }
     if (GONE.has(type) || (type === 'bridge' && view.role === 'pontic')) {
-      // A planned extraction never hides that the tooth is already gone.
-      if (state.cross !== 'existing') state.cross = status
+      // Absent is blue, to extract red — and a planned extraction never
+      // hides that the tooth is already gone.
+      if (state.cross !== 'blue') state.cross = view.status === 'planned' ? 'red' : 'blue'
       continue
     }
     if (RING.has(type)) {
-      state.ring = status
-      if (type !== 'crown') state.codes.push({ type, status })
+      state.ring = tone
+      if (type !== 'crown') state.codes.push({ type, tone })
+      continue
+    }
+    if (ENDODONTICS.has(type)) {
+      state.rootLine = tone
       continue
     }
     if (CARIES.has(type)) {
       // A whole-tooth caries: the crown of the box.
-      state.surfaces.O = status === 'planned' ? 'planned' : 'caries'
+      state.surfaces.O = tone
       continue
     }
-    state.codes.push({ type, status })
+    state.codes.push({ type, tone })
   }
   return state
 }

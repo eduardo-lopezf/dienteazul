@@ -33,6 +33,7 @@ from app.core.privacy import PrivacyPolicy, incompatible_tiers
 from app.core.privacy.egress import log_egress_audit
 from app.core.scheduler import init_scheduler, shutdown_scheduler
 from app.core.schemas import ErrorResponse
+from app.core.server_errors import record as record_server_error
 from app.core.tenancy import SingleTenantResolver
 from app.database import async_session_maker, commit_before_response, engine, get_db
 
@@ -279,6 +280,9 @@ async def request_id_middleware(request: Request, call_next):
     incoming = request.headers.get("x-request-id")
     rid = incoming if incoming and len(incoming) <= 64 else new_request_id()
     tokens = set_request_context(request_id=rid)
+    # Also on the request: an exception that escapes the route reaches the
+    # error handler after this context is reset.
+    request.state.request_id = rid
     try:
         response = await call_next(request)
     finally:
@@ -366,6 +370,16 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler for unhandled errors."""
     logger.exception("Unhandled exception", exc_info=exc)
+    # Kept for the operator's panel: where it failed, never what with.
+    route = request.scope.get("route")
+    await record_server_error(
+        exc,
+        method=request.method,
+        path=getattr(route, "path", None) or request.url.path,
+        request_id=getattr(request.state, "request_id", None),
+        clinic_id=getattr(request.state, "clinic_id", None),
+        user_id=getattr(request.state, "user_id", None),
+    )
     if settings.ENVIRONMENT == "development":
         error_response = ErrorResponse(
             message=str(exc),

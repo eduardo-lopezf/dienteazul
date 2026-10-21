@@ -1,7 +1,7 @@
 """Pydantic schemas for the patients_clinical module."""
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -169,6 +169,10 @@ class QuestionAnswer(BaseModel):
 
 SignerCapacity = Literal["patient", "guardian", "representative"]
 
+#: Which form: the adult one, or the pediatric one a guardian signs
+#: (``questionnaire.FORMS``).
+FormKind = Literal["adult", "pediatric"]
+
 #: A drawn signature is a few kilobytes; this is room to spare and a lid.
 _SIGNATURE_MAX_CHARS = 400_000
 
@@ -192,6 +196,9 @@ class HealthQuestionnaireCreate(BaseModel):
     """What the patient declared, or the scan of the sheet they filled in."""
 
     taken_at: datetime | None = None
+    form_kind: FormKind = "adult"
+    #: Pediatric form only: what it asks to write (``PEDIATRIC_FIELD_GROUPS``).
+    form_data: dict[str, Annotated[str, Field(max_length=300)]] = {}
     chief_complaint: str | None = Field(default=None, max_length=2000)
     blood_type: str | None = Field(default=None, max_length=10)
     declared_allergies: str | None = Field(default=None, max_length=2000)
@@ -211,6 +218,8 @@ class HealthQuestionnaireResponse(BaseModel):
     patient_id: UUID
     taken_at: datetime
     form_version: str
+    form_kind: str = "adult"
+    form_data: dict[str, str] = {}
     chief_complaint: str | None
     blood_type: str | None
     declared_allergies: str | None

@@ -122,6 +122,26 @@ async function handleDiscarded() {
         @return-to-current="handleDateChange(null)"
       />
 
+      <!-- The same action as at the foot of the chart, within reach without
+           scrolling past both arches. -->
+      <div
+        v-if="!hasDraft && !isViewingHistory"
+        class="flex justify-end"
+      >
+        <UButton
+          size="sm"
+          icon="i-lucide-plus"
+          color="success"
+          variant="solid"
+          :loading="starting"
+          :disabled="readonly"
+          data-testid="perio-open-draft-top"
+          @click="handleStart"
+        >
+          {{ t('periodontogram.session.openDraft') }}
+        </UButton>
+      </div>
+
       <TimelineSlider
         v-if="timeline && timeline.dates.length > 0"
         :dates="timeline.dates.map(d => ({ date: d.date, change_count: d.change_count }))"
@@ -146,8 +166,11 @@ async function handleDiscarded() {
           <UButton
             size="sm"
             icon="i-lucide-plus"
+            color="success"
+            variant="solid"
             :loading="starting"
             :disabled="readonly"
+            data-testid="perio-open-draft-bottom"
             @click="handleStart"
           >
             {{ t('periodontogram.session.openDraft') }}

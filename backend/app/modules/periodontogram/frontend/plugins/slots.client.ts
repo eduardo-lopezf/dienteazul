@@ -18,4 +18,15 @@ export default defineNuxtPlugin(() => {
     permission: 'periodontogram.read',
     labelKey: 'periodontogram.tab.label'
   })
+
+  // The latest closed session on the printed odontogram sheet. The sheet
+  // belongs to the odontogram, which knows nothing of this module.
+  registerSlot('odontogram.print.sections', {
+    id: 'periodontogram.print',
+    component: defineAsyncComponent(
+      () => import('../components/PerioPrintSection.vue')
+    ),
+    order: 10,
+    permission: 'periodontogram.read'
+  })
 })

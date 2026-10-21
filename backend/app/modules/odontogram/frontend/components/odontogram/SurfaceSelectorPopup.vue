@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Surface, TreatmentStatus, TreatmentType } from '~~/app/types'
-import { getOcclusalPath, getLateralPath, isUpperTooth, getToothTransform, TREATMENT_COLORS } from './ToothSVGPaths'
+import { getOcclusalPath, getLateralPath, isUpperTooth, getToothTransform } from './ToothSVGPaths'
 import { getToothNameKey, getToothPositionKeys } from '~~/app/config/odontogramConstants'
+import { nomColor } from '../../utils/nomColors'
 
 const props = defineProps<{
   open: boolean
@@ -116,7 +117,7 @@ const lateralDimensions = computed(() => {
 })
 
 // Treatment color
-const treatmentColor = computed(() => TREATMENT_COLORS[props.treatmentType] || '#3B82F6')
+const treatmentColor = computed(() => nomColor(props.treatmentType, props.status))
 
 // Toggle surface selection
 function toggleSurface(surface: Surface) {

@@ -9,7 +9,6 @@ import {
   isDeciduousTooth,
   PATTERN_DEFINITIONS,
   STATUS_STYLES,
-  TREATMENT_COLORS,
   TREATMENT_OVERLAYS,
   makesToothTransparent,
   getIconAnchors,
@@ -22,9 +21,9 @@ import {
   PULP_FILL_CONFIG,
   OCCLUSAL_VISUALIZATION,
   PATTERN_CONFIG,
-  normalizeTreatmentType,
-  getTreatmentColor
+  normalizeTreatmentType
 } from '~~/app/config/odontogramConstants'
+import { nomColor } from '../../utils/nomColors'
 // Note: Icon rendering uses inline SVG elements based on treatment type, not LATERAL_ICONS directly
 import ImplantSVG from './ImplantSVG.vue'
 
@@ -157,7 +156,7 @@ const hasCrownFillTreatment = computed(() => crownFillTreatment.value !== undefi
 
 const crownFillColor = computed(() => {
   if (!crownFillTreatment.value) return 'none'
-  return getTreatmentColor(crownFillTreatment.value.treatment_type)
+  return chartColor(crownFillTreatment.value)
 })
 
 const crownFillOpacity = computed(() => {
@@ -175,8 +174,13 @@ function getTreatmentOfType(type: string): Treatment | undefined {
   return toothTreatments.value.find(t => t.treatment_type === type)
 }
 
-function getImplantFill(_treatment: Treatment): string {
-  return TREATMENT_COLORS.implant || '#10B981'
+function getImplantFill(treatment: Treatment): string {
+  return chartColor(treatment)
+}
+
+/** The colour the norm gives this treatment in its state (`utils/nomColors`). */
+function chartColor(treatment: Pick<ToothTreatmentView, 'treatment_type' | 'status'>): string {
+  return nomColor(treatment.treatment_type, treatment.status)
 }
 
 // ============================================================================
@@ -217,7 +221,7 @@ function getPulpFillColor(): string {
   if (!treatment) return 'none'
   const normalized = normalizeTreatmentType(treatment.treatment_type)
   const config = PULP_FILL_CONFIG[normalized]
-  return config?.color || getTreatmentColor(treatment.treatment_type)
+  return config?.color || chartColor(treatment)
 }
 
 // Get fill opacity for pulp based on treatment status
@@ -503,7 +507,7 @@ const hasPlannedLateralTreatments = computed(() => {
           >
             <path
               :d="TREATMENT_OVERLAYS.rootCanal.indicator"
-              :fill="TREATMENT_COLORS.root_canal"
+              :fill="chartColor(getTreatmentOfType('root_canal')!)"
               :opacity="STATUS_STYLES[getTreatmentOfType('root_canal')!.status]?.opacity"
               stroke="none"
             />
@@ -516,7 +520,7 @@ const hasPlannedLateralTreatments = computed(() => {
           >
             <path
               :d="TREATMENT_OVERLAYS.post.shaft"
-              :fill="TREATMENT_COLORS.post"
+              :fill="chartColor(getTreatmentOfType('post')!)"
               :opacity="STATUS_STYLES[getTreatmentOfType('post')!.status]?.opacity"
               stroke="#6B7280"
               stroke-width="0.5"
@@ -535,9 +539,9 @@ const hasPlannedLateralTreatments = computed(() => {
                 :cx="iconAnchors.apex.x"
                 :cy="iconAnchors.apex.y"
                 r="6"
-                :fill="getTreatmentColor(treatment.treatment_type)"
+                :fill="chartColor(treatment)"
                 :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="1"
               />
             </template>
@@ -553,7 +557,7 @@ const hasPlannedLateralTreatments = computed(() => {
                   y1="-20"
                   x2="20"
                   y2="20"
-                  :stroke="getTreatmentColor(treatment.treatment_type)"
+                  :stroke="chartColor(treatment)"
                   stroke-width="5"
                   stroke-linecap="round"
                 />
@@ -562,7 +566,7 @@ const hasPlannedLateralTreatments = computed(() => {
                   y1="-20"
                   x2="-20"
                   y2="20"
-                  :stroke="getTreatmentColor(treatment.treatment_type)"
+                  :stroke="chartColor(treatment)"
                   stroke-width="5"
                   stroke-linecap="round"
                 />
@@ -575,9 +579,9 @@ const hasPlannedLateralTreatments = computed(() => {
                 :cx="iconAnchors.apex.x"
                 :cy="iconAnchors.apex.y - (treatment.treatment_type === 'periapical_large' ? 12 : treatment.treatment_type === 'periapical_medium' ? 8 : 4)"
                 :r="treatment.treatment_type === 'periapical_large' ? 16 : treatment.treatment_type === 'periapical_medium' ? 10 : 6"
-                :fill="getTreatmentColor(treatment.treatment_type)"
+                :fill="chartColor(treatment)"
                 :fill-opacity="0.7 * (STATUS_STYLES[treatment.status]?.opacity ?? 1)"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="1"
               />
             </template>
@@ -587,7 +591,7 @@ const hasPlannedLateralTreatments = computed(() => {
               <path
                 :d="`M ${iconAnchors.crownCenter.x - 6},${iconAnchors.crownCenter.y - 16} L ${iconAnchors.crownCenter.x},${iconAnchors.crownCenter.y - 8} L ${iconAnchors.crownCenter.x - 4},${iconAnchors.crownCenter.y} L ${iconAnchors.crownCenter.x + 2},${iconAnchors.crownCenter.y + 8} L ${iconAnchors.crownCenter.x - 2},${iconAnchors.crownCenter.y + 16}`"
                 fill="none"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="3"
                 :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                 stroke-linecap="round"
@@ -602,7 +606,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 :y1="iconAnchors.apex.y + 4"
                 :x2="iconAnchors.apex.x + 16"
                 :y2="iconAnchors.apex.y + 4"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="4"
                 :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                 stroke-linecap="round"
@@ -615,7 +619,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 <path
                   d="M 9,0 A 9,9 0 1,1 0,-9 C 2.52,-9 4.93,-8 6.74,-6.26 L 9,-4 M 9,-9 V -4 H 4"
                   fill="none"
-                  :stroke="getTreatmentColor(treatment.treatment_type)"
+                  :stroke="chartColor(treatment)"
                   stroke-width="2"
                   :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   stroke-linecap="round"
@@ -630,7 +634,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 <path
                   d="M -16,0 L 16,0"
                   fill="none"
-                  :stroke="getTreatmentColor(treatment.treatment_type)"
+                  :stroke="chartColor(treatment)"
                   stroke-width="3"
                   :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   stroke-linecap="round"
@@ -638,7 +642,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 <path
                   d="M 10,-6 L 16,0 L 10,6"
                   fill="none"
-                  :stroke="getTreatmentColor(treatment.treatment_type)"
+                  :stroke="chartColor(treatment)"
                   stroke-width="3"
                   :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   stroke-linecap="round"
@@ -656,7 +660,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 :cy="iconAnchors.crownCenter.y + (iconAnchors.rootCenter.y - iconAnchors.crownCenter.y) * 0.25"
                 r="6"
                 fill="none"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="2.5"
                 stroke-dasharray="3 2"
                 :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
@@ -671,7 +675,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 width="12"
                 height="12"
                 fill="none"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="2.5"
                 stroke-dasharray="3 2"
                 :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
@@ -686,7 +690,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 width="8"
                 height="50"
                 rx="2"
-                :fill="getTreatmentColor(treatment.treatment_type)"
+                :fill="chartColor(treatment)"
                 :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
               />
             </template>
@@ -701,7 +705,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     y="-8"
                     width="16"
                     height="16"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="0.8 * (STATUS_STYLES[treatment.status]?.opacity ?? 1)"
                   />
                   <line
@@ -709,7 +713,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     y1="0"
                     x2="12"
                     y2="0"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     stroke-width="2"
                   />
                 </template>
@@ -721,7 +725,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     width="20"
                     height="12"
                     rx="2"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="0.8 * (STATUS_STYLES[treatment.status]?.opacity ?? 1)"
                   />
                   <circle
@@ -738,7 +742,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     y1="-4"
                     x2="16"
                     y2="-4"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     stroke-width="3"
                   />
                   <line
@@ -746,7 +750,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     y1="4"
                     x2="16"
                     y2="4"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     stroke-width="3"
                   />
                 </template>
@@ -757,7 +761,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     cy="0"
                     rx="8"
                     ry="6"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   />
                 </template>
@@ -766,7 +770,7 @@ const hasPlannedLateralTreatments = computed(() => {
                   <path
                     d="M -20,0 Q -14,-6 -8,0 Q -2,6 4,0 Q 10,-6 16,0"
                     fill="none"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     stroke-width="3"
                     stroke-linecap="round"
                   />
@@ -853,7 +857,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     v-for="surface in treatment.surfaces"
                     :key="`${treatment.id}-${surface}`"
                     :d="occlusalPaths.surfaces[surface]"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     stroke="none"
                     class="treatment-surface-overlay"
@@ -862,7 +866,7 @@ const hasPlannedLateralTreatments = computed(() => {
                 <template v-else>
                   <path
                     :d="occlusalPaths.surfaces.O"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     stroke="none"
                     class="treatment-surface-overlay"
@@ -879,7 +883,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     :cx="surface === 'O' ? 25 : surface === 'M' ? 12 : surface === 'D' ? 38 : surface === 'V' ? 25 : 25"
                     :cy="surface === 'O' ? 25 : surface === 'M' ? 25 : surface === 'D' ? 25 : surface === 'V' ? 12 : 38"
                     r="4"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     class="treatment-dot-overlay"
                   />
@@ -889,7 +893,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     cx="25"
                     cy="25"
                     r="4"
-                    :fill="getTreatmentColor(treatment.treatment_type)"
+                    :fill="chartColor(treatment)"
                     :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     class="treatment-dot-overlay"
                   />
@@ -904,7 +908,7 @@ const hasPlannedLateralTreatments = computed(() => {
                     :key="`${treatment.id}-${surface}-outline`"
                     :d="occlusalPaths.surfaces[surface]"
                     fill="none"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     :stroke-width="1.5"
                     :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     class="treatment-outline-overlay"
@@ -914,7 +918,7 @@ const hasPlannedLateralTreatments = computed(() => {
                   <path
                     :d="occlusalPaths.surfaces.O"
                     fill="none"
-                    :stroke="getTreatmentColor(treatment.treatment_type)"
+                    :stroke="chartColor(treatment)"
                     :stroke-width="1.5"
                     :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                     class="treatment-outline-overlay"
@@ -930,7 +934,7 @@ const hasPlannedLateralTreatments = computed(() => {
                   v-for="surface in treatment.surfaces"
                   :key="`${treatment.id}-${surface}`"
                   :d="occlusalPaths.surfaces[surface]"
-                  :fill="getTreatmentColor(treatment.treatment_type)"
+                  :fill="chartColor(treatment)"
                   :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   stroke="none"
                   class="treatment-surface-overlay"
@@ -939,7 +943,7 @@ const hasPlannedLateralTreatments = computed(() => {
               <template v-else>
                 <path
                   :d="occlusalPaths.surfaces.O"
-                  :fill="getTreatmentColor(treatment.treatment_type)"
+                  :fill="chartColor(treatment)"
                   :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
                   stroke="none"
                   class="treatment-surface-overlay"
@@ -955,9 +959,9 @@ const hasPlannedLateralTreatments = computed(() => {
           >
             <path
               :d="occlusalPaths.outline"
-              :fill="getPatternId(treatment.treatment_type) ? `url(#${getPatternId(treatment.treatment_type)})` : getTreatmentColor(treatment.treatment_type)"
+              :fill="getPatternId(treatment.treatment_type, treatment.status) ? `url(#${getPatternId(treatment.treatment_type, treatment.status)})` : chartColor(treatment)"
               :fill-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
-              :stroke="getTreatmentColor(treatment.treatment_type)"
+              :stroke="chartColor(treatment)"
               stroke-width="1.5"
               class="pattern-fill-overlay"
             />
@@ -977,9 +981,9 @@ const hasPlannedLateralTreatments = computed(() => {
             <g class="whole-tooth-indicator">
               <path
                 :d="occlusalPaths.outline"
-                :fill="getTreatmentColor(treatment.treatment_type)"
+                :fill="chartColor(treatment)"
                 :fill-opacity="(STATUS_STYLES[treatment.status]?.opacity ?? 1) * 0.4"
-                :stroke="getTreatmentColor(treatment.treatment_type)"
+                :stroke="chartColor(treatment)"
                 stroke-width="2"
               />
             </g>
@@ -997,7 +1001,7 @@ const hasPlannedLateralTreatments = computed(() => {
             y1="8"
             x2="42"
             y2="42"
-            stroke="#6B7280"
+            stroke="#1D4ED8"
             stroke-width="2.5"
             stroke-linecap="round"
           />
@@ -1006,7 +1010,7 @@ const hasPlannedLateralTreatments = computed(() => {
             y1="8"
             x2="8"
             y2="42"
-            stroke="#6B7280"
+            stroke="#1D4ED8"
             stroke-width="2.5"
             stroke-linecap="round"
           />
@@ -1049,7 +1053,7 @@ const hasPlannedLateralTreatments = computed(() => {
         >
           <path
             :d="occlusalPaths.outline"
-            :fill="getTreatmentColor(pendingTreatment!.type)"
+            :fill="nomColor(pendingTreatment!.type, pendingTreatment!.status)"
             stroke="var(--odontogram-selected)"
             stroke-width="2"
           />

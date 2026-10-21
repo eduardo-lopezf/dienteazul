@@ -646,13 +646,24 @@
       "deciduousOnly": "{treatment} es solo para dientes temporales; el {tooth} es permanente",
       "permanentOnly": "{treatment} es solo para dientes permanentes; el {tooth} es temporal"
     },
+    "nom": {
+      "title": "Colores (NOM-013-SSA2-2015)",
+      "blue": "Azul: tratamientos ya realizados (resinas, amalgamas, endodoncias, coronas) y dientes ausentes",
+      "red": "Rojo: caries activa, lesiones y tratamientos pendientes",
+      "green": "Verde: caries incipiente (mancha blanca) y tratamientos provisionales",
+      "yellow": "Amarillo: prevención (selladores de fosas y fisuras)",
+      "cross": "X: diente ausente (azul) o extracción pendiente (roja)"
+    },
     "boxes": {
       "viewAnatomical": "Anatómica",
       "viewBoxes": "Casillas",
       "legend": {
-        "todo": "Caries / por hacer",
-        "done": "Hecho",
-        "cross": "Ausente o extracción",
+        "red": "Caries / por hacer",
+        "blue": "Hecho",
+        "green": "Incipiente / provisional",
+        "yellow": "Sellador",
+        "rootLine": "Endodoncia",
+        "cross": "Ausente (azul) o extracción (rojo)",
         "ring": "Corona"
       },
       "codes": {
@@ -685,6 +696,23 @@
         "biopsy_soft_tissue": "Bx",
         "biopsy_hard_tissue": "Bx",
         "sealant": "S"
+      }
+    },
+    "compare": {
+      "open": "Comparar fechas",
+      "title": "Comparar dos fechas",
+      "today": "Hoy",
+      "date": "Fecha",
+      "failed": "No se pudo cargar el odontograma de esa fecha",
+      "changesTitle": "Cambios entre las dos fechas",
+      "noChanges": "No hay cambios entre estas dos fechas.",
+      "changes": {
+        "added": "{name} registrado",
+        "addedPlanned": "{name} planificado",
+        "performed": "{name} realizado",
+        "removed": "{name} retirado",
+        "eruption": "Pasa a: {status}",
+        "condition": "Ficha del diente: {condition}"
       }
     },
     "print": {
@@ -3549,6 +3577,63 @@
     "moved": "La normativa de referencia se configura en Espacio de trabajo:"
   },
   "healthQuestionnaire": {
+    "forms": {
+      "adult": "Adulto",
+      "pediatric": "Odontología pediátrica"
+    },
+    "form": "Formulario",
+    "formHint": "Para menores de 18 años se propone el de odontología pediátrica, que firma el padre, la madre o el tutor.",
+    "pediatric": {
+      "signRequired": "Firma con el dedo, un lápiz o el ratón. La firma del padre, la madre o el tutor es obligatoria; si prefiere firmar en papel, elige «En papel», imprime el formulario pediátrico y sube el cuestionario firmado.",
+      "title": "Odontología pediátrica",
+      "badge": "Pediátrico",
+      "sections": {
+        "child": "El niño(a)",
+        "family": "Familia y médico",
+        "exam": "Exploración",
+        "dental": "Información dental",
+        "habits": "Hábitos",
+        "medical": "Información médica",
+        "history": "Historia clínica"
+      },
+      "fields": {
+        "school": "Escuela",
+        "school_grade": "Grado escolar",
+        "siblings": "Nº de hermanos",
+        "guardian_name": "Nombre del padre, madre o tutor",
+        "guardian_occupation": "Ocupación",
+        "guardian_phone": "Teléfono del tutor",
+        "physician_name": "Nombre de su médico",
+        "weight": "Peso",
+        "height": "Talla",
+        "blood_pressure": "T/A",
+        "temperature": "Temp.",
+        "behavior": "Conducta",
+        "current_health": "Estado actual de salud",
+        "last_physical_exam": "Último examen físico",
+        "patientName": "Nombre del paciente",
+        "sex": "Sexo",
+        "birthDate": "Fecha de nacimiento",
+        "city": "Ciudad",
+        "postalCode": "Código postal"
+      },
+      "detail": {
+        "which": "¿Cuál?",
+        "when": "¿Cuándo?",
+        "toWhat": "¿A qué?",
+        "why": "¿Por qué?"
+      },
+      "genders": {
+        "male": "Masculino",
+        "female": "Femenino"
+      },
+      "conditionsIntro": "¿Ha padecido o padece alguna de las siguientes infecciones o alteraciones?",
+      "consent": "Declaro que la información anterior es verdadera y completa. Como padre, madre o tutor del paciente, autorizo la exploración, el diagnóstico y el tratamiento odontológico de mi hijo(a) en esta clínica, y me comprometo a informar de cualquier cambio en su salud.",
+      "signature": "Nombre y firma del padre, madre o tutor",
+      "signTitle": "Firma del padre, madre o tutor",
+      "guardianOnly": "El cuestionario pediátrico lo firma el padre, la madre, el tutor o un representante, no el menor.",
+      "paperSteps": "Imprime el cuestionario pediátrico en blanco, que el padre, la madre o el tutor lo llene y firme el consentimiento a mano, y sube aquí el archivo firmado (PDF o foto)."
+    },
     "sign": {
       "title": "Firma del paciente",
       "statement": "Declaro que la información que proporcioné en este cuestionario es verdadera.",
@@ -3607,6 +3692,24 @@
     "time": "Hora",
     "cause": "Causa",
     "questions": {
+      "prior_dental_visit": "¿Ha sido atendido el niño(a) en un consultorio dental?",
+      "bad_dental_experience": "¿Su experiencia dental previa fue mala?",
+      "plays_sport": "¿Practica algún deporte?",
+      "thumb_sucking": "Succión del dedo",
+      "nail_biting": "Morderse las uñas",
+      "lip_biting": "Morderse los labios",
+      "mouth_breathing": "Duerme con la boca abierta",
+      "teeth_grinding": "Rechinar los dientes",
+      "frequent_headache": "Dolor de cabeza frecuente",
+      "current_illness": "¿Padece el paciente alguna enfermedad actualmente?",
+      "head_face_accident": "¿Ha tenido accidentes en la cabeza y/o la cara?",
+      "allergic": "¿Es alérgico?",
+      "tonsillectomy": "¿Ha sido operado de amígdalas (anginas)?",
+      "adenoidectomy": "¿Ha sido operado de adenoides?",
+      "prolonged_illness": "¿Ha tenido enfermedades prolongadas o debilitantes?",
+      "receives_medical_care": "¿Recibe atención médica?",
+      "prior_dental_treatment": "¿Ha recibido tratamiento dental?",
+      "anesthetized": "¿Ha sido anestesiado?",
       "medical_care_2y": "¿Ha recibido atención médica en los últimos 2 años?",
       "hospitalized_5y": "¿Ha sido hospitalizado en los últimos 5 años?",
       "taking_medication": "¿Está actualmente tomando algún medicamento?",
@@ -3621,6 +3724,11 @@
       "contraceptive": "En caso de ser mujer, ¿usa algún método anticonceptivo?"
     },
     "conditions": {
+      "emotional_disorders": "Desórdenes emocionales",
+      "persistent_bleeding": "Sangrado persistente",
+      "hemophilia": "Hemofilia",
+      "chronic_nasal_obstruction": "Obstrucción nasal crónica",
+      "frequent_throat_infections": "Infecciones frecuentes de garganta",
       "hypotension": "Hipotensión arterial",
       "hypertension": "Hipertensión arterial",
       "heart_failure": "Insuficiencia cardiaca",
@@ -3816,6 +3924,8 @@
       "imaging": "Radiografías y fotografías"
     },
     "field": {
+      "form_kind": "Formulario",
+      "form_data": "Datos del formulario",
       "asa_class": "Clase",
       "rationale": "En qué se basa",
       "systolic": "TA sistólica (mmHg)",

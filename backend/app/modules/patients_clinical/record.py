@@ -196,7 +196,14 @@ async def _collect_questionnaires(
             occurred_at=row.taken_at,
             summary=row.chief_complaint or "",
             detail={
+                # Only said for the pediatric form: the adult one is the default.
+                "form_kind": row.form_kind if row.form_kind != "adult" else None,
                 "chief_complaint": row.chief_complaint,
+                # What the pediatric form asks to write (school, guardian, weight…).
+                "form_data": [
+                    {"field": key, "value": value} for key, value in (row.form_data or {}).items()
+                ]
+                or None,
                 "blood_type": row.blood_type,
                 "declared_allergies": row.declared_allergies,
                 # Only what was answered "yes": that is what a reader scans for.

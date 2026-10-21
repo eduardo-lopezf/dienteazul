@@ -2,15 +2,18 @@
 import { TREATMENT_ICONS } from './TreatmentIcons'
 import {
   TREATMENT_CATEGORIES,
-  getTreatmentColor,
   PLANNED_INDICATOR_COLOR
 } from '~~/app/config/odontogramConstants'
 import type { TreatmentStatus } from '~~/app/types'
+import { NOM_COLORS, nomColor, type NomTone } from '../../utils/nomColors'
 
 const { t } = useI18n()
 
 // Collapsed by default
 const isExpanded = ref(false)
+
+// What each colour on the teeth means (NOM-013 convention, `utils/nomColors`).
+const NOM_TONES: NomTone[] = ['blue', 'red', 'green', 'yellow']
 
 // Status types
 const statusTypes: Array<{ key: TreatmentStatus }> = [
@@ -65,6 +68,33 @@ function toggleExpanded() {
       v-show="isExpanded"
       class="legend-content"
     >
+      <!-- Colours on the teeth, after the Mexican record's convention -->
+      <div
+        class="legend-section"
+        data-testid="odontogram-legend-nom"
+      >
+        <h4 class="section-title">
+          {{ t('odontogram.nom.title') }}
+        </h4>
+        <ul class="nom-list">
+          <li
+            v-for="tone in NOM_TONES"
+            :key="tone"
+            class="nom-item"
+          >
+            <span
+              class="nom-swatch"
+              :style="{ background: NOM_COLORS[tone].light }"
+            />
+            <span>{{ t(`odontogram.nom.${tone}`) }}</span>
+          </li>
+          <li class="nom-item">
+            <span class="nom-symbol">✕</span>
+            <span>{{ t('odontogram.nom.cross') }}</span>
+          </li>
+        </ul>
+      </div>
+
       <!-- Status Indicators -->
       <div class="legend-section">
         <h4 class="section-title">
@@ -113,7 +143,7 @@ function toggleExpanded() {
             <div
               v-if="hasIcon(treatment)"
               class="treatment-icon"
-              :style="{ color: getTreatmentColor(treatment) }"
+              :style="{ color: nomColor(treatment, 'existing') }"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -125,7 +155,7 @@ function toggleExpanded() {
             <span
               v-else
               class="treatment-color"
-              :style="{ backgroundColor: getTreatmentColor(treatment) }"
+              :style="{ backgroundColor: nomColor(treatment, 'existing') }"
             />
             <span class="item-label">
               {{ getTreatmentLabel(treatment) }}
@@ -319,5 +349,32 @@ function toggleExpanded() {
   .treatment-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+}
+.nom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.nom-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.nom-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  border-radius: 2px;
+}
+
+.nom-symbol {
+  flex: none;
+  width: 12px;
+  text-align: center;
+  font-weight: 700;
 }
 </style>

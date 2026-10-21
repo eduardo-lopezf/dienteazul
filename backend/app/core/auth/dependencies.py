@@ -236,6 +236,9 @@ async def get_clinic_context(
     # them automatically (request_id was set by the middleware). Not
     # reset — the middleware drops the whole context at request end.
     set_request_context(clinic_id=membership.clinic.id, user_id=current_user.id)
+    # Read by the error handler, which runs after this context is gone.
+    request.state.clinic_id = str(membership.clinic.id)
+    request.state.user_id = str(current_user.id)
 
     return ClinicContext(
         user=current_user,

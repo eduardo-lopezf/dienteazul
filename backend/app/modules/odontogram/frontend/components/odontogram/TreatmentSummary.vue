@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ToothTreatmentView, Treatment, TreatmentStatus, TreatmentType } from '~~/app/types'
-import { TREATMENT_COLORS, STATUS_STYLES } from './ToothSVGPaths'
+import { STATUS_STYLES } from './ToothSVGPaths'
 import { viewForTooth } from '~~/app/utils/treatmentView'
+import { nomColor } from '../../utils/nomColors'
 
 const props = defineProps<{
   treatments: Treatment[]
@@ -150,7 +151,7 @@ function getTreatmentLabel(type: string): string {
         <div class="treatment-info">
           <span
             class="treatment-dot"
-            :style="{ backgroundColor: TREATMENT_COLORS[entry.type] || '#9CA3AF' }"
+            :style="{ backgroundColor: nomColor(entry.type, 'existing') }"
           />
           <span class="treatment-name">{{ getTreatmentLabel(entry.type) }}</span>
         </div>

@@ -5,8 +5,8 @@
  */
 import type { PatientExtended } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
-import type { HealthQuestionnaire } from '../../composables/useHealthQuestionnaires'
-import { QUESTIONS } from '../../composables/useHealthQuestionnaires'
+import type { FormKind, HealthQuestionnaire } from '../../composables/useHealthQuestionnaires'
+import { FORM_KINDS, questionsOf, suggestedForm } from '../../composables/useHealthQuestionnaires'
 
 const props = defineProps<{ ctx: { patient: PatientExtended } }>()
 
@@ -41,7 +41,12 @@ function when(item: HealthQuestionnaire): string {
 }
 
 function positives(item: HealthQuestionnaire): string[] {
-  return QUESTIONS.filter(key => item.answers[key]?.answer)
+  return questionsOf(item.form_kind).filter(key => item.answers[key]?.answer)
+}
+
+/** The questions a questionnaire answered, in its own form's order. */
+function asked(item: HealthQuestionnaire): string[] {
+  return questionsOf(item.form_kind).filter(key => item.answers[key])
 }
 
 function summary(item: HealthQuestionnaire): string {
@@ -62,9 +67,19 @@ async function show(action: (tab: Window | null) => Promise<void>) {
   }
 }
 
-function printBlank() {
-  show(tab => questionnaires.openBlankForm(props.ctx.patient.id, locale.value, tab))
+function printBlank(kind: FormKind) {
+  show(tab => questionnaires.openBlankForm(props.ctx.patient.id, locale.value, tab, kind))
 }
+
+// Both blank forms, the one for this patient's age first.
+const printItems = computed(() => {
+  const first = suggestedForm(props.ctx.patient.date_of_birth)
+  return [first, ...FORM_KINDS.filter(kind => kind !== first)].map(kind => ({
+    label: t(`healthQuestionnaire.forms.${kind}`),
+    icon: kind === 'pediatric' ? 'i-lucide-baby' : 'i-lucide-user',
+    onSelect: () => printBlank(kind)
+  }))
+})
 
 async function retract(item: HealthQuestionnaire) {
   // Taken back, with a reason — never deleted (ADR 0032).
@@ -91,16 +106,18 @@ async function retract(item: HealthQuestionnaire) {
       <span class="truncate">{{ t('healthQuestionnaire.title') }}</span>
       <template #action>
         <div class="flex gap-2">
-          <UButton
-            size="sm"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-printer"
-            data-testid="questionnaire-print-blank"
-            @click="printBlank"
-          >
-            {{ t('healthQuestionnaire.printBlank') }}
-          </UButton>
+          <UDropdownMenu :items="printItems">
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-printer"
+              trailing-icon="i-lucide-chevron-down"
+              data-testid="questionnaire-print-blank"
+            >
+              {{ t('healthQuestionnaire.printBlank') }}
+            </UButton>
+          </UDropdownMenu>
           <UButton
             v-if="canWrite"
             size="sm"
@@ -148,6 +165,17 @@ async function retract(item: HealthQuestionnaire) {
               {{ item.chief_complaint || t('healthQuestionnaire.title') }}
             </p>
             <p class="text-caption text-muted">
+              <UBadge
+                v-if="item.form_kind === 'pediatric'"
+                color="info"
+                variant="subtle"
+                size="xs"
+                class="mr-1"
+                icon="i-lucide-baby"
+                data-testid="questionnaire-pediatric"
+              >
+                {{ t('healthQuestionnaire.pediatric.badge') }}
+              </UBadge>
               {{ when(item) }} · {{ summary(item) }}
               <UBadge
                 v-if="item.signed_at"
@@ -232,9 +260,27 @@ async function retract(item: HealthQuestionnaire) {
             <span v-if="item.blood_type">{{ t('healthQuestionnaire.bloodType') }}: {{ item.blood_type }}</span>
             <span v-if="item.declared_allergies"> · {{ t('healthQuestionnaire.allergies') }}: {{ item.declared_allergies }}</span>
           </p>
+          <dl
+            v-if="Object.keys(item.form_data ?? {}).length"
+            class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5"
+            data-testid="questionnaire-form-data"
+          >
+            <div
+              v-for="(value, key) in item.form_data"
+              :key="key"
+              class="flex gap-1"
+            >
+              <dt class="text-muted">
+                {{ t(`healthQuestionnaire.pediatric.fields.${key}`) }}:
+              </dt>
+              <dd class="text-default">
+                {{ value }}
+              </dd>
+            </div>
+          </dl>
           <ul class="space-y-1">
             <li
-              v-for="key in QUESTIONS.filter(k => item.answers[k])"
+              v-for="key in asked(item)"
               :key="key"
               class="flex gap-2"
             >
@@ -275,6 +321,7 @@ async function retract(item: HealthQuestionnaire) {
       v-model:open="formOpen"
       :patient-id="ctx.patient.id"
       :patient-name="`${ctx.patient.first_name} ${ctx.patient.last_name}`.trim()"
+      :patient-birth-date="ctx.patient.date_of_birth"
       @saved="load"
     />
   </UCard>

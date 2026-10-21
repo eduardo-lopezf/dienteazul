@@ -25,6 +25,7 @@
 import { computed } from 'vue'
 import type { Furcation, PerioSite, PerioTooth, Prognosis, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
+import { isNarrowKeratinizedGingiva, isPathologicalDepth } from '../utils/perioConvention'
 
 const props = defineProps<{
   arch: 'upper' | 'lower'
@@ -138,7 +139,7 @@ function onSiteNumberInput(
 function onSiteToggle(
   toothNumber: number,
   code: SiteCode,
-  field: 'bleeding_on_probing' | 'plaque',
+  field: 'bleeding_on_probing' | 'plaque' | 'suppuration',
   current: boolean | undefined
 ) {
   if (props.readonly) return
@@ -371,6 +372,7 @@ function selectOnFocus(e: FocusEvent) {
               :value="t.keratinized_gingiva_mm ?? ''"
               :disabled="readonly || !t.is_present"
               class="perio-cell-input"
+              :class="{ 'is-pathological': isNarrowKeratinizedGingiva(t.keratinized_gingiva_mm) }"
               @focus="selectOnFocus"
               @change="(e) => onToothNumberInput(t.tooth_number, 'keratinized_gingiva_mm', e)"
             >
@@ -383,7 +385,8 @@ function selectOnFocus(e: FocusEvent) {
             { kind: 'site-pd', label: 'Sondaje' },
             { kind: 'site-gm', label: 'Margen' },
             { kind: 'site-plaque', label: 'Placa' },
-            { kind: 'site-bop', label: 'Sangrado' }
+            { kind: 'site-bop', label: 'Sangrado' },
+            { kind: 'site-sup', label: 'Supuración' }
           ]"
           :key="`v-${row.kind}`"
           class="perio-row-vestibular"
@@ -412,6 +415,7 @@ function selectOnFocus(e: FocusEvent) {
                   :value="siteValue(t, code)?.probing_depth_mm ?? ''"
                   :disabled="readonly || !t.is_present"
                   class="perio-cell-input perio-cell-input--site"
+                  :class="{ 'is-pathological': isPathologicalDepth(siteValue(t, code)?.probing_depth_mm) }"
                   :title="`${code} sondaje (0–15 mm)`"
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(t.tooth_number, code, 'probing_depth_mm', e)"
@@ -445,6 +449,15 @@ function selectOnFocus(e: FocusEvent) {
                   :disabled="readonly || !t.is_present"
                   :title="`${code} sangrado (clic para alternar)`"
                   @click="onSiteToggle(t.tooth_number, code, 'bleeding_on_probing', siteValue(t, code)?.bleeding_on_probing)"
+                />
+                <button
+                  v-else-if="row.kind === 'site-sup'"
+                  type="button"
+                  class="perio-cell-toggle perio-cell-toggle--sup"
+                  :class="{ 'is-on': siteValue(t, code)?.suppuration }"
+                  :disabled="readonly || !t.is_present"
+                  :title="`${code} supuración (clic para alternar)`"
+                  @click="onSiteToggle(t.tooth_number, code, 'suppuration', siteValue(t, code)?.suppuration)"
                 />
               </template>
             </div>
@@ -522,6 +535,7 @@ function selectOnFocus(e: FocusEvent) {
         <!-- Palatal site metrics — sky tint -->
         <tr
           v-for="row in [
+            { kind: 'site-sup', label: 'Supuración' },
             { kind: 'site-bop', label: 'Sangrado' },
             { kind: 'site-plaque', label: 'Placa' },
             { kind: 'site-gm', label: 'Margen' },
@@ -554,6 +568,7 @@ function selectOnFocus(e: FocusEvent) {
                   :value="siteValue(t, code)?.probing_depth_mm ?? ''"
                   :disabled="readonly || !t.is_present"
                   class="perio-cell-input perio-cell-input--site"
+                  :class="{ 'is-pathological': isPathologicalDepth(siteValue(t, code)?.probing_depth_mm) }"
                   :title="`${code} sondaje (0–15 mm)`"
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(t.tooth_number, code, 'probing_depth_mm', e)"
@@ -588,6 +603,15 @@ function selectOnFocus(e: FocusEvent) {
                   :title="`${code} sangrado (clic para alternar)`"
                   @click="onSiteToggle(t.tooth_number, code, 'bleeding_on_probing', siteValue(t, code)?.bleeding_on_probing)"
                 />
+                <button
+                  v-else-if="row.kind === 'site-sup'"
+                  type="button"
+                  class="perio-cell-toggle perio-cell-toggle--sup"
+                  :class="{ 'is-on': siteValue(t, code)?.suppuration }"
+                  :disabled="readonly || !t.is_present"
+                  :title="`${code} supuración (clic para alternar)`"
+                  @click="onSiteToggle(t.tooth_number, code, 'suppuration', siteValue(t, code)?.suppuration)"
+                />
               </template>
             </div>
           </td>
@@ -605,7 +629,8 @@ function selectOnFocus(e: FocusEvent) {
             { kind: 'site-pd', label: 'Sondaje' },
             { kind: 'site-gm', label: 'Margen' },
             { kind: 'site-plaque', label: 'Placa' },
-            { kind: 'site-bop', label: 'Sangrado' }
+            { kind: 'site-bop', label: 'Sangrado' },
+            { kind: 'site-sup', label: 'Supuración' }
           ]"
           :key="`l-${row.kind}`"
           class="perio-row-palatal"
@@ -634,6 +659,7 @@ function selectOnFocus(e: FocusEvent) {
                   :value="siteValue(t, code)?.probing_depth_mm ?? ''"
                   :disabled="readonly || !t.is_present"
                   class="perio-cell-input perio-cell-input--site"
+                  :class="{ 'is-pathological': isPathologicalDepth(siteValue(t, code)?.probing_depth_mm) }"
                   :title="`${code} sondaje (0–15 mm)`"
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(t.tooth_number, code, 'probing_depth_mm', e)"
@@ -667,6 +693,15 @@ function selectOnFocus(e: FocusEvent) {
                   :disabled="readonly || !t.is_present"
                   :title="`${code} sangrado (clic para alternar)`"
                   @click="onSiteToggle(t.tooth_number, code, 'bleeding_on_probing', siteValue(t, code)?.bleeding_on_probing)"
+                />
+                <button
+                  v-else-if="row.kind === 'site-sup'"
+                  type="button"
+                  class="perio-cell-toggle perio-cell-toggle--sup"
+                  :class="{ 'is-on': siteValue(t, code)?.suppuration }"
+                  :disabled="readonly || !t.is_present"
+                  :title="`${code} supuración (clic para alternar)`"
+                  @click="onSiteToggle(t.tooth_number, code, 'suppuration', siteValue(t, code)?.suppuration)"
                 />
               </template>
             </div>
@@ -743,6 +778,7 @@ function selectOnFocus(e: FocusEvent) {
         <!-- Vestibular site metrics directly below the V tooth row -->
         <tr
           v-for="row in [
+            { kind: 'site-sup', label: 'Supuración' },
             { kind: 'site-bop', label: 'Sangrado' },
             { kind: 'site-plaque', label: 'Placa' },
             { kind: 'site-gm', label: 'Margen' },
@@ -775,6 +811,7 @@ function selectOnFocus(e: FocusEvent) {
                   :value="siteValue(t, code)?.probing_depth_mm ?? ''"
                   :disabled="readonly || !t.is_present"
                   class="perio-cell-input perio-cell-input--site"
+                  :class="{ 'is-pathological': isPathologicalDepth(siteValue(t, code)?.probing_depth_mm) }"
                   :title="`${code} sondaje (0–15 mm)`"
                   @focus="selectOnFocus"
                   @change="(e) => onSiteNumberInput(t.tooth_number, code, 'probing_depth_mm', e)"
@@ -809,6 +846,15 @@ function selectOnFocus(e: FocusEvent) {
                   :title="`${code} sangrado (clic para alternar)`"
                   @click="onSiteToggle(t.tooth_number, code, 'bleeding_on_probing', siteValue(t, code)?.bleeding_on_probing)"
                 />
+                <button
+                  v-else-if="row.kind === 'site-sup'"
+                  type="button"
+                  class="perio-cell-toggle perio-cell-toggle--sup"
+                  :class="{ 'is-on': siteValue(t, code)?.suppuration }"
+                  :disabled="readonly || !t.is_present"
+                  :title="`${code} supuración (clic para alternar)`"
+                  @click="onSiteToggle(t.tooth_number, code, 'suppuration', siteValue(t, code)?.suppuration)"
+                />
               </template>
             </div>
           </td>
@@ -834,6 +880,7 @@ function selectOnFocus(e: FocusEvent) {
               :value="t.keratinized_gingiva_mm ?? ''"
               :disabled="readonly || !t.is_present"
               class="perio-cell-input"
+              :class="{ 'is-pathological': isNarrowKeratinizedGingiva(t.keratinized_gingiva_mm) }"
               @focus="selectOnFocus"
               @change="(e) => onToothNumberInput(t.tooth_number, 'keratinized_gingiva_mm', e)"
             >
@@ -1073,6 +1120,17 @@ function selectOnFocus(e: FocusEvent) {
 .perio-cell-toggle--bop.is-on {
   background-color: var(--color-danger-soft);
   border-color: var(--color-danger-accent);
+}
+
+.perio-cell-toggle--sup.is-on {
+  /* Suppuration: a yellow mark, as on the paper charts. */
+  background-color: var(--color-warning-soft);
+  border-color: #EAB308;
+}
+
+.perio-cell-input.is-pathological {
+  color: var(--color-danger-accent);
+  font-weight: 600;
 }
 
 .perio-cell-toggle--plaque.is-on {

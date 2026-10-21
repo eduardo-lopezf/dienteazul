@@ -131,6 +131,11 @@ def _value(key: str, value: Any, labels: dict[str, Any]) -> str:
                 + (f" ({', '.join(tooth['surfaces'])})" if tooth.get("surfaces") else "")
                 for tooth in value
             )
+        if key == "form_data":
+            # What a form asks to write, each value under its own label.
+            return " · ".join(
+                f"{_value('form_field', item['field'], labels)}: {item['value']}" for item in value
+            )
         if key == "affirmative_answers":
             return " · ".join(
                 _value("question", item["question"], labels)

@@ -38,7 +38,9 @@ const VALUE_KEYS: Record<string, string[]> = {
   relative: ['patients.medicalHistory.relatives'],
   prognosis: ['treatmentPlans.prognosis'],
   declared_conditions: ['healthQuestionnaire.conditions'],
-  question: ['healthQuestionnaire.questions']
+  question: ['healthQuestionnaire.questions'],
+  form_kind: ['healthQuestionnaire.forms'],
+  form_field: ['healthQuestionnaire.pediatric.fields']
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:\d{2})?)?$/
@@ -72,6 +74,12 @@ function text(key: string, value: unknown, t: Translate, te: Exists, locale: str
   }
   if (Array.isArray(value)) {
     if (key === 'teeth') return teeth(value)
+    if (key === 'form_data') {
+      // What a form asks to write, each value under its own label.
+      return (value as { field: string, value: string }[])
+        .map(item => `${text('form_field', item.field, t, te, locale)}: ${item.value}`)
+        .join(' · ')
+    }
     if (key === 'affirmative_answers') {
       // What the patient answered "yes" to, with the cause they gave.
       return (value as { question: string, detail?: string | null }[]).map((item) => {

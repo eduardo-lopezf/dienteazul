@@ -817,8 +817,10 @@ async def blank_questionnaire_form(
     _: Annotated[None, Depends(require_permission("patients_clinical.medical.read"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     locale: str = Query(default="es", pattern="^(es|en)$"),
+    kind: str = Query(default="adult", pattern="^(adult|pediatric)$"),
 ) -> Response:
-    """The questionnaire as a blank sheet, to fill in by hand and scan."""
+    """The questionnaire as a blank sheet, to fill in by hand and scan:
+    the adult form, or the pediatric one a parent or guardian signs."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
@@ -826,9 +828,10 @@ async def blank_questionnaire_form(
     professional_id = (
         await directory.for_account(db, ctx.clinic_id, ctx.user_id) if directory else None
     )
-    pdf = await render_blank_pdf(db, patient, professional_id, locale)
+    pdf = await render_blank_pdf(db, patient, professional_id, locale, kind)
+    filename = "cuestionario_pediatrico.pdf" if kind == "pediatric" else "cuestionario_de_salud.pdf"
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'inline; filename="cuestionario_de_salud.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
