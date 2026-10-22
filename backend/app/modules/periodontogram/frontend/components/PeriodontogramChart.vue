@@ -8,9 +8,11 @@
  * periodontogram aligned with the rest of the patient file's "main
  * actions live up top" convention.
  */
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import type { PerioIndices, PerioSnapshotDetail, PerioSnapshotSummary, PerioTooth, SiteCode } from '../types'
 import { usePeriodontogramSession } from '../composables/usePeriodontogramSession'
+import { perioLayout } from '../utils/perioLayout'
 
 // Mirrors backend constants — client-side live indices must match the
 // formula the backend persists at close. Denominators anchor to
@@ -87,6 +89,31 @@ const upperTeeth = computed(() =>
 const lowerTeeth = computed(() =>
   props.snapshot.teeth.filter(t => Math.floor(t.tooth_number / 10) >= 3)
 )
+
+const chartArea = ref<HTMLElement | null>(null)
+const { width: chartWidth } = useElementSize(chartArea)
+const layout = computed(() => perioLayout(chartWidth.value))
+const splitArches = computed(() => layout.value.split)
+const blockZoom = computed(() => (layout.value.zoom < 1 ? layout.value.zoom : undefined))
+
+function inQuadrant(teeth: PerioTooth[], quadrant: number): PerioTooth[] {
+  return teeth.filter(t => Math.floor(t.tooth_number / 10) === quadrant)
+}
+
+const archBlocks = computed(() => {
+  if (!splitArches.value) {
+    return [
+      { key: 'upper', arch: 'upper' as const, teeth: upperTeeth.value },
+      { key: 'lower', arch: 'lower' as const, teeth: lowerTeeth.value }
+    ]
+  }
+  return [
+    { key: 'q1', arch: 'upper' as const, teeth: inQuadrant(upperTeeth.value, 1) },
+    { key: 'q2', arch: 'upper' as const, teeth: inQuadrant(upperTeeth.value, 2) },
+    { key: 'q4', arch: 'lower' as const, teeth: inQuadrant(lowerTeeth.value, 4) },
+    { key: 'q3', arch: 'lower' as const, teeth: inQuadrant(lowerTeeth.value, 3) }
+  ]
+})
 
 // Optimistic-first: the parent's mutator updates `currentSnapshot.value`
 // so the cell repaints on the next frame, then we queue the debounced
@@ -189,22 +216,21 @@ const liveIndices = computed<PerioIndices | null>(() => {
     />
 
     <div
+      ref="chartArea"
       class="overflow-x-auto pb-2"
       role="region"
       aria-label="Periodontograma — arcadas superior e inferior"
+      data-testid="perio-chart-area"
+      :data-split="splitArches || undefined"
     >
-      <div class="min-w-[1100px] space-y-4">
+      <div class="w-max min-w-full space-y-4">
         <PerioArchBlock
-          arch="upper"
-          :teeth="upperTeeth"
+          v-for="block in archBlocks"
+          :key="block.key"
+          :arch="block.arch"
+          :teeth="block.teeth"
           :readonly="isReadOnly"
-          @edit-tooth="handleEditTooth"
-          @edit-site="handleEditSite"
-        />
-        <PerioArchBlock
-          arch="lower"
-          :teeth="lowerTeeth"
-          :readonly="isReadOnly"
+          :style="blockZoom ? { zoom: blockZoom } : undefined"
           @edit-tooth="handleEditTooth"
           @edit-site="handleEditSite"
         />

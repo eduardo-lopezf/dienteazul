@@ -9,7 +9,6 @@ from fastapi import (
     Depends,
     File,
     Form,
-    HTTPException,
     Query,
     Response,
     UploadFile,
@@ -23,6 +22,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.patients.service import PatientService
 
+from .errors import DOCUMENT_NOT_FOUND, DOCUMENT_TYPE_INVALID, PATIENT_NOT_FOUND, media_error
 from .schemas import (
     AttachmentCreate,
     AttachmentResponse,
@@ -88,7 +88,7 @@ async def upload_document(
 ) -> ApiResponse[DocumentResponse]:
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise media_error(PATIENT_NOT_FOUND, status_code=404, detail="Patient not found")
 
     validate_document_type(document_type)
     validate_file_size(file)
@@ -127,10 +127,11 @@ async def list_patient_documents(
 ) -> PaginatedApiResponse[DocumentResponse]:
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise media_error(PATIENT_NOT_FOUND, status_code=404, detail="Patient not found")
 
     if document_type and document_type not in DOCUMENT_TYPES:
-        raise HTTPException(
+        raise media_error(
+            DOCUMENT_TYPE_INVALID,
             status_code=400,
             detail=f"Invalid document type. Allowed: {', '.join(DOCUMENT_TYPES)}",
         )
@@ -185,7 +186,7 @@ async def upload_photo(
     """
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise media_error(PATIENT_NOT_FOUND, status_code=404, detail="Patient not found")
 
     validate_file_size(file)
     mime_type = validate_mime_type(file)
@@ -231,7 +232,7 @@ async def list_patient_photos(
 ) -> PaginatedApiResponse[DocumentResponse]:
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise media_error(PATIENT_NOT_FOUND, status_code=404, detail="Patient not found")
 
     documents, total = await PhotoService.list_photos(
         db=db,
@@ -271,7 +272,7 @@ async def get_document(
 ) -> ApiResponse[DocumentResponse]:
     document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
     return ApiResponse(data=_decorate(document))
 
 
@@ -285,7 +286,7 @@ async def download_document(
 ) -> Response:
     document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
 
     from .storage import get_storage_backend
 
@@ -330,7 +331,7 @@ async def update_document(
 ) -> ApiResponse[DocumentResponse]:
     document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
     updated = await DocumentService.update_document(
         db, document, data.model_dump(exclude_unset=True)
     )
@@ -350,7 +351,7 @@ async def patch_photo_metadata(
 ) -> ApiResponse[DocumentResponse]:
     document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
     updated = await PhotoService.update_metadata(
         db,
         document,
@@ -375,7 +376,7 @@ async def delete_document(
 ) -> None:
     document = await DocumentService.get_document(db, ctx.clinic_id, document_id)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
     await DocumentService.delete_document(db, document)
 
 

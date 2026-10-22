@@ -13,6 +13,13 @@ from sqlalchemy.orm import selectinload
 from app.core.events import EventType, event_bus
 
 from .attachment_registry import attachment_registry
+from .errors import (
+    ATTACHMENT_NOT_FOUND,
+    DOCUMENT_NOT_FOUND,
+    OWNER_NOT_FOUND,
+    WRONG_PATIENT,
+    media_error,
+)
 from .exif import extract_captured_at
 from .models import Document, MediaAttachment
 from .photo_taxonomy import (
@@ -370,12 +377,14 @@ class PhotoService:
         a = await DocumentService.get_document(db, clinic_id, document_a_id)
         b = await DocumentService.get_document(db, clinic_id, document_b_id)
         if not a or not b:
-            raise HTTPException(
+            raise media_error(
+                DOCUMENT_NOT_FOUND,
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="One or both documents not found",
             )
         if a.patient_id != b.patient_id:
-            raise HTTPException(
+            raise media_error(
+                WRONG_PATIENT,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Documents must belong to the same patient",
             )
@@ -398,7 +407,7 @@ class PhotoService:
     async def unpair(db: AsyncSession, clinic_id: UUID, document_id: UUID) -> Document:
         doc = await DocumentService.get_document(db, clinic_id, document_id)
         if not doc:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise media_error(DOCUMENT_NOT_FOUND, status_code=404, detail="Document not found")
         partner_id = doc.paired_document_id
         doc.paired_document_id = None
         if partner_id:
@@ -428,12 +437,14 @@ class PhotoService:
     ) -> None:
         target = await DocumentService.get_document(db, clinic_id, target_id)
         if not target:
-            raise HTTPException(
+            raise media_error(
+                DOCUMENT_NOT_FOUND,
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Pair target document not found",
             )
         if target.patient_id != patient_id:
-            raise HTTPException(
+            raise media_error(
+                WRONG_PATIENT,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Pair target must belong to the same patient",
             )
@@ -469,7 +480,8 @@ class AttachmentService:
 
         document = await DocumentService.get_document(db, clinic_id, document_id)
         if not document:
-            raise HTTPException(
+            raise media_error(
+                DOCUMENT_NOT_FOUND,
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found",
             )
@@ -478,12 +490,14 @@ class AttachmentService:
             db, clinic_id, owner_type, owner_id
         )
         if owner_patient_id is None:
-            raise HTTPException(
+            raise media_error(
+                OWNER_NOT_FOUND,
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Owner ({owner_type}, {owner_id}) not found in this clinic",
             )
         if owner_patient_id != document.patient_id:
-            raise HTTPException(
+            raise media_error(
+                WRONG_PATIENT,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Document and owner belong to different patients",
             )
@@ -540,7 +554,8 @@ class AttachmentService:
         )
         attachment = result.scalar_one_or_none()
         if not attachment:
-            raise HTTPException(
+            raise media_error(
+                ATTACHMENT_NOT_FOUND,
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Attachment not found",
             )

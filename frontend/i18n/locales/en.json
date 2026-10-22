@@ -2064,7 +2064,7 @@
     "required": "This field is required",
     "invalidEmail": "Invalid email",
     "networkError": "Connection error",
-    "serverError": "Server error",
+    "serverError": "Server error. If it happens again, give this reference to support",
     "notFound": "Not found",
     "offline": "Offline — data may not be up to date",
     "inactive": "Inactive",

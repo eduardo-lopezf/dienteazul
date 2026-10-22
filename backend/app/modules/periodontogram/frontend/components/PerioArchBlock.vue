@@ -63,7 +63,15 @@ const orderedTeeth = computed(() => {
 const TOOTH_COL_PX = 60
 const profileOverlayWidth = computed(() => `${orderedTeeth.value.length * TOOTH_COL_PX}px`)
 
-const heading = computed(() => (props.arch === 'upper' ? 'Superior' : 'Inferior'))
+// Drawn one quadrant at a time where the whole arch does not fit (see
+// PeriodontogramChart): the heading then names which teeth it holds.
+const heading = computed(() => {
+  const name = props.arch === 'upper' ? 'Superior' : 'Inferior'
+  const quadrants = new Set(orderedTeeth.value.map(t => Math.floor(t.tooth_number / 10)))
+  const teeth = orderedTeeth.value
+  if (quadrants.size !== 1 || teeth.length === 0) return name
+  return `${name} · ${teeth[0].tooth_number}–${teeth[teeth.length - 1].tooth_number}`
+})
 const innerFace = computed<'palatal' | 'lingual'>(() =>
   props.arch === 'upper' ? 'palatal' : 'lingual'
 )
@@ -189,7 +197,7 @@ function selectOnFocus(e: FocusEvent) {
 </script>
 
 <template>
-  <section class="perio-arch-block rounded-lg border border-default bg-surface">
+  <section class="perio-arch-block mx-auto w-fit max-w-full rounded-lg border border-default bg-surface">
     <header class="flex items-center justify-between px-3 py-2">
       <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
         {{ heading }}
@@ -201,7 +209,7 @@ function selectOnFocus(e: FocusEvent) {
 
     <!-- data-dense: 14 px probing cells are below every touch minimum
          and knowingly stay that way here — growing them in place would
-         only widen the 1100 px chart. Touch entry is a separate mode. -->
+         only widen the chart. Touch entry is a separate mode. -->
     <table
       data-dense
       class="perio-arch-table table-fixed border-collapse text-center font-mono text-[11px] leading-tight"

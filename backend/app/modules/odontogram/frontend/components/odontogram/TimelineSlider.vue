@@ -263,10 +263,11 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Slider track (fixed height) -->
+    <!-- Slider track (fixed height). Inset so the labels centred on the
+         first and last stops stay inside the card on a narrow screen. -->
     <div
       ref="sliderRef"
-      class="relative h-10 mt-2 cursor-pointer select-none rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+      class="relative h-10 mt-2 mx-6 cursor-pointer select-none rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
       tabindex="0"
       role="slider"
       :aria-valuenow="currentIndex ?? dates.length"

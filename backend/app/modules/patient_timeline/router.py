@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -11,6 +11,7 @@ from app.core.schemas import ApiResponse
 from app.database import get_db
 from app.modules.patients.service import PatientService
 
+from .errors import patient_not_found
 from .schemas import TimelineResponse
 from .service import TimelineService
 
@@ -33,10 +34,7 @@ async def get_patient_timeline(
     """Paginated timeline for a patient, optionally filtered by category."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
 
     entries, total = await TimelineService.get_timeline(
         db, ctx.clinic_id, patient_id, category, page, page_size

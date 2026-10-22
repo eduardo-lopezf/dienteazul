@@ -1,5 +1,23 @@
 import type { ApiResponse, PaginatedResponse } from '~/types'
 
+/** The error envelope every failure from this API carries. */
+interface ErrorEnvelope {
+  message?: string
+  code?: string | null
+  category?: string | null
+  reference?: string | null
+  fields?: Record<string, string>
+}
+
+/** What `useApi` hangs off a thrown error, for callers that want it. */
+export interface ApiFailure {
+  code: string | null
+  category: string | null
+  /** The request id. What a user quotes and an operator greps for. */
+  reference: string | null
+  fields: Record<string, string>
+}
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 interface UseApiOptions {
@@ -32,6 +50,17 @@ function _withQuery(path: string, query?: UseApiOptions['query']): string {
   return path.includes('?') ? `${path}&${s}` : `${path}?${s}`
 }
 
+/**
+ * The message with the reference after it, when there is one.
+ *
+ * Kept on one line so it survives a toast that does not wrap, and
+ * prefixed with a word rather than shown bare: an unexplained hex string
+ * next to an error reads as part of the failure.
+ */
+function withReference(message: string, reference: string | null): string {
+  return reference ? `${message} (ref. ${reference})` : message
+}
+
 export function useApi() {
   const auth = useAuth()
   const { t } = useI18n()
@@ -59,7 +88,28 @@ export function useApi() {
         responseType
       })
     } catch (error: unknown) {
-      const fetchError = error as { name?: string, statusCode?: number, data?: { message?: string } }
+      const fetchError = error as {
+        name?: string
+        statusCode?: number
+        data?: ErrorEnvelope
+        response?: { headers?: { get(name: string): string | null } }
+      }
+
+      // Put what the backend said about this failure on the error itself,
+      // so a caller can branch on the case (`code`) or show the reference
+      // without re-reading the envelope. See `app/core/errors.py`.
+      const failure: ApiFailure = {
+        code: fetchError.data?.code ?? null,
+        category: fetchError.data?.category ?? null,
+        // The body carries it; the header is the fallback for a failure
+        // that never reached the app — a gateway's 502, say.
+        reference:
+          fetchError.data?.reference
+          ?? fetchError.response?.headers?.get('x-request-id')
+          ?? null,
+        fields: fetchError.data?.fields ?? {}
+      }
+      Object.assign(error as object, { failure })
 
       // Caller-initiated cancellation: don't toast, just rethrow so the
       // caller can no-op. AbortController is used by orchestrators
@@ -140,9 +190,13 @@ export function useApi() {
       }
 
       if (fetchError.statusCode && fetchError.statusCode >= 500) {
+        // The reference is the whole point of showing anything here: the
+        // message is deliberately vague (it could quote patient data), so
+        // what the person needs is the string that leads whoever looks
+        // straight to this request's log lines and its `ServerError` row.
         toast.add({
           title: t('common.error'),
-          description: t('common.serverError'),
+          description: withReference(t('common.serverError'), failure.reference),
           color: 'error'
         })
         throw error

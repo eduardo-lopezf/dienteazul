@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type { Surface, ToothTreatmentView, Treatment, TreatmentStatus } from '~~/app/types'
+// These are the per-tooth views the parent passes in `treatments`, not the
+// `Treatment` rows they were built from: a view carries `treatment_type`
+// and a `Treatment` has only `clinical_type`, which is why annotating the
+// helpers below with `Treatment` made every one of them a type error.
+import type { Surface, ToothTreatmentView, TreatmentStatus } from '~~/app/types'
 import {
   getOcclusalPath,
   getLateralPath,
@@ -170,11 +174,11 @@ function hasTreatment(type: string, status?: TreatmentStatus): boolean {
   )
 }
 
-function getTreatmentOfType(type: string): Treatment | undefined {
+function getTreatmentOfType(type: string): ToothTreatmentView | undefined {
   return toothTreatments.value.find(t => t.treatment_type === type)
 }
 
-function getImplantFill(treatment: Treatment): string {
+function getImplantFill(treatment: ToothTreatmentView): string {
   return chartColor(treatment)
 }
 
@@ -197,7 +201,7 @@ const pulpFillTreatments = computed(() => {
 const hasPulpTreatment = computed(() => pulpFillTreatments.value.length > 0)
 
 // Get the primary pulp treatment (first one with pulp_fill rule)
-function getPulpTreatment(): Treatment | undefined {
+function getPulpTreatment(): ToothTreatmentView | undefined {
   return pulpFillTreatments.value[0]
 }
 
@@ -279,7 +283,7 @@ const occlusalSurfaceTreatments = computed(() => {
 })
 
 // Get occlusal visualization config for a treatment
-function getOcclusalConfig(treatment: Treatment) {
+function getOcclusalConfig(treatment: ToothTreatmentView) {
   const normalized = normalizeTreatmentType(treatment.treatment_type)
   return OCCLUSAL_VISUALIZATION[normalized]
 }
@@ -303,7 +307,7 @@ const patternFillTreatments = computed(() => {
 })
 
 // Get pattern config for a treatment (available for future use)
-function _getPatternConfig(treatment: Treatment) {
+function _getPatternConfig(treatment: ToothTreatmentView) {
   const normalized = normalizeTreatmentType(treatment.treatment_type)
   return PATTERN_CONFIG[normalized]
 }

@@ -5,7 +5,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -13,11 +14,13 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.core.advisory_locks import BOOT_LOCK, advisory_lock
 from app.core.auth.router import limiter
 from app.core.auth.router import router as auth_router
+from app.core.errors import UNHANDLED_CODE, AppError, ErrorCategory, category_for_status
 from app.core.log_context import (
     new_request_id,
     reset_request_context,
@@ -207,6 +210,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Without this the browser cannot read `X-Request-Id`: it is not one of
+    # the few response headers CORS exposes by default. The reference also
+    # travels in the error body, but the header is what a failure with no
+    # body of its own still carries.
+    expose_headers=["X-Request-Id"],
 )
 
 
@@ -350,12 +358,32 @@ async def module_gate_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-@app.exception_handler(HTTPException)
+def _reference(request: Request) -> str | None:
+    """This request's id — the string that leads to its log lines."""
+    return getattr(request.state, "request_id", None)
+
+
+# Registered against Starlette's class, not FastAPI's subclass: the router
+# raises the base one for a URL that matches no route, and that answer used
+# to be a bare ``{"detail": "Not Found"}`` — a different shape from every
+# other failure, and the only one with no reference to quote.
+@app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    """Handler for HTTP exceptions using standard ErrorResponse format."""
+    """Handler for HTTP exceptions using standard ErrorResponse format.
+
+    An ``AppError`` says which case it is; a bare ``HTTPException`` is
+    categorised from its status and goes out without a code, which is what
+    tells an operator the raise site has not been claimed yet.
+    """
     error_response = ErrorResponse(
         message=str(exc.detail),
         errors=[str(exc.detail)] if exc.detail else [],
+        category=(
+            exc.category if isinstance(exc, AppError) else category_for_status(exc.status_code)
+        ),
+        code=exc.code if isinstance(exc, AppError) else None,
+        reference=_reference(request),
+        fields=exc.fields if isinstance(exc, AppError) else {},
     )
     headers = dict(exc.headers or {})
     headers.update(_cors_headers(request))
@@ -363,6 +391,39 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         status_code=exc.status_code,
         content=error_response.model_dump(),
         headers=headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """A rejected payload, in the same envelope as every other failure.
+
+    FastAPI's own answer is a bare ``{"detail": [...]}``: a different
+    shape from the rest of the API, with no reference and nothing a form
+    can point at a field with. This keeps the status and the per-field
+    messages and puts them where the client already looks.
+    """
+    fields: dict[str, str] = {}
+    for item in exc.errors():
+        # ``loc`` is ("body", "email") — the field is what follows the
+        # part of the request it came from.
+        location = [str(part) for part in item.get("loc", ()) if part not in ("body", "query")]
+        fields[".".join(location) or "_"] = str(item.get("msg", ""))
+
+    error_response = ErrorResponse(
+        message="The request was not accepted",
+        errors=list(fields.values()),
+        category=ErrorCategory.VALIDATION.value,
+        code="validation.invalid_payload",
+        reference=_reference(request),
+        fields=fields,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=error_response.model_dump(),
+        headers=_cors_headers(request),
     )
 
 
@@ -380,16 +441,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         clinic_id=getattr(request.state, "clinic_id", None),
         user_id=getattr(request.state, "user_id", None),
     )
+    # The message is withheld outside development — it can quote values.
+    # The reference is not: it names the request, nothing in it, and it is
+    # the only thing the person on the screen can hand over.
+    shared = {
+        "category": ErrorCategory.INTERNAL.value,
+        "code": UNHANDLED_CODE,
+        "reference": _reference(request),
+    }
     if settings.ENVIRONMENT == "development":
-        error_response = ErrorResponse(
-            message=str(exc),
-            errors=[str(exc)],
-        )
+        error_response = ErrorResponse(message=str(exc), errors=[str(exc)], **shared)
     else:
-        error_response = ErrorResponse(
-            message="Internal server error",
-            errors=[],
-        )
+        error_response = ErrorResponse(message="Internal server error", errors=[], **shared)
     return JSONResponse(
         status_code=500,
         content=error_response.model_dump(),

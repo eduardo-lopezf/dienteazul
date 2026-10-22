@@ -1,8 +1,10 @@
 """File validation utilities."""
 
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 
 from app.config import settings
+
+from .errors import DOCUMENT_TYPE_INVALID, FILE_TOO_LARGE, FILE_TYPE_NOT_ALLOWED, media_error
 
 # Document types enum
 DOCUMENT_TYPES = ["consent", "id_scan", "insurance", "report", "referral", "other"]
@@ -34,7 +36,8 @@ def validate_file_size(file: UploadFile, content_length: int | None = None) -> N
     max_size = settings.STORAGE_MAX_FILE_SIZE
 
     if content_length and content_length > max_size:
-        raise HTTPException(
+        raise media_error(
+            FILE_TOO_LARGE,
             status_code=400,
             detail=f"File size exceeds limit of {max_size // (1024 * 1024)}MB",
         )
@@ -56,7 +59,8 @@ def validate_mime_type(file: UploadFile) -> str:
     content_type = file.content_type or "application/octet-stream"
 
     if content_type not in allowed:
-        raise HTTPException(
+        raise media_error(
+            FILE_TYPE_NOT_ALLOWED,
             status_code=400,
             detail=f"File type '{content_type}' not allowed. Allowed: {', '.join(sorted(allowed))}",
         )
@@ -74,7 +78,8 @@ def validate_document_type(document_type: str) -> None:
         HTTPException: If document type invalid
     """
     if document_type not in DOCUMENT_TYPES:
-        raise HTTPException(
+        raise media_error(
+            DOCUMENT_TYPE_INVALID,
             status_code=400,
             detail=f"Invalid document type. Allowed: {', '.join(DOCUMENT_TYPES)}",
         )

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
+from .errors import PHOTO_TAXONOMY_INVALID, media_error
+
 # Top-level kind. Drives the UI gallery rail and the thumbnail pipeline.
 MEDIA_KIND_DOCUMENT = "document"
 MEDIA_KIND_PHOTO = "photo"
@@ -97,14 +99,16 @@ def validate_media_classification(
       present must belong to 'xray'
     """
     if media_kind not in MEDIA_KINDS:
-        raise HTTPException(
+        raise media_error(
+            PHOTO_TAXONOMY_INVALID,
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid media_kind '{media_kind}'. Allowed: {', '.join(MEDIA_KINDS)}",
         )
 
     if media_kind in (MEDIA_KIND_DOCUMENT, MEDIA_KIND_SCAN, MEDIA_KIND_VIDEO):
         if media_category is not None or media_subtype is not None:
-            raise HTTPException(
+            raise media_error(
+                PHOTO_TAXONOMY_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"media_kind '{media_kind}' must not carry category/subtype",
             )
@@ -112,24 +116,28 @@ def validate_media_classification(
 
     if media_kind == MEDIA_KIND_XRAY:
         if media_category not in (None, "xray"):
-            raise HTTPException(
+            raise media_error(
+                PHOTO_TAXONOMY_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="media_kind 'xray' requires media_category='xray' or null",
             )
         category = "xray"
     else:  # photo
         if media_category is None:
-            raise HTTPException(
+            raise media_error(
+                PHOTO_TAXONOMY_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="media_kind 'photo' requires media_category",
             )
         if media_category == "xray":
-            raise HTTPException(
+            raise media_error(
+                PHOTO_TAXONOMY_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Use media_kind='xray' for radiographs, not photo+category=xray",
             )
         if media_category not in MEDIA_CATEGORIES:
-            raise HTTPException(
+            raise media_error(
+                PHOTO_TAXONOMY_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     f"Invalid media_category '{media_category}'. "

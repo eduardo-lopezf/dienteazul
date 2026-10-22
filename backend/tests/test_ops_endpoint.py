@@ -778,8 +778,16 @@ async def test_a_clinic_is_deleted_whole_in_development_and_not_at_all_in_produc
         )
     )
     for (table,) in leftovers:
+        # Compared as text, and the column cast rather than the parameter:
+        # not every `clinic_id` in the schema is a UUID column —
+        # `server_errors` keeps it as `String(36)` so the log has no foreign
+        # key to join or cascade — and asyncpg refuses a `UUID` object for a
+        # text parameter ("expected str, got UUID"). `CAST(... AS text)`
+        # rather than `::text` for the reason `core/ops/usage.py` carries:
+        # a cast written next to a bind parameter is swallowed by `text()`.
         count = await db_session.scalar(
-            text(f'SELECT count(*) FROM "{table}" WHERE clinic_id = :id'), {"id": UUID(doomed)}
+            text(f'SELECT count(*) FROM "{table}" WHERE CAST(clinic_id AS text) = :id'),
+            {"id": str(doomed)},
         )
         assert count == 0, table
     # …its holder went with it, and the other clinic lost nothing.

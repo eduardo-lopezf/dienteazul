@@ -11,7 +11,7 @@ submits the whole blob — but it now writes normalized rows atomically.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -21,6 +21,7 @@ from app.core.schemas import ApiResponse
 from app.database import get_db
 from app.modules.patients.service import PatientService
 
+from .errors import record_not_found, rejected
 from .questionnaire_pdf import render_blank_pdf
 from .schemas import (
     AllergyCreate,
@@ -60,7 +61,7 @@ router = APIRouter()
 async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> None:
     patient = await PatientService.get_patient(db, clinic_id, patient_id)
     if patient is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise record_not_found("patient", "Patient")
 
 
 # --- Medical context (1:1) ----------------------------------------------
@@ -168,7 +169,7 @@ async def update_allergy(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
+        raise record_not_found("allergy", "Allergy")
     allergy = await PatientsClinicalService.update_allergy(
         db, allergy, data.model_dump(exclude_unset=True)
     )
@@ -191,7 +192,7 @@ async def delete_allergy(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allergy not found")
+        raise record_not_found("allergy", "Allergy")
     await PatientsClinicalService.delete_allergy(db, allergy, user_id=ctx.user_id)
     await db.commit()
 
@@ -250,7 +251,7 @@ async def update_medication(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found")
+        raise record_not_found("medication", "Medication")
     med = await PatientsClinicalService.update_medication(
         db, med, data.model_dump(exclude_unset=True)
     )
@@ -273,7 +274,7 @@ async def delete_medication(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found")
+        raise record_not_found("medication", "Medication")
     await PatientsClinicalService.delete_medication(db, med, user_id=ctx.user_id)
     await db.commit()
 
@@ -332,7 +333,7 @@ async def update_systemic_disease(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Disease not found")
+        raise record_not_found("disease", "Disease")
     disease = await PatientsClinicalService.update_systemic_disease(
         db, disease, data.model_dump(exclude_unset=True)
     )
@@ -355,7 +356,7 @@ async def delete_systemic_disease(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Disease not found")
+        raise record_not_found("disease", "Disease")
     await PatientsClinicalService.delete_systemic_disease(db, disease, user_id=ctx.user_id)
     await db.commit()
 
@@ -414,7 +415,7 @@ async def update_surgical_history(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surgery not found")
+        raise record_not_found("surgery", "Surgery")
     surgery = await PatientsClinicalService.update_surgical_history(
         db, surgery, data.model_dump(exclude_unset=True)
     )
@@ -437,7 +438,7 @@ async def delete_surgical_history(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Surgery not found")
+        raise record_not_found("surgery", "Surgery")
     await PatientsClinicalService.delete_surgical_history(db, surgery, user_id=ctx.user_id)
     await db.commit()
 
@@ -495,9 +496,7 @@ async def delete_emergency_contact(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     contact = await PatientsClinicalService.get_emergency_contact(db, patient_id)
     if contact is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Emergency contact not found"
-        )
+        raise record_not_found("emergency_contact", "Emergency contact")
     await PatientsClinicalService.delete_emergency_contact(db, contact)
     await db.commit()
 
@@ -555,9 +554,7 @@ async def delete_legal_guardian(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     guardian = await PatientsClinicalService.get_legal_guardian(db, patient_id)
     if guardian is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Legal guardian not found"
-        )
+        raise record_not_found("legal_guardian", "Legal guardian")
     await PatientsClinicalService.delete_legal_guardian(db, guardian)
     await db.commit()
 
@@ -710,7 +707,7 @@ async def create_asa_assessment(
             db, ctx.clinic_id, patient_id, data.model_dump(), ctx.user_id
         )
     except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+        raise rejected("asa_assessment", str(error)) from error
     event_bus.publish_after_commit(
         db,
         EventType.PATIENT_MEDICAL_UPDATED,
@@ -737,7 +734,7 @@ async def retract_asa_assessment(
         db, ctx.clinic_id, patient_id, assessment_id
     )
     if assessment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+        raise record_not_found("asa_assessment", "Assessment")
     await PatientsClinicalService.retract_entry(
         db, assessment, reason=data.reason, user_id=ctx.user_id
     )
@@ -782,7 +779,7 @@ async def create_questionnaire(
             db, ctx.clinic_id, patient_id, data.model_dump(), ctx.user_id
         )
     except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+        raise rejected("questionnaire", str(error)) from error
     return ApiResponse(data=HealthQuestionnaireResponse.model_validate(questionnaire))
 
 
@@ -803,7 +800,7 @@ async def retract_questionnaire(
         db, ctx.clinic_id, patient_id, questionnaire_id
     )
     if questionnaire is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Questionnaire not found")
+        raise record_not_found("questionnaire", "Questionnaire")
     await PatientsClinicalService.retract_entry(
         db, questionnaire, reason=data.reason, user_id=ctx.user_id
     )
@@ -823,7 +820,7 @@ async def blank_questionnaire_form(
     the adult form, or the pediatric one a parent or guardian signs."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if patient is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise record_not_found("patient", "Patient")
     directory = provider(ProfessionalDirectory)
     professional_id = (
         await directory.for_account(db, ctx.clinic_id, ctx.user_id) if directory else None

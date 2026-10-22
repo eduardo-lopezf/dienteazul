@@ -10,13 +10,14 @@ the ``patients_clinical`` module after Fase B.4.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .errors import patient_not_found
 from .schemas import (
     PatientCreate,
     PatientExtendedResponse,
@@ -109,10 +110,7 @@ async def get_patient(
     """Get a patient by ID."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
     return ApiResponse(data=PatientResponse.model_validate(patient))
 
 
@@ -127,10 +125,7 @@ async def update_patient(
     """Update a patient."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
     patient = await PatientService.update_patient(db, patient, data.model_dump(exclude_unset=True))
     return ApiResponse(data=PatientResponse.model_validate(patient))
 
@@ -145,10 +140,7 @@ async def delete_patient(
     """Soft delete (archive) a patient."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
     await PatientService.archive_patient(db, patient)
 
 
@@ -165,10 +157,7 @@ async def get_patient_extended(
     """Get patient with extended identity/demographics info."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
     return ApiResponse(data=PatientExtendedResponse.model_validate(patient))
 
 
@@ -183,9 +172,6 @@ async def update_patient_extended(
     """Update patient with extended demographic fields."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+        raise patient_not_found()
     patient = await PatientService.update_patient(db, patient, data.model_dump(exclude_unset=True))
     return ApiResponse(data=PatientExtendedResponse.model_validate(patient))
