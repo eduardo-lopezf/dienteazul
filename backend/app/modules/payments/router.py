@@ -88,9 +88,7 @@ async def _ensure_patient(
     """
     if not patients_available():
         if writing:
-            raise payments_error(
-                "payments.patients.unavailable", detail=PATIENTS_UNAVAILABLE
-            )
+            raise payments_error("payments.patients.unavailable", detail=PATIENTS_UNAVAILABLE)
         return
 
     from sqlalchemy import select

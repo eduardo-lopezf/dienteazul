@@ -124,7 +124,9 @@ async def update_category(
         raise catalog_error("catalog.category.not_found")
 
     if category.is_system:
-        raise catalog_error("catalog.category.system_protected", detail="Cannot modify system category")
+        raise catalog_error(
+            "catalog.category.system_protected", detail="Cannot modify system category"
+        )
 
     # Check key uniqueness if changing
     if data.key and data.key != category.key:
@@ -154,7 +156,9 @@ async def delete_category(
         raise catalog_error("catalog.category.not_found")
 
     if category.is_system:
-        raise catalog_error("catalog.category.system_protected", detail="Cannot delete system category")
+        raise catalog_error(
+            "catalog.category.system_protected", detail="Cannot delete system category"
+        )
 
     await CategoryService.delete_category(db, category, soft=True)
 
@@ -263,7 +267,9 @@ async def delete_vat_type(
         raise catalog_error("catalog.vat_type.not_found")
 
     if vat_type.is_system:
-        raise catalog_error("catalog.vat_type.system_protected", detail="Cannot delete system VAT type")
+        raise catalog_error(
+            "catalog.vat_type.system_protected", detail="Cannot delete system VAT type"
+        )
 
     if vat_type.is_default:
         raise catalog_error("catalog.vat_type.default_protected")
@@ -294,7 +300,9 @@ def _specialty_conflict(exc: DuplicateSpecialtyError) -> AppError:
         or next(iter(existing.names.values()), "")
     )
     state = "active" if existing.is_active else "inactive"
-    return catalog_error("catalog.specialty.duplicate", detail=f"Specialty already exists: {name} ({state})")
+    return catalog_error(
+        "catalog.specialty.duplicate", detail=f"Specialty already exists: {name} ({state})"
+    )
 
 
 @router.get("/specialties", response_model=ApiResponse[list[SpecialtyResponse]])
@@ -408,7 +416,9 @@ async def restore_specialty_pack(
     except UnknownSpecialtyError as error:
         raise _pack_or_404(key) from error
     except ValueError as error:
-        raise catalog_error("catalog.specialty.restore_requires_enabled", detail=str(error)) from error
+        raise catalog_error(
+            "catalog.specialty.restore_requires_enabled", detail=str(error)
+        ) from error
     return ApiResponse(data=SpecialtyPackResponse.model_validate(pack))
 
 

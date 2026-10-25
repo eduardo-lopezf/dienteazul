@@ -12,7 +12,7 @@ from app.modules.record.errors import ERROR_CATALOG
 
 @pytest.mark.asyncio
 async def test_missing_patient_record_error_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     response = await client.get(
         f"/api/v1/record/patients/{UUID(int=0)}",
@@ -38,8 +38,12 @@ async def test_invalid_disclosure_error_is_traceable(
         json={
             "purpose": "continuity_of_care",
             "recipient_name": "Referral",
+            # A referral with no justification on file: the disclosure is
+            # refused by `_require_evidence`, before scope is looked at.
+            # `scope` has to be non-empty or the schema rejects the body
+            # first, with a 422 that never reaches the catalogued error.
             "evidence": "",
-            "scope": [],
+            "scope": ["patients.identification"],
         },
     )
 

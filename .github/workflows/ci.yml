@@ -251,7 +251,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Run ESLint
         working-directory: frontend
@@ -276,7 +276,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck host + module layers (no new errors)
         working-directory: frontend
@@ -294,7 +294,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci --no-audit --no-fund
 
       - name: Run tests
         working-directory: frontend
@@ -394,7 +394,7 @@ jobs:
       - name: Install frontend deps + Playwright browsers
         working-directory: frontend
         run: |
-          npm install
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Generate modules.json with host paths

@@ -38,9 +38,7 @@ CanEditTemplates = Annotated[None, Depends(require_permission("consents.template
 
 
 def _refuse(error: ConsentError) -> AppError:
-    return consent_domain_error(
-        str(error), state_error=isinstance(error, ConsentStateError)
-    )
+    return consent_domain_error(str(error), state_error=isinstance(error, ConsentStateError))
 
 
 # --- Templates ---------------------------------------------------------------

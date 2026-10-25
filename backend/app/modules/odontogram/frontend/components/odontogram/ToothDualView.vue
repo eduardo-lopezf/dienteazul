@@ -299,6 +299,47 @@ const lateralIconTreatments = computed(() => {
 // Get icon anchors for this tooth
 const iconAnchors = computed(() => getIconAnchors(props.toothNumber))
 
+// The lateral view is mirrored per quadrant (`getToothTransform`). A mark
+// that must read the same on every tooth — an arrow to the chart's left, a
+// "₩" — undoes the mirroring with these. In local coordinates the root is
+// always towards -y and the mesial face towards +x (`besideCrown`).
+const quadrant = computed(() => Math.floor(props.toothNumber / 10))
+const flipX = computed(() => ([2, 3, 6, 7].includes(quadrant.value) ? -1 : 1))
+const flipY = computed(() => ([3, 4, 7, 8].includes(quadrant.value) ? -1 : 1))
+
+/** An arrowhead at `tip`, pointing away from `from`. */
+function arrowHead(tipX: number, tipY: number, fromX: number, fromY: number, size = 7): string {
+  const angle = Math.atan2(tipY - fromY, tipX - fromX)
+  const wing = (turn: number) =>
+    `${tipX + size * Math.cos(angle + turn)},${tipY + size * Math.sin(angle + turn)}`
+  return `M ${wing(Math.PI * 0.8)} L ${tipX},${tipY} L ${wing(-Math.PI * 0.8)}`
+}
+
+/** Giroversión: a curved arrow at the incisal edge, to the chart's left or right. */
+function rotationArrow(type: string): string {
+  const d = (type === 'rotation_right' ? 1 : -1) * flipX.value
+  return `M ${-12 * d},0 Q 0,-12 ${12 * d},0 ${arrowHead(12 * d, 0, 0, -12)}`
+}
+
+/** Intrusion points to the root, extrusion to the occlusal edge. */
+function verticalArrow(type: string): string {
+  const tip = type === 'intrusion' ? -16 : 16
+  return `M 0,${-tip} L 0,${tip} ${arrowHead(0, tip, 0, -tip)}`
+}
+
+// Where the movement marks go, apart from each other and from a bracket on
+// the crown: the turn at the incisal edge, intrusion/extrusion on the root,
+// crowding at the neck, a diastema on the mesial side.
+
+/** Just past the incisal / occlusal edge. */
+const incisalEdgeY = computed(() => viewBoxDimensions.value.y + viewBoxDimensions.value.height + 2)
+
+/** The neck of the tooth, between crown and root. */
+const cervicalY = computed(() => {
+  const a = iconAnchors.value
+  return a ? a.crownCenter.y + (a.rootCenter.y - a.crownCenter.y) * 0.45 : 0
+})
+
 // Rule 4: Pattern fill treatments (cenital view)
 const patternFillTreatments = computed(() => {
   return toothTreatments.value.filter(t =>
@@ -655,6 +696,65 @@ const hasPlannedLateralTreatments = computed(() => {
               </g>
             </template>
 
+            <!-- Giroversión: curved arrow at the incisal edge, left or right on the chart -->
+            <template v-else-if="['rotation_left', 'rotation_right'].includes(treatment.treatment_type) && iconAnchors">
+              <path
+                :transform="`translate(${iconAnchors.crownCenter.x}, ${incisalEdgeY})`"
+                :d="rotationArrow(treatment.treatment_type)"
+                :data-mark="treatment.treatment_type"
+                fill="none"
+                :stroke="chartColor(treatment)"
+                stroke-width="3"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </template>
+
+            <!-- Intrusion / extrusion: arrow along the root, to the apex or to the edge -->
+            <template v-else-if="['intrusion', 'extrusion'].includes(treatment.treatment_type) && iconAnchors">
+              <path
+                :transform="`translate(${iconAnchors.rootCenter.x}, ${iconAnchors.rootCenter.y})`"
+                :d="verticalArrow(treatment.treatment_type)"
+                :data-mark="treatment.treatment_type"
+                fill="none"
+                :stroke="chartColor(treatment)"
+                stroke-width="3"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </template>
+
+            <!-- Diastema: "=" on the mesial side of the crown -->
+            <template v-else-if="treatment.treatment_type === 'diastema' && iconAnchors">
+              <path
+                :transform="`translate(${iconAnchors.besideCrown.x}, ${iconAnchors.besideCrown.y})`"
+                d="M -5,-4 H 7 M -5,4 H 7"
+                data-mark="diastema"
+                fill="none"
+                :stroke="chartColor(treatment)"
+                stroke-width="3"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+                stroke-linecap="round"
+              />
+            </template>
+
+            <!-- Crowding: "₩" at the neck of the tooth, upright on every quadrant -->
+            <template v-else-if="treatment.treatment_type === 'crowding' && iconAnchors">
+              <path
+                :transform="`translate(${iconAnchors.crownCenter.x}, ${cervicalY}) scale(1, ${flipY})`"
+                d="M -12,-8 L -6,8 L 0,-4 L 6,8 L 12,-8 M -14,0 H 14"
+                data-mark="crowding"
+                fill="none"
+                :stroke="chartColor(treatment)"
+                stroke-width="2.5"
+                :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </template>
+
             <!-- Soft tissue biopsy: a punch at the gum, beside the crown. The
                  gum sits a quarter of the way from the crown towards the
                  root, which holds for upper and lower teeth alike. -->
@@ -702,23 +802,16 @@ const hasPlannedLateralTreatments = computed(() => {
             <!-- Orthodontic treatments on crown -->
             <template v-else-if="['bracket', 'tube', 'band', 'attachment', 'retainer'].includes(treatment.treatment_type) && iconAnchors">
               <g :transform="`translate(${iconAnchors.crownCenter.x}, ${iconAnchors.crownCenter.y})`">
-                <!-- Bracket -->
+                <!-- Bracket: "#" -->
                 <template v-if="treatment.treatment_type === 'bracket'">
-                  <rect
-                    x="-8"
-                    y="-8"
-                    width="16"
-                    height="16"
-                    :fill="chartColor(treatment)"
-                    :fill-opacity="0.8 * (STATUS_STYLES[treatment.status]?.opacity ?? 1)"
-                  />
-                  <line
-                    x1="-12"
-                    y1="0"
-                    x2="12"
-                    y2="0"
+                  <path
+                    d="M -4,-11 V 11 M 4,-11 V 11 M -11,-4 H 11 M -11,4 H 11"
+                    data-mark="bracket"
+                    fill="none"
                     :stroke="chartColor(treatment)"
-                    stroke-width="2"
+                    stroke-width="3"
+                    :stroke-opacity="STATUS_STYLES[treatment.status]?.opacity ?? 1"
+                    stroke-linecap="round"
                   />
                 </template>
                 <!-- Tube -->

@@ -44,7 +44,7 @@ def _load_catalog() -> dict[str, ErrorDefinition]:
 
 
 # Fail at startup if the module's error contract is malformed.
-ERROR_CATALOG: Final[dict[str, ErrorDefinition]] = _load_catalog() # type: ignore
+ERROR_CATALOG: Final[dict[str, ErrorDefinition]] = _load_catalog()  # type: ignore
 
 
 def professional_error(code: str, *, detail: str | None = None) -> AppError:

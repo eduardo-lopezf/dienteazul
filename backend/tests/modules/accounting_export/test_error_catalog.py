@@ -11,7 +11,7 @@ from app.modules.accounting_export.errors import ERROR_CATALOG
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", ["/preview", "/run"])
 async def test_reversed_export_period_error_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str], path: str
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic, path: str
 ) -> None:
     response = await client.get(
         f"/api/v1/accounting_export{path}",

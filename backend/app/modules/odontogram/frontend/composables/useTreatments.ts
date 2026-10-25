@@ -152,11 +152,17 @@ export function useTreatments() {
     }
   }
 
-  async function deleteTreatment(treatmentId: string): Promise<boolean> {
+  /** `silent`: no success toast — the caller says what was done, once. */
+  async function deleteTreatment(
+    treatmentId: string,
+    options: { silent?: boolean } = {}
+  ): Promise<boolean> {
     try {
       await api.del(`/api/v1/odontogram/treatments/${treatmentId}`)
       removeLocalTreatment(treatmentId)
-      toast.add({ title: t('odontogram.treatments.treatmentDeleted'), color: 'success' })
+      if (!options.silent) {
+        toast.add({ title: t('odontogram.treatments.treatmentDeleted'), color: 'success' })
+      }
       return true
     } catch (err) {
       toast.add({

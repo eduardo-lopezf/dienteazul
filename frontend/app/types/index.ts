@@ -469,6 +469,12 @@ export type ClinicalType
     | 'periapical_medium'
     | 'periapical_large'
     | 'rotated'
+    | 'rotation_left'
+    | 'rotation_right'
+    | 'intrusion'
+    | 'extrusion'
+    | 'diastema'
+    | 'crowding'
     | 'displaced'
     | 'unerupted'
     // Restauradora

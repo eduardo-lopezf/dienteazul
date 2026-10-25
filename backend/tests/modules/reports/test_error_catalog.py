@@ -11,7 +11,7 @@ from app.modules.reports.errors import ERROR_CATALOG
 
 @pytest.mark.asyncio
 async def test_disabled_report_integration_error_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     was_active = module_registry.is_installed("billing")
     module_registry.deactivate("billing")
@@ -36,7 +36,7 @@ async def test_disabled_report_integration_error_is_traceable(
 
 @pytest.mark.asyncio
 async def test_invalid_lifecycle_date_range_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     response = await client.get(
         "/api/v1/reports/scheduling/waiting-times",

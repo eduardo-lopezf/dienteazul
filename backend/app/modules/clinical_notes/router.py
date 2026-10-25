@@ -302,9 +302,7 @@ async def list_attachments(
     try:
         rows = await list_attachments_for_owner(db, ctx.clinic_id, owner_type, owner_id)
     except NoteOwnerError as e:
-        raise clinical_notes_error(
-            "clinical_notes.attachment.owner_invalid", detail=str(e)
-        ) from e
+        raise clinical_notes_error("clinical_notes.attachment.owner_invalid", detail=str(e)) from e
     return ApiResponse(data=[NoteAttachmentResponse.model_validate(r) for r in rows])
 
 

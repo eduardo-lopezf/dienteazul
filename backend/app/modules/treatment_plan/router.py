@@ -101,7 +101,9 @@ async def list_pipeline(
     treatment_plan's manifest.depends. Filtering happens in SQL by tab.
     """
     if tab not in PIPELINE_TABS:
-        raise treatment_plan_error("treatment_plan.pipeline.invalid_tab", detail=f"Unknown tab '{tab}'")
+        raise treatment_plan_error(
+            "treatment_plan.pipeline.invalid_tab", detail=f"Unknown tab '{tab}'"
+        )
 
     rows, total = await TreatmentPlanService.list_pipeline(
         db,

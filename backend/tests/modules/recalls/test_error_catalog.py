@@ -12,7 +12,7 @@ from app.modules.recalls.errors import ERROR_CATALOG
 
 @pytest.mark.asyncio
 async def test_missing_recall_error_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     response = await client.get(
         f"/api/v1/recalls/{UUID(int=0)}",

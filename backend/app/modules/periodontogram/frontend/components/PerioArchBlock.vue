@@ -68,8 +68,10 @@ const heading = computed(() => {
   const name = props.arch === 'upper' ? 'Superior' : 'Inferior'
   const quadrants = new Set(orderedTeeth.value.map(t => Math.floor(t.tooth_number / 10)))
   const teeth = orderedTeeth.value
-  if (quadrants.size !== 1 || teeth.length === 0) return name
-  return `${name} · ${teeth[0].tooth_number}–${teeth[teeth.length - 1].tooth_number}`
+  const first = teeth[0]
+  const last = teeth[teeth.length - 1]
+  if (quadrants.size !== 1 || !first || !last) return name
+  return `${name} · ${first.tooth_number}–${last.tooth_number}`
 })
 const innerFace = computed<'palatal' | 'lingual'>(() =>
   props.arch === 'upper' ? 'palatal' : 'lingual'

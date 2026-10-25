@@ -12,46 +12,19 @@ import { spawnSync } from 'node:child_process'
 
 const ALLOWED = {
   // No fixed release exists: the advisory covers every published
-  // version (<=3.0.3, and 3.0.3 is the latest). It is a stack-exhaustion
-  // DoS on deeply nested brace patterns, reached by expanding a glob —
-  // and nothing here expands a glob from user input: `braces` arrives
-  // under `micromatch` → `fast-glob`, which the i18n and router plugins
-  // use at build time to find files on disk.
+  // version (<=1.4.0, the latest). `node-forge` arrives under `listhen`,
+  // the dev-server listener that mints a self-signed certificate for
+  // `nuxi dev --https`; the weakness is RSA PKCS#1 v1.5 signature
+  // verification, which this project never asks it to do. Verified on
+  // 2026-10-25: `listhen`, `nitropack` and `node-forge` are all absent
+  // from `.output/server/node_modules`, and nothing under `.output`
+  // mentions `node-forge`.
   //
-  // Verified on 2026-10-03: `npm run build` ships none of that chain —
-  // `braces`, `micromatch`, `fast-glob` and `globby` are all absent from
-  // `.output/server/node_modules`. ("braces" does appear inside
-  // `.output/server/chunks/_/icons.mjs`: that is the orthodontic icon.)
-  'braces': 'no published fix (<=3.0.3 is every version); build-time glob matching, absent from .output',
-
-  // Same shape: the advisory covers every published version (<=1.4.0,
-  // the latest). `node-forge` arrives under `listhen`, the dev-server
-  // listener that mints a self-signed certificate for `nuxi dev --https`;
-  // the weakness is RSA PKCS#1 v1.5 signature verification, which this
-  // project never asks it to do. Verified the same way: `listhen`,
-  // `nitropack` and `node-forge` are absent from `.output/server`.
-  'node-forge': 'no published fix (<=1.4.0 is every version); dev-server TLS only, absent from .output',
-
-  // Both arrive under `@nuxt/devtools`, which runs with `nuxi dev` and
-  // nowhere else: verified on 2026-10-06 that `npm run build` ships
-  // neither — `simple-git` is absent from `.output/server/node_modules`.
-  // The advisories are about git executing what its own configuration or
-  // `VISUAL` tells it to, so reaching them means running the dev server
-  // against a repository or environment an attacker already controls.
-  //
-  // The fix is `@nuxt/devtools` 4, and it is not reachable yet. This
-  // comment used to say it came with nuxt 4.5.2; it does not — nuxt 4.6.0
-  // still depends on `@nuxt/devtools` `^3.4.2`, and 4 is only published as
-  // `4.0.0-beta.4` (checked on 2026-10-06). Pinning `simple-git` forward
-  // instead does not work, and that is measured, not assumed: v4 dropped
-  // its default export, `@nuxt/devtools` imports `Git from 'simple-git'`,
-  // and `nuxt prepare` dies with "does not provide an export named
-  // 'default'" — taking dev and build with it.
-  //
-  // `nuxt` itself needs no entry since 4.6.0: its own advisories are
-  // closed, and it is listed only through this chain and `node-forge`.
-  'simple-git': 'dev-only, under @nuxt/devtools; absent from .output; v4 drops the default export devtools imports',
-  '@simple-git/argv-parser': 'same chain: dev-only under @nuxt/devtools, absent from .output'
+  // `nuxt` itself needs no entry: its own advisories are closed as of
+  // 4.6.2, and it is listed only through this chain. The same bump took
+  // `@nuxt/devtools` to 3.4.4, which no longer depends on `simple-git` —
+  // the two `simple-git` entries that used to sit below are gone with it.
+  'node-forge': 'no published fix (<=1.4.0 is every version); dev-server TLS only, absent from .output'
 }
 
 const FAIL_AT = new Set(['high', 'critical'])
@@ -121,12 +94,12 @@ function parentsOf(name) {
  * Which packages inherit an allowlisted reason.
  *
  * A package with a high advisory of its own needs its own entry. A
- * package that is only high *because* something it depends on is — ten of
- * the twelve here, the whole `fast-glob` → `micromatch` → `braces` chain
- * and `nitropack` → `listhen` → `node-forge` — inherits the reason from
- * the package that carries the advisory. Writing those out by hand would
- * be ten copies of one sentence, each going stale on its own; this keeps
- * the gate asking about the two packages that are actually unfixable.
+ * package that is only high *because* something it depends on is — the
+ * six here, `nuxt` and `nitropack` → `listhen` → `node-forge` among them
+ * — inherits the reason from the package that carries the advisory.
+ * Writing those out by hand would be six copies of one sentence, each
+ * going stale on its own; this keeps the gate asking about the one
+ * package that is actually unfixable.
  *
  * Computed by elimination rather than by walking up, because the graph
  * has cycles: `nuxt` is high through `@nuxt/vite-builder`, which is high

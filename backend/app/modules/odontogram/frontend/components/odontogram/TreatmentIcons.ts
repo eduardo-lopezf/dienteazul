@@ -97,6 +97,38 @@ export const TREATMENT_ICONS: Record<string, string> = {
     <path d="M21 3v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   `,
 
+  // Giroversión to the left - curved arrow
+  rotation_left: `
+    <path d="M19 15Q12 4 5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <path d="M5 9v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+
+  // Giroversión to the right - curved arrow
+  rotation_right: `
+    <path d="M5 15Q12 4 19 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <path d="M19 9v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+
+  // Intrusion - arrow up (towards the root of an upper tooth)
+  intrusion: `
+    <path d="M12 20V4M6 10l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+
+  // Extrusion - arrow down
+  extrusion: `
+    <path d="M12 4v16M6 14l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+
+  // Diastema - "="
+  diastema: `
+    <path d="M5 9h14M5 15h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  `,
+
+  // Crowding - "₩"
+  crowding: `
+    <path d="M3 6l4 13 5-10 5 10 4-13M2 12h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+
   // Displaced - arrows pointing outward
   displaced: `
     <path d="M12 4V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -429,10 +461,7 @@ export const TREATMENT_ICONS: Record<string, string> = {
 
   // Bracket - orthodontic bracket
   bracket: `
-    <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="1.5"/>
-    <line x1="3" y1="12" x2="8" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <line x1="16" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <rect x="10" y="10" width="4" height="4" fill="currentColor"/>
+    <path d="M9 3v18M15 3v18M3 9h18M3 15h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
   `,
 
   // Tube - orthodontic tube (on molars)

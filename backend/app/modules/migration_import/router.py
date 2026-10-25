@@ -846,9 +846,7 @@ async def undo_job(
     except ValueError as exc:
         raise migration_error("migration_import.undo.invalid_state", detail=str(exc)) from exc
     if plan.blockers:
-        raise migration_error(
-            "migration_import.undo.blocked", detail=describe_blockers(plan)
-        )
+        raise migration_error("migration_import.undo.blocked", detail=describe_blockers(plan))
     job.execute_options = {**(job.execute_options or {}), "status_before_undo": job.status}
     job.status = "undoing"
     job.undo_error = None

@@ -261,7 +261,13 @@ class TreatmentType(StrEnum):
     PERIAPICAL_SMALL = "periapical_small"
     PERIAPICAL_MEDIUM = "periapical_medium"
     PERIAPICAL_LARGE = "periapical_large"
-    ROTATED = "rotated"
+    ROTATED = "rotated"  # Direction not said; kept for findings charted before the two below.
+    ROTATION_LEFT = "rotation_left"  # Giroversión, arrow to the chart's left.
+    ROTATION_RIGHT = "rotation_right"  # Giroversión, arrow to the chart's right.
+    INTRUSION = "intrusion"  # Sunk towards the root: arrow to the apex.
+    EXTRUSION = "extrusion"  # Out of the socket: arrow to the occlusal edge.
+    DIASTEMA = "diastema"  # Space on the mesial side, drawn "=".
+    CROWDING = "crowding"  # Apiñamiento, drawn "₩".
     DISPLACED = "displaced"
     UNERUPTED = "unerupted"
 
@@ -378,7 +384,12 @@ TREATMENTS_BY_CATEGORY: Final[dict[str, list[str]]] = {
         TreatmentType.PERIAPICAL_SMALL.value,
         TreatmentType.PERIAPICAL_MEDIUM.value,
         TreatmentType.PERIAPICAL_LARGE.value,
-        TreatmentType.ROTATED.value,
+        TreatmentType.ROTATION_LEFT.value,
+        TreatmentType.ROTATION_RIGHT.value,
+        TreatmentType.INTRUSION.value,
+        TreatmentType.EXTRUSION.value,
+        TreatmentType.DIASTEMA.value,
+        TreatmentType.CROWDING.value,
         TreatmentType.DISPLACED.value,
         TreatmentType.UNERUPTED.value,
     ],
@@ -447,6 +458,12 @@ TREATMENT_VISUALIZATION_RULES: Final[dict[str, list[str]]] = {
         TreatmentType.PERIAPICAL_MEDIUM.value,
         TreatmentType.PERIAPICAL_LARGE.value,
         TreatmentType.ROTATED.value,
+        TreatmentType.ROTATION_LEFT.value,
+        TreatmentType.ROTATION_RIGHT.value,
+        TreatmentType.INTRUSION.value,
+        TreatmentType.EXTRUSION.value,
+        TreatmentType.DIASTEMA.value,
+        TreatmentType.CROWDING.value,
         TreatmentType.DISPLACED.value,
         TreatmentType.IMPLANT.value,
         TreatmentType.APICOECTOMY.value,
@@ -494,6 +511,12 @@ WHOLE_TOOTH_TREATMENTS: Final[set[str]] = {
     TreatmentType.PERIAPICAL_MEDIUM.value,
     TreatmentType.PERIAPICAL_LARGE.value,
     TreatmentType.ROTATED.value,
+    TreatmentType.ROTATION_LEFT.value,
+    TreatmentType.ROTATION_RIGHT.value,
+    TreatmentType.INTRUSION.value,
+    TreatmentType.EXTRUSION.value,
+    TreatmentType.DIASTEMA.value,
+    TreatmentType.CROWDING.value,
     TreatmentType.DISPLACED.value,
     TreatmentType.UNERUPTED.value,
     TreatmentType.OVERLAY.value,

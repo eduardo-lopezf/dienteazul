@@ -36,6 +36,7 @@ import {
 } from '../../utils/dentitionLayout'
 import { dentalIndices } from '../../utils/dentalIndices'
 import { boxDimmedTeeth as boxDimmed } from '../../utils/boxChart'
+import { findingState, type FindingChange, type ToothFinding } from '../../utils/toothFindings'
 
 export type OdontogramMode = 'full' | 'view-only' | 'diagnosis' | 'planning'
 
@@ -311,17 +312,135 @@ const alerts = computed(() =>
 )
 
 // ----------------------------------------------------------------------------
-// Eruption: clicking a tooth with no treatment armed opens its eruption card.
+// Diagnosis card: clicking a tooth with no treatment armed opens its findings
+// (`ToothDiagnosisModal`); the eruption card is one button away from it.
 // ----------------------------------------------------------------------------
 
+const diagnosisTooth = ref<number | null>(null)
 const eruptionTooth = ref<number | null>(null)
+/** The card's pending changes are being saved. */
+const findingsSaving = ref(false)
+/** A surface finding (caries) waiting for its surfaces in the picker. */
+const surfaceFinding = ref<ClinicalType | null>(null)
 
-function openEruption(toothNumber: number) {
-  eruptionTooth.value = toothNumber
+/** A card about a tooth is open: the tooth tooltips keep out of its way. */
+const tooltipsBlocked = computed(() =>
+  diagnosisTooth.value !== null || eruptionTooth.value !== null || showSurfaceSelector.value
+)
+
+function openDiagnosis(toothNumber: number) {
+  diagnosisTooth.value = toothNumber
+}
+
+async function acceptDiagnosis(changes: FindingChange[]) {
+  if (await saveFindingChanges(changes)) diagnosisTooth.value = null
+}
+
+async function surfaceFromDiagnosis(finding: ToothFinding, tooth: number, changes: FindingChange[]) {
+  if (!(await saveFindingChanges(changes))) return
+  surfaceFinding.value = finding.type ?? null
+  selectedTooth.value = tooth
+  diagnosisTooth.value = null
+  showSurfaceSelector.value = true
+}
+
+async function openEruptionFromDiagnosis(tooth: number, changes: FindingChange[]) {
+  if (!(await saveFindingChanges(changes))) return
+  eruptionTooth.value = tooth
+  diagnosisTooth.value = null
 }
 
 async function onEruptionChanged() {
   await fetchOdontogram(props.patientId)
+}
+
+/** Everything charted on the tooth now, whatever the status filter shows. */
+function currentViews(toothNumber: number): ToothTreatmentView[] {
+  return viewsForTooth(getToothTreatments(toothNumber), toothNumber)
+}
+
+function eruptionStatusOf(tooth: number): EruptionStatus | null {
+  return chartFacts.value.statusOf?.(tooth) ?? null
+}
+
+async function chartFinding(
+  toothNumber: number,
+  clinicalType: ClinicalType,
+  status: TreatmentStatus,
+  surfaces?: Surface[]
+) {
+  const payload: TreatmentCreate = {
+    tooth_numbers: [toothNumber],
+    clinical_type: clinicalType,
+    status,
+    scope: 'tooth'
+  }
+  if (surfaces?.length) payload.surfaces = surfaces
+  const treatment = await createTreatment(props.patientId, payload)
+  if (!treatment) return false
+  // An extraction indicated while building a plan belongs to that plan.
+  if (status === 'planned' && isPlanningMode.value && props.planId) {
+    await treatmentPlansApi.addItem(props.planId, { treatment_id: treatment.id })
+  }
+  undoStack.value.push({ treatmentId: treatment.id, type: treatment.clinical_type })
+  emit('treatmentAdd', treatment)
+  return true
+}
+
+/**
+ * Saves what was pressed on the diagnosis card (`draftChanges`: removals
+ * first, so a turn swaps cleanly). A finding goes on as one treatment per
+ * tooth, or as the eruption status; it comes off as what the card may take
+ * off. One toast says what was done, not one per tooth. `false` if a
+ * request failed (the card stays open; what was saved stays saved).
+ */
+async function saveFindingChanges(changes: FindingChange[]): Promise<boolean> {
+  if (!changes.length) return true
+  findingsSaving.value = true
+  const done = new Map<string, { finding: ToothFinding, on: boolean, teeth: number[] }>()
+  let ok = true
+  let eruptionTouched = false
+  try {
+    for (const { finding, tooth, on } of changes) {
+      if (finding.kind === 'eruption') {
+        await api.put(`/api/v1/odontogram/patients/${props.patientId}/teeth/${tooth}`, {
+          eruption_status: on ? finding.eruption : null
+        })
+        eruptionTouched = true
+      } else if (on) {
+        if (!(await chartFinding(tooth, finding.type!, finding.status ?? 'existing'))) {
+          ok = false
+          continue
+        }
+      } else {
+        const { removable } = findingState(finding, currentViews(tooth), eruptionStatusOf(tooth))
+        for (const id of removable) await deleteTreatment(id, { silent: true })
+      }
+      const key = `${finding.key}:${on}`
+      if (!done.has(key)) done.set(key, { finding, on, teeth: [] })
+      done.get(key)!.teeth.push(tooth)
+    }
+  } catch {
+    ok = false
+    toast.add({ title: t('odontogram.findings.saveFailed'), color: 'error' })
+  } finally {
+    if (eruptionTouched) await fetchOdontogram(props.patientId)
+    emit('treatmentsChanged')
+    findingsSaving.value = false
+  }
+  if (done.size) {
+    toast.add({
+      title: t('odontogram.findings.saved'),
+      description: [...done.values()].map(d =>
+        t(d.on ? 'odontogram.findings.added' : 'odontogram.findings.removed', {
+          finding: t(`odontogram.findings.items.${d.finding.key}`),
+          teeth: [...d.teeth].sort((a, b) => a - b).join(', ')
+        })
+      ).join(' · '),
+      color: 'success'
+    })
+  }
+  return ok
 }
 
 const pendingTreatment = computed(() => {
@@ -532,7 +651,7 @@ function handleToothClick(toothNumber: number) {
     return
   }
   if (!isClickToApplyMode.value) {
-    openEruption(toothNumber)
+    openDiagnosis(toothNumber)
     return
   }
   if (!treatmentFits(toothNumber)) return
@@ -715,7 +834,7 @@ function resetMultiToothSelection() {
 function handleToothContextMenu(toothNumber: number, event: MouseEvent) {
   if (isReadonly.value) return
   event.preventDefault()
-  openEruption(toothNumber)
+  openDiagnosis(toothNumber)
 }
 
 async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
@@ -770,11 +889,23 @@ async function applyTreatment(toothNumber: number, surfaces?: Surface[]) {
   // and every application still offers Undo in its toast.
 }
 
-function handleSurfaceConfirm(surfaces: Surface[]) {
-  if (selectedTooth.value && surfaces.length) {
-    applyTreatment(selectedTooth.value, surfaces)
-  }
+async function handleSurfaceConfirm(surfaces: Surface[]) {
+  const tooth = selectedTooth.value
+  const finding = surfaceFinding.value
   selectedTooth.value = null
+  surfaceFinding.value = null
+  if (!tooth || !surfaces.length) return
+  if (finding) {
+    await chartFinding(tooth, finding, 'existing', surfaces)
+    emit('treatmentsChanged')
+    return
+  }
+  applyTreatment(tooth, surfaces)
+}
+
+function handleSurfaceCancel() {
+  selectedTooth.value = null
+  surfaceFinding.value = null
 }
 
 async function handleUndo() {
@@ -1195,6 +1326,7 @@ defineExpose({
                 :class="'status-' + upperMidlineBridgeStatus"
               />
               <ToothQuadrant
+                :tooltips-blocked="tooltipsBlocked"
                 :teeth="teethLayout.upperRight"
                 :get-tooth-data="getToothData"
                 :get-treatments="getFilteredTreatments"
@@ -1220,6 +1352,7 @@ defineExpose({
               <div class="w-px bg-surface-sunken  mx-2" />
 
               <ToothQuadrant
+                :tooltips-blocked="tooltipsBlocked"
                 :teeth="teethLayout.upperLeft"
                 :get-tooth-data="getToothData"
                 :get-treatments="getFilteredTreatments"
@@ -1258,6 +1391,7 @@ defineExpose({
                 :class="'status-' + lowerMidlineBridgeStatus"
               />
               <ToothQuadrant
+                :tooltips-blocked="tooltipsBlocked"
                 :teeth="teethLayout.lowerRight"
                 :get-tooth-data="getToothData"
                 :get-treatments="getFilteredTreatments"
@@ -1283,6 +1417,7 @@ defineExpose({
               <div class="w-px bg-surface-sunken  mx-2" />
 
               <ToothQuadrant
+                :tooltips-blocked="tooltipsBlocked"
                 :teeth="teethLayout.lowerLeft"
                 :get-tooth-data="getToothData"
                 :get-treatments="getFilteredTreatments"
@@ -1399,10 +1534,10 @@ defineExpose({
     <SurfaceSelectorPopup
       v-model:open="showSurfaceSelector"
       :tooth-number="selectedTooth || 0"
-      :treatment-type="(selectedTreatmentType as ClinicalType) || 'filling_composite'"
-      :status="selectedTreatmentStatus"
+      :treatment-type="surfaceFinding ?? ((selectedTreatmentType as ClinicalType) || 'filling_composite')"
+      :status="surfaceFinding ? 'existing' : selectedTreatmentStatus"
       @confirm="handleSurfaceConfirm"
-      @cancel="selectedTooth = null"
+      @cancel="handleSurfaceCancel"
     />
 
     <!-- Treatment edit modal -->
@@ -1504,6 +1639,20 @@ defineExpose({
         </UCard>
       </template>
     </UModal>
+
+    <ToothDiagnosisModal
+      :tooth-number="diagnosisTooth"
+      :get-treatments="currentViews"
+      :get-eruption-status="eruptionStatusOf"
+      :layout="teethLayout"
+      :dimmed-teeth="dimmedTeeth"
+      :get-tooth-data="getToothData"
+      :saving="findingsSaving"
+      @cancel="() => { if (!findingsSaving) diagnosisTooth = null }"
+      @accept="acceptDiagnosis"
+      @surface="surfaceFromDiagnosis"
+      @eruption="openEruptionFromDiagnosis"
+    />
 
     <ToothEruptionModal
       :tooth-number="eruptionTooth"

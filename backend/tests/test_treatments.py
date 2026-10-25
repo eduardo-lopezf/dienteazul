@@ -359,6 +359,27 @@ async def test_create_diagnostic_finding_without_catalog(
     assert data["price_snapshot"] is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "clinical_type",
+    ["rotation_left", "rotation_right", "intrusion", "extrusion", "diastema", "crowding"],
+)
+async def test_tooth_card_findings_are_whole_tooth_diagnoses(
+    client: AsyncClient, auth_headers: dict, setup: dict, clinical_type: str
+) -> None:
+    """The findings the tooth card charts go on the whole tooth, with no price."""
+    r = await client.post(
+        f"/api/v1/odontogram/patients/{setup['patient_id']}/treatments",
+        headers=auth_headers,
+        json={"clinical_type": clinical_type, "tooth_numbers": [11], "status": "performed"},
+    )
+    assert r.status_code == 201, r.text
+    data = r.json()["data"]
+    assert data["clinical_type"] == clinical_type
+    assert data["scope"] == "tooth"
+    assert data["price_snapshot"] is None
+
+
 # ----------------------------------------------------------------------------
 # Conflicts and validators
 # ----------------------------------------------------------------------------

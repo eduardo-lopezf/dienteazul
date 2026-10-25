@@ -69,6 +69,12 @@ export const DEFAULTS_BY_TYPE: Readonly<Record<string, TypeDefaults>> = {
       'periapical_medium',
       'periapical_large',
       'rotated',
+      'rotation_left',
+      'rotation_right',
+      'intrusion',
+      'extrusion',
+      'diastema',
+      'crowding',
       'displaced',
       'unerupted'
     ],

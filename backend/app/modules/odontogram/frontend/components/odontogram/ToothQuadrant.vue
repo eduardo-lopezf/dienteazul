@@ -46,16 +46,43 @@ const props = withDefaults(defineProps<{
   dimmedTeeth?: number[]
   /** The tooth's eruption status, when charted: shown as a tag under it. */
   getEruptionStatus?: (toothNumber: number) => string | null | undefined
+  /**
+   * A card about a tooth is open (diagnosis, eruption, surfaces): the
+   * tooltips close and stay closed, so none sits on top of it.
+   */
+  tooltipsBlocked?: boolean
 }>(), {
-  getGroupId: () => () => null,
-  getGroupStatus: () => () => null,
-  getGroupType: () => () => null,
+  // A function prop's default is the function itself, not a factory:
+  // `() => () => null` made every tooth "in a group" (a truthy function).
+  getGroupId: () => null,
+  getGroupStatus: () => null,
+  getGroupType: () => null,
   multiSelectedTeeth: () => [],
   dimmedTeeth: () => [],
-  getEruptionStatus: () => () => null
+  getEruptionStatus: () => null,
+  tooltipsBlocked: false
 })
 
 const { t } = useI18n()
+
+// The tooltip shows on hover. A click on an editable chart opens the tooth's
+// card (or applies the armed treatment), so a click-opened tooltip only
+// doubled it; a read-only chart does nothing else on click, so there the
+// click still opens it.
+const tooltipMode = computed(() => (props.readonly ? 'click' : 'hover'))
+const openTooltip = ref<number | null>(null)
+
+watch(() => props.tooltipsBlocked, (blocked) => {
+  if (blocked) openTooltip.value = null
+})
+
+function setTooltip(tooth: number, open: boolean) {
+  if (open) {
+    if (!props.tooltipsBlocked) openTooltip.value = tooth
+  } else if (openTooltip.value === tooth) {
+    openTooltip.value = null
+  }
+}
 
 /** Short tag for a status that changes how the tooth is read; none when erupted. */
 function eruptionTag(toothNumber: number): string | null {
@@ -120,9 +147,12 @@ function isUpperTooth(toothNumber: number): boolean {
       :key="toothNum"
     >
       <UPopover
+        :mode="tooltipMode"
+        :open="openTooltip === toothNum"
         :open-delay="300"
         :close-delay="100"
         :ui="{ width: 'min-w-48 max-w-72' }"
+        @update:open="(open: boolean) => setTooltip(toothNum, open)"
       >
         <div
           class="tooth-cell"

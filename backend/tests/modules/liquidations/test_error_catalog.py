@@ -12,7 +12,7 @@ from app.modules.liquidations.errors import ERROR_CATALOG
 
 @pytest.mark.asyncio
 async def test_missing_liquidation_error_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     response = await client.get(
         f"/api/v1/liquidations/{UUID(int=0)}",
@@ -30,7 +30,7 @@ async def test_missing_liquidation_error_is_traceable(
 
 @pytest.mark.asyncio
 async def test_invalid_settlement_period_is_traceable(
-    client: AsyncClient, auth_headers: dict[str, str]
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
 ) -> None:
     response = await client.get(
         "/api/v1/liquidations/preview",

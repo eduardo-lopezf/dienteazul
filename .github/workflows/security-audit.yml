@@ -73,8 +73,11 @@ jobs:
       # Pinning npm here rather than adding those entries to the lock: a
       # lock repaired with npm 10 is silently reverted by the next
       # `npm install` on a developer's npm 11, so the fix would not hold.
-      # This is the only `npm ci` in the repo — every other job runs
-      # `npm install`, which tolerates the difference.
+      #
+      # Every job installs with `npm ci` since 2026-10-25. The others get
+      # their npm from `node-version: "24"`, which bundles npm 11; this
+      # one keeps the explicit pin because it is the job whose whole
+      # purpose is to read the lock file as shipped.
       - name: Pin npm to the version that generates the lock file
         run: npm i -g npm@11
 

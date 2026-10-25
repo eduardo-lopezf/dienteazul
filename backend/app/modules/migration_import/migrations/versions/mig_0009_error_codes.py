@@ -18,9 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "migration_import_jobs", sa.Column("error_code", sa.String(120), nullable=True)
-    )
+    op.add_column("migration_import_jobs", sa.Column("error_code", sa.String(120), nullable=True))
     op.add_column(
         "migration_import_jobs", sa.Column("undo_error_code", sa.String(120), nullable=True)
     )
