@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
+from .errors import billing_error, service_error, workflow_error
 from .hooks import BillingHookRegistry
 from .schemas import (
     BillingPartyUpdate,
@@ -93,7 +94,7 @@ async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -
         )
     )
     if owned is None:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise billing_error("billing.patient.not_found")
 
 
 # ============================================================================
@@ -129,7 +130,7 @@ async def create_series(
         await db.commit()
         return ApiResponse(data=InvoiceSeriesResponse.model_validate(series))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="series")
 
 
 @router.put("/series/{series_id}", response_model=ApiResponse[InvoiceSeriesResponse])
@@ -154,7 +155,7 @@ async def update_series(
     series = result.scalar_one_or_none()
 
     if not series:
-        raise HTTPException(status_code=404, detail="Series not found")
+        raise billing_error("billing.series.not_found")
 
     try:
         series = await InvoiceSeriesService.update_series(
@@ -163,7 +164,7 @@ async def update_series(
         await db.commit()
         return ApiResponse(data=InvoiceSeriesResponse.model_validate(series))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="series")
 
 
 @router.post("/series/{series_id}/reset", response_model=ApiResponse[InvoiceSeriesResponse])
@@ -192,7 +193,7 @@ async def reset_series_counter(
     series = result.scalar_one_or_none()
 
     if not series:
-        raise HTTPException(status_code=404, detail="Series not found")
+        raise billing_error("billing.series.not_found")
 
     try:
         series = await InvoiceSeriesService.reset_series_counter(
@@ -201,7 +202,7 @@ async def reset_series_counter(
         await db.commit()
         return ApiResponse(data=InvoiceSeriesResponse.model_validate(series))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="series")
 
 
 # ============================================================================
@@ -242,8 +243,8 @@ async def list_invoices(
     if compliance_severity:
         bad = set(compliance_severity) - VALID_COMPLIANCE_SEVERITIES
         if bad:
-            raise HTTPException(
-                status_code=422,
+            raise billing_error(
+                "billing.invoice.compliance_severity_invalid",
                 detail=f"Invalid compliance_severity values: {sorted(bad)}",
             )
     invoices, total = await InvoiceService.list_invoices(
@@ -290,7 +291,7 @@ async def get_invoice(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=True
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     response = InvoiceDetailResponse.model_validate(invoice)
     summaries = await compute_paid_summaries_for_invoices(db, ctx.clinic_id, [invoice.id])
@@ -340,7 +341,7 @@ async def create_invoice(
 
         return ApiResponse(data=InvoiceResponse.model_validate(invoice))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice")
 
 
 @router.post(
@@ -391,7 +392,7 @@ async def create_invoice_from_budget(
 
         return ApiResponse(data=InvoiceResponse.model_validate(invoice))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice")
 
 
 @router.put("/invoices/{invoice_id}", response_model=ApiResponse[InvoiceResponse])
@@ -410,7 +411,7 @@ async def update_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     try:
         update_data = data.model_dump(exclude_unset=True)
@@ -423,7 +424,7 @@ async def update_invoice(
         )
         return ApiResponse(data=InvoiceResponse.model_validate(invoice))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice")
 
 
 @router.patch(
@@ -456,7 +457,7 @@ async def update_billing_party(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     try:
         await InvoiceWorkflowService.update_billing_party(
@@ -470,11 +471,9 @@ async def update_billing_party(
         )
         await db.commit()
     except InvoiceWorkflowError as e:
-        # 409 when optimistic-lock mismatch, 422 otherwise.
-        status = 409 if "concurrent" in str(e).lower() else 422
-        raise HTTPException(status_code=status, detail=str(e))
+        raise workflow_error(e, operation="billing_party")
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise billing_error("billing.invoice.billing_party_invalid", detail=str(e))
 
     invoice = await InvoiceService.get_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
@@ -494,13 +493,13 @@ async def delete_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     try:
         await InvoiceService.delete_invoice(db, invoice, ctx.user_id)
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice")
 
 
 # ============================================================================
@@ -525,17 +524,17 @@ async def add_invoice_item(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     if not InvoiceWorkflowService.can_edit(invoice):
-        raise HTTPException(status_code=400, detail="Can only edit draft invoices")
+        raise billing_error("billing.invoice.draft_required")
 
     try:
         item = await InvoiceItemService.create_item(db, ctx.clinic_id, invoice, data.model_dump())
         await db.commit()
         return ApiResponse(data=InvoiceItemResponse.model_validate(item))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice_item")
 
 
 @router.put(
@@ -555,14 +554,14 @@ async def update_invoice_item(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     if not InvoiceWorkflowService.can_edit(invoice):
-        raise HTTPException(status_code=400, detail="Can only edit draft invoices")
+        raise billing_error("billing.invoice.draft_required")
 
     item = next((i for i in invoice.items if i.id == item_id), None)
     if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise billing_error("billing.invoice_item.not_found")
 
     try:
         item = await InvoiceItemService.update_item(
@@ -571,7 +570,7 @@ async def update_invoice_item(
         await db.commit()
         return ApiResponse(data=InvoiceItemResponse.model_validate(item))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="invoice_item")
 
 
 @router.delete("/invoices/{invoice_id}/items/{item_id}", status_code=204)
@@ -587,14 +586,14 @@ async def delete_invoice_item(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     if not InvoiceWorkflowService.can_edit(invoice):
-        raise HTTPException(status_code=400, detail="Can only edit draft invoices")
+        raise billing_error("billing.invoice.draft_required")
 
     item = next((i for i in invoice.items if i.id == item_id), None)
     if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise billing_error("billing.invoice_item.not_found")
 
     await InvoiceItemService.delete_item(db, item, invoice)
     await db.commit()
@@ -622,7 +621,7 @@ async def issue_invoice(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     # Serialize concurrent issue of the same draft (audit S3/C4, #97): lock
     # the row and refresh status, so a second request sees the committed
@@ -688,7 +687,7 @@ async def issue_invoice(
         await db.commit()
         return ApiResponse(data=InvoiceResponse.model_validate(invoice))
     except InvoiceWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e, operation="invoice")
 
 
 @router.post("/invoices/{invoice_id}/send-email", response_model=ApiResponse[InvoiceResponse])
@@ -707,23 +706,23 @@ async def send_invoice_email(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     # Can only send non-draft invoices
     if invoice.status not in ["issued", "partial", "paid"]:
-        raise HTTPException(
-            status_code=400,
+        raise billing_error(
+            "billing.invoice.send_status_invalid",
             detail=f"Cannot send invoice with status '{invoice.status}'. Invoice must be issued first.",
         )
 
     if data.send_email and not patients_available():
-        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
+        raise billing_error("billing.patients.unavailable", detail=PATIENTS_UNAVAILABLE)
 
     # Check patient has email
     patient = invoice.patient
     if data.send_email and (not patient or not patient.email):
-        raise HTTPException(
-            status_code=400,
+        raise billing_error(
+            "billing.invoice.email_missing",
             detail="Cannot send email: patient has no email address",
         )
 
@@ -775,14 +774,14 @@ async def void_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     try:
         invoice = await InvoiceWorkflowService.void_invoice(db, invoice, ctx.user_id, reason)
         await db.commit()
         return ApiResponse(data=InvoiceResponse.model_validate(invoice))
     except InvoiceWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e, operation="invoice")
 
 
 @router.post(
@@ -806,7 +805,7 @@ async def create_credit_note(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     try:
         items = None
@@ -832,7 +831,7 @@ async def create_credit_note(
 
         return ApiResponse(data=InvoiceResponse.model_validate(credit_note))
     except InvoiceWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e, operation="credit_note")
 
 
 # ============================================================================
@@ -865,7 +864,7 @@ async def list_invoice_payments(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     rows = await InvoicePaymentService.list_for_invoice(db, ctx.clinic_id, invoice_id)
     return ApiResponse(data=[InvoicePaymentResponse.from_link(r) for r in rows])
@@ -902,10 +901,10 @@ async def apply_payment_to_invoice(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
     if not InvoiceWorkflowService.can_record_payment(invoice):
-        raise HTTPException(
-            status_code=400,
+        raise billing_error(
+            "billing.invoice.payment_status_invalid",
             detail=f"Cannot record payment for invoice with status '{invoice.status}'",
         )
 
@@ -920,8 +919,8 @@ async def apply_payment_to_invoice(
 
     total_paid, balance_due = await compute_paid_summary(db, ctx.clinic_id, invoice_id)
     if payload.amount > balance_due:
-        raise HTTPException(
-            status_code=400,
+        raise billing_error(
+            "billing.invoice.payment_exceeds_balance",
             detail=f"Payment amount ({payload.amount}) exceeds balance due ({balance_due})",
         )
 
@@ -944,7 +943,7 @@ async def apply_payment_to_invoice(
             notes=payload.notes,
         )
     except PaymentWorkflowError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise billing_error("billing.invoice.payment_invalid", detail=str(exc))
 
     link = InvoicePayment(
         clinic_id=ctx.clinic_id,
@@ -982,7 +981,7 @@ async def get_invoice_history(
         db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     history = await InvoiceHistoryService.list_history(db, ctx.clinic_id, invoice_id)
     return ApiResponse(data=[InvoiceHistoryResponse.model_validate(h) for h in history])
@@ -1006,7 +1005,7 @@ async def download_invoice_pdf(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     # Get clinic for branding
     from app.core.auth.models import Clinic
@@ -1059,7 +1058,7 @@ async def preview_invoice_pdf(
         db, ctx.clinic_id, invoice_id, include_items=True, include_payments=False
     )
     if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise billing_error("billing.invoice.not_found")
 
     # Get clinic for branding
     from app.core.auth.models import Clinic
@@ -1110,7 +1109,7 @@ async def get_billing_settings(
     clinic = result.scalar_one_or_none()
 
     if not clinic:
-        raise HTTPException(status_code=404, detail="Clinic not found")
+        raise billing_error("billing.clinic.not_found")
 
     settings = clinic.settings or {}
     billing_settings = settings.get("billing", {})
@@ -1140,7 +1139,7 @@ async def update_billing_settings(
     clinic = result.scalar_one_or_none()
 
     if not clinic:
-        raise HTTPException(status_code=404, detail="Clinic not found")
+        raise billing_error("billing.clinic.not_found")
 
     settings = clinic.settings or {}
     billing_settings = settings.get("billing", {})

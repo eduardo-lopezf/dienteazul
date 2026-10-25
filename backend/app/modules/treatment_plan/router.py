@@ -3,13 +3,14 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .errors import service_error, treatment_plan_error
 from .models import PlanTemplate
 from .prescriptions import PrescriptionService, ProfessionalNotFoundError
 from .proposals import PlanProposalService
@@ -100,7 +101,7 @@ async def list_pipeline(
     treatment_plan's manifest.depends. Filtering happens in SQL by tab.
     """
     if tab not in PIPELINE_TABS:
-        raise HTTPException(status_code=400, detail=f"Unknown tab '{tab}'")
+        raise treatment_plan_error("treatment_plan.pipeline.invalid_tab", detail=f"Unknown tab '{tab}'")
 
     rows, total = await TreatmentPlanService.list_pipeline(
         db,
@@ -237,7 +238,7 @@ async def get_treatment_plan(
     """Get a treatment plan with full details."""
     plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     response = TreatmentPlanDetailResponse.model_validate(plan)
     # Not part of the ORM row: computed here so the screen can say what
     # to do next without a second round trip and a second set of rules.
@@ -272,7 +273,7 @@ async def create_treatment_plan(
         plan = await TreatmentPlanService.create(db, ctx.clinic_id, ctx.user_id, data.model_dump())
         return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
 
 
 @router.put(
@@ -296,9 +297,9 @@ async def update_treatment_plan(
             user_id=ctx.user_id,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
 
 
@@ -319,10 +320,10 @@ async def update_plan_status(
             db, ctx.clinic_id, plan_id, data.status, ctx.user_id
         )
         if not plan:
-            raise HTTPException(status_code=404, detail="Treatment plan not found")
+            raise treatment_plan_error("treatment_plan.plan.not_found")
         return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
 
 
 # -----------------------------------------------------------------------------
@@ -349,9 +350,11 @@ async def confirm_treatment_plan(
     except InformedConsentRequiredError as e:
         # Its own status, so the screen can say what is missing and where
         # to get it instead of showing a generic refusal.
-        raise HTTPException(status_code=409, detail=CONSENT_REQUIRED) from e
+        raise treatment_plan_error(
+            "treatment_plan.plan.consent_required", detail=CONSENT_REQUIRED
+        ) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
 
 
@@ -373,7 +376,7 @@ async def get_plan_history(
     """
     plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
 
     entries = await TreatmentPlanService.history(db, ctx.clinic_id, plan_id)
 
@@ -427,20 +430,17 @@ async def reopen_treatment_plan(
     """
     plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
 
     if ctx.role != "admin":
         stewards = await stewards_of(db, ctx.clinic_id, plan)
         if ctx.user_id not in stewards:
-            raise HTTPException(
-                status_code=403,
-                detail="Only an administrator or an assigned professional can reopen this plan",
-            )
+            raise treatment_plan_error("treatment_plan.plan.reopen_forbidden")
 
     try:
         plan = await TreatmentPlanService.reopen(db, ctx.clinic_id, plan_id, ctx.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
 
 
@@ -470,9 +470,9 @@ async def close_treatment_plan(
             closure_note=data.closure_note,
         )
     except PlanHasCollectionsError as e:
-        raise HTTPException(status_code=409, detail=e.CODE) from e
+        raise treatment_plan_error("treatment_plan.plan.has_collections", detail=e.CODE) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
 
 
@@ -490,7 +490,7 @@ async def reactivate_treatment_plan(
     try:
         plan = await TreatmentPlanService.reactivate(db, ctx.clinic_id, plan_id, ctx.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="plan") from e
     return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
 
 
@@ -516,7 +516,7 @@ async def log_plan_contact(
 
     plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     timestamp = datetime.now(UTC).isoformat()
     line = f"[{timestamp}] {data.channel} by {ctx.user_id}"
     if data.note:
@@ -536,9 +536,9 @@ async def delete_treatment_plan(
     try:
         deleted = await TreatmentPlanService.delete(db, ctx.clinic_id, plan_id, ctx.user_id)
     except PlanHasCollectionsError as e:
-        raise HTTPException(status_code=409, detail=e.CODE) from e
+        raise treatment_plan_error("treatment_plan.plan.has_collections", detail=e.CODE) from e
     if not deleted:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
 
 
 # -----------------------------------------------------------------------------
@@ -565,9 +565,9 @@ async def add_plan_item(
         )
         return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="item") from e
 
 
 @router.put(
@@ -588,11 +588,11 @@ async def update_plan_item(
             db, ctx.clinic_id, plan_id, item_id, data.model_dump(exclude_unset=True)
         )
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="item") from e
     if not item:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
@@ -613,9 +613,9 @@ async def remove_plan_item(
             db, ctx.clinic_id, plan_id, item_id, ctx.user_id
         )
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(e)) from e
     if not removed:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
 
 
 @router.patch(
@@ -637,15 +637,15 @@ async def reorder_plan_items(
     try:
         items = await TreatmentPlanService.reorder_items(db, ctx.clinic_id, plan_id, data.item_ids)
     except PlanLockedError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise service_error(e, resource="plan") from e
     if items is None:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
 
     plan = await TreatmentPlanService.get(db, ctx.clinic_id, plan_id)
     if not plan:
-        raise HTTPException(status_code=404, detail="Treatment plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     return ApiResponse(data=TreatmentPlanDetailResponse.model_validate(plan))
 
 
@@ -672,7 +672,7 @@ async def complete_plan_item(
         data.notes,
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
@@ -697,9 +697,9 @@ async def reopen_plan_item(
             db, ctx.clinic_id, plan_id, item_id, ctx.user_id
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="item") from exc
     if not item:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
@@ -710,7 +710,7 @@ async def reopen_plan_item(
 
 def _item_response_or_404(item) -> ApiResponse[PlannedTreatmentItemResponse]:
     if not item:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     return ApiResponse(data=PlannedTreatmentItemResponse.model_validate(item))
 
 
@@ -740,7 +740,7 @@ async def complete_item_session(
             data.notes,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="session") from exc
     return _item_response_or_404(item)
 
 
@@ -763,7 +763,7 @@ async def cancel_item_session(
             db, ctx.clinic_id, plan_id, item_id, session_id, ctx.user_id, data.notes
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="session") from exc
     return _item_response_or_404(item)
 
 
@@ -791,7 +791,7 @@ async def update_item_session(
             data.model_dump(exclude_unset=True),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="session") from exc
     return _item_response_or_404(item)
 
 
@@ -818,7 +818,7 @@ async def add_item_session(
             data.model_dump(),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="session") from exc
     return _item_response_or_404(item)
 
 
@@ -840,7 +840,7 @@ async def delete_item_session(
             db, ctx.clinic_id, plan_id, item_id, session_id
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="session") from exc
     return _item_response_or_404(item)
 
 
@@ -864,10 +864,10 @@ async def link_budget_to_plan(
     try:
         plan = await TreatmentPlanService.link_budget(db, ctx.clinic_id, plan_id, data.budget_id)
         if not plan:
-            raise HTTPException(status_code=404, detail="Treatment plan not found")
+            raise treatment_plan_error("treatment_plan.plan.not_found")
         return ApiResponse(data=TreatmentPlanResponse.model_validate(plan))
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise service_error(e, resource="budget") from e
 
 
 @router.post(
@@ -883,10 +883,7 @@ async def sync_plan_with_budget(
     """Request synchronization of plan items with linked budget."""
     success = await TreatmentPlanService.request_budget_sync(db, ctx.clinic_id, plan_id)
     if not success:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot sync: plan not found or no budget linked",
-        )
+        raise treatment_plan_error("treatment_plan.budget.not_linked")
     return ApiResponse(data={"synced": True})
 
 
@@ -955,7 +952,7 @@ async def create_plan_template(
             db, ctx.clinic_id, ctx.user_id, data.model_dump()
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="template") from exc
     await db.commit()
     reloaded = await PlanTemplateService.get(db, ctx.clinic_id, template.id)
     return ApiResponse(data=(await _template_responses(db, ctx.clinic_id, [reloaded]))[0])
@@ -974,9 +971,9 @@ async def update_plan_template(
             db, ctx.clinic_id, template_id, data.model_dump(exclude_unset=True)
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="template") from exc
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise treatment_plan_error("treatment_plan.template.not_found")
     await db.commit()
     reloaded = await PlanTemplateService.get(db, ctx.clinic_id, template_id)
     return ApiResponse(data=(await _template_responses(db, ctx.clinic_id, [reloaded]))[0])
@@ -991,7 +988,7 @@ async def delete_plan_template(
 ) -> None:
     """Hide a template. Soft delete — a curated shape is never dropped."""
     if not await PlanTemplateService.delete(db, ctx.clinic_id, template_id):
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise treatment_plan_error("treatment_plan.template.not_found")
     await db.commit()
 
 
@@ -1012,7 +1009,7 @@ async def create_template_from_plan(
         db, ctx.clinic_id, ctx.user_id, plan_id, data.name, data.description
     )
     if not template:
-        raise HTTPException(status_code=404, detail="Plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     await db.commit()
     reloaded = await PlanTemplateService.get(db, ctx.clinic_id, template.id)
     return ApiResponse(data=(await _template_responses(db, ctx.clinic_id, [reloaded]))[0])
@@ -1049,14 +1046,14 @@ async def apply_plan_template(
             data.excluded_template_item_ids,
         )
     except TemplateNeedsTeethError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"code": "template_needs_teeth", "treatments": exc.item_names},
+        raise treatment_plan_error(
+            "treatment_plan.template.needs_teeth",
+            fields={"treatments": exc.item_names},
         ) from exc
     except PlanLockedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="template") from exc
 
     await db.commit()
     return ApiResponse(
@@ -1102,14 +1099,14 @@ async def add_catalog_items_to_plan(
             ],
         )
     except TemplateNeedsTeethError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"code": "template_needs_teeth", "treatments": exc.item_names},
+        raise treatment_plan_error(
+            "treatment_plan.template.needs_teeth",
+            fields={"treatments": exc.item_names},
         ) from exc
     except PlanLockedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="template") from exc
 
     await db.commit()
     return ApiResponse(
@@ -1142,7 +1139,7 @@ async def list_plan_proposals(
     """Charted findings on this patient that nothing is planned for yet."""
     proposals = await PlanProposalService.list_proposals(db, ctx.clinic_id, plan_id)
     if proposals is None:
-        raise HTTPException(status_code=404, detail="Plan not found")
+        raise treatment_plan_error("treatment_plan.plan.not_found")
     return ApiResponse(data=[PlanProposal.model_validate(p) for p in proposals])
 
 
@@ -1192,9 +1189,9 @@ async def accept_plan_proposals(
             db, ctx.clinic_id, ctx.user_id, plan_id, data.finding_ids
         )
     except PlanLockedError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise treatment_plan_error("treatment_plan.plan.locked", detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="proposal") from exc
 
     await db.commit()
     return ApiResponse(data=[PlannedTreatmentItemResponse.model_validate(i) for i in items])
@@ -1222,7 +1219,7 @@ async def list_item_prescriptions(
     """Prescriptions written for one plan treatment, newest first."""
     rows = await PrescriptionService.list_for_item(db, ctx.clinic_id, plan_id, item_id)
     if rows is None:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     return ApiResponse(data=[PrescriptionResponse.model_validate(r) for r in rows])
 
 
@@ -1254,9 +1251,9 @@ async def create_item_prescription(
             data.professional_id,
         )
     except ProfessionalNotFoundError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise service_error(exc, resource="prescription") from exc
     if prescription is None:
-        raise HTTPException(status_code=404, detail="Treatment item not found")
+        raise treatment_plan_error("treatment_plan.item.not_found")
     await db.commit()
     return ApiResponse(data=PrescriptionResponse.model_validate(prescription))
 
@@ -1272,7 +1269,7 @@ async def prescription_pdf(
     """The prescription as a print-ready PDF (served inline)."""
     prescription = await PrescriptionService.get(db, ctx.clinic_id, prescription_id)
     if prescription is None:
-        raise HTTPException(status_code=404, detail="Prescription not found")
+        raise treatment_plan_error("treatment_plan.prescription.not_found")
     pdf = await PrescriptionService.render_pdf(db, prescription, locale)
     return Response(
         content=pdf,

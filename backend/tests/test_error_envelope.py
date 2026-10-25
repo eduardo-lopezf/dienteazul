@@ -19,6 +19,9 @@ from fastapi import status
 from httpx import AsyncClient
 
 from app.core.errors import ErrorCategory, category_for_status
+from app.modules.agenda.errors import ERROR_CATALOG as AGENDA_ERROR_CATALOG
+from app.modules.patients.errors import ERROR_CATALOG
+from app.modules.patients_clinical.errors import ERROR_CATALOG as PATIENTS_CLINICAL_ERROR_CATALOG
 
 
 @pytest.mark.asyncio
@@ -32,9 +35,63 @@ async def test_a_claimed_failure_names_its_case(
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     body = response.json()
-    assert body["code"] == "patients.patient.not_found"
-    assert body["category"] == ErrorCategory.NOT_FOUND.value
-    assert body["message"]
+    definition = ERROR_CATALOG["patients.patient.not_found"]
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["message"] == definition.message
+    assert response.status_code == definition.status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sort", ["last_visit:sideways", "unknown_field:asc"])
+async def test_invalid_patient_sort_uses_the_error_catalog(
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic, sort: str
+) -> None:
+    response = await client.get("/api/v1/patients", headers=auth_headers, params={"sort": sort})
+
+    definition = ERROR_CATALOG["patients.patient.invalid_sort"]
+    body = response.json()
+    assert response.status_code == definition.status_code
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["message"] == definition.message
+    assert body["reference"] == response.headers["x-request-id"]
+
+
+@pytest.mark.asyncio
+async def test_missing_appointment_uses_the_agenda_error_catalog(
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
+) -> None:
+    response = await client.get(
+        "/api/v1/agenda/appointments/00000000-0000-0000-0000-000000000000",
+        headers=auth_headers,
+    )
+
+    definition = AGENDA_ERROR_CATALOG["agenda.appointment.not_found"]
+    body = response.json()
+    assert response.status_code == definition.status_code
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["message"] == definition.message
+    assert body["reference"] == response.headers["x-request-id"]
+
+
+@pytest.mark.asyncio
+async def test_missing_clinical_patient_uses_its_error_catalog(
+    client: AsyncClient, auth_headers: dict[str, str], test_clinic
+) -> None:
+    response = await client.get(
+        "/api/v1/patients_clinical/patients/00000000-0000-0000-0000-000000000000/medical-context",
+        headers=auth_headers,
+    )
+
+    definition = PATIENTS_CLINICAL_ERROR_CATALOG["patients_clinical.patient.not_found"]
+    body = response.json()
+    assert response.status_code == definition.status_code
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["message"] == definition.message
+    assert body["reference"] == response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

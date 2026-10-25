@@ -22,6 +22,7 @@ from app.config import settings
 from app.core.auth.models import Clinic, TierLimit
 from app.modules.agenda.models import Appointment
 from app.modules.migration_import import service as import_service
+from app.modules.migration_import.errors import ERROR_CATALOG
 from app.modules.migration_import.models import EntityMapping, ImportCreatedRow, ImportJob
 from app.modules.patients.models import Patient
 from app.modules.professionals.models import Professional
@@ -217,6 +218,10 @@ async def test_what_does_not_fit_in_the_clinics_storage_is_refused(
     )
     assert refused.status_code == 403
     message = refused.json()["message"]
+    definition = ERROR_CATALOG["migration_import.storage.insufficient_space"]
+    assert refused.json()["code"] == definition.code
+    assert refused.json()["category"] == definition.category.value
+    assert refused.json()["reference"] == refused.headers["x-request-id"]
     assert message.startswith("No hay espacio suficiente para subir esta hoja")
     assert "quedan 0.0 MB" in message
 

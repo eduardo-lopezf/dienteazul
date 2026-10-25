@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -17,6 +17,7 @@ from app.database import get_db
 from app.modules.media.storage import get_storage_backend
 from app.modules.media.validation import validate_file_size, validate_mime_type
 
+from .errors import professional_error
 from .models import Professional
 from .schemas import (
     MyProfessionalUpdate,
@@ -121,7 +122,7 @@ async def update_my_profile(
             db, professional, data.model_dump(exclude_unset=True)
         )
     except UnknownSpecialtyError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise professional_error("professionals.specialty.not_found", detail=str(exc)) from exc
     return ApiResponse(data=await _to_response(db, ctx.clinic_id, updated))
 
 
@@ -152,10 +153,7 @@ async def _my_profile(db: AsyncSession, ctx: ClinicContext) -> Professional:
         else None
     )
     if professional is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="This account has no professional profile in this clinic",
-        )
+        raise professional_error("professionals.profile.not_found")
     return professional
 
 
@@ -168,7 +166,7 @@ async def get_professional(
 ) -> ApiResponse[ProfessionalResponse]:
     professional = await ProfessionalService.get(db, ctx.clinic_id, professional_id)
     if professional is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professional not found")
+        raise professional_error("professionals.professional.not_found")
     return ApiResponse(data=await _to_response(db, ctx.clinic_id, professional))
 
 
@@ -184,11 +182,11 @@ async def create_professional(
     try:
         professional = await ProfessionalService.create(db, ctx.clinic_id, data.model_dump())
     except UnknownSpecialtyError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise professional_error("professionals.specialty.not_found", detail=str(exc)) from exc
     except UnknownUserLinkError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise professional_error("professionals.account.not_in_clinic", detail=str(exc)) from exc
     except UserLinkTakenError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise professional_error("professionals.account.already_linked", detail=str(exc)) from exc
     return ApiResponse(data=await _to_response(db, ctx.clinic_id, professional))
 
 
@@ -202,17 +200,17 @@ async def update_professional(
 ) -> ApiResponse[ProfessionalResponse]:
     professional = await ProfessionalService.get(db, ctx.clinic_id, professional_id)
     if professional is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professional not found")
+        raise professional_error("professionals.professional.not_found")
     try:
         updated = await ProfessionalService.update(
             db, professional, data.model_dump(exclude_unset=True)
         )
     except UnknownSpecialtyError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise professional_error("professionals.specialty.not_found", detail=str(exc)) from exc
     except UnknownUserLinkError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise professional_error("professionals.account.not_in_clinic", detail=str(exc)) from exc
     except UserLinkTakenError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise professional_error("professionals.account.already_linked", detail=str(exc)) from exc
     return ApiResponse(data=await _to_response(db, ctx.clinic_id, updated))
 
 
@@ -242,13 +240,15 @@ async def upload_professional_photo(
 ) -> ApiResponse[ProfessionalResponse]:
     professional = await ProfessionalService.get(db, ctx.clinic_id, professional_id)
     if professional is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professional not found")
+        raise professional_error("professionals.professional.not_found")
 
     validate_file_size(file)
     mime_type = validate_mime_type(file)
     extension = _PHOTO_EXTENSION_BY_MIME.get(mime_type)
     if extension is None:
-        raise HTTPException(status_code=400, detail=f"Unsupported photo type '{mime_type}'")
+        raise professional_error(
+            "professionals.photo.unsupported_type", detail=f"Unsupported photo type '{mime_type}'"
+        )
 
     data = await file.read()
     storage = get_storage_backend()
@@ -268,7 +268,7 @@ async def get_professional_photo(
 ) -> Response:
     professional = await ProfessionalService.get(db, ctx.clinic_id, professional_id)
     if professional is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professional not found")
+        raise professional_error("professionals.professional.not_found")
 
     storage = get_storage_backend()
     for extension, mime_type in _PHOTO_MIME_BY_EXTENSION.items():
@@ -276,4 +276,4 @@ async def get_professional_photo(
         if await storage.exists(path):
             return Response(content=await storage.retrieve(path), media_type=mime_type)
 
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    raise professional_error("professionals.photo.not_found")

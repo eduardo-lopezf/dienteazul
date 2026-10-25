@@ -10,13 +10,14 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import cashbox_error, service_error
 from .schemas import (
     CashClosingCreate,
     CashClosingReopen,
@@ -43,10 +44,6 @@ from .service import (
 # ``/api/v1/<module name>``, so declaring one gives
 # ``/api/v1/cashbox/cashbox/...``.
 router = APIRouter(tags=["cashbox"])
-
-
-def _bad_request(exc: Exception) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
 # Declared before ``/movements/{movement_id}``: FastAPI resolves routes in
@@ -122,7 +119,7 @@ async def get_movement(
 ) -> ApiResponse[CashMovementResponse]:
     movement = await MovementService.get(db, ctx.clinic_id, movement_id)
     if movement is None:
-        raise HTTPException(status_code=404, detail="Cash movement not found")
+        raise cashbox_error("cashbox.movement.not_found")
     return ApiResponse(data=CashMovementResponse.model_validate(movement))
 
 
@@ -142,9 +139,9 @@ async def update_movement(
             data.model_dump(exclude_unset=True),
         )
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     if movement is None:
-        raise HTTPException(status_code=404, detail="Cash movement not found")
+        raise cashbox_error("cashbox.movement.not_found")
     await db.commit()
     reloaded = await MovementService.get(db, ctx.clinic_id, movement_id)
     return ApiResponse(data=CashMovementResponse.model_validate(reloaded))
@@ -160,9 +157,9 @@ async def delete_movement(
     try:
         deleted = await MovementService.delete(db, ctx.clinic_id, movement_id)
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     if not deleted:
-        raise HTTPException(status_code=404, detail="Cash movement not found")
+        raise cashbox_error("cashbox.movement.not_found")
     await db.commit()
 
 
@@ -239,7 +236,7 @@ async def close_day(
             data.model_dump(),
         )
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     await db.commit()
     reloaded = await ClosingService.get(db, ctx.clinic_id, closing.id)
     return ApiResponse(data=CashClosingResponse.model_validate(reloaded))
@@ -254,7 +251,7 @@ async def get_closing(
 ) -> ApiResponse[CashClosingResponse]:
     closing = await ClosingService.get(db, ctx.clinic_id, closing_id)
     if closing is None:
-        raise HTTPException(status_code=404, detail="Cash closing not found")
+        raise cashbox_error("cashbox.closing.not_found")
     return ApiResponse(data=CashClosingResponse.model_validate(closing))
 
 
@@ -278,9 +275,9 @@ async def reopen_closing(
             db, ctx.clinic_id, closing_id, ctx.user_id, data.reason
         )
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     if closing is None:
-        raise HTTPException(status_code=404, detail="Cash closing not found")
+        raise cashbox_error("cashbox.closing.not_found")
     await db.commit()
     reloaded = await ClosingService.get(db, ctx.clinic_id, closing_id)
     return ApiResponse(data=CashClosingResponse.model_validate(reloaded))
@@ -316,7 +313,7 @@ async def get_period(
             day,
         )
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     return ApiResponse(data=period)
 
 
@@ -368,7 +365,7 @@ async def acknowledge_late_entry(
     try:
         await LateEntryService.acknowledge(db, ctx.clinic_id, ctx.user_id, data.model_dump())
     except CashboxError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     await db.commit()
 
     entries = await LateEntryService.list(
@@ -382,5 +379,5 @@ async def acknowledge_late_entry(
     )
     match = next((e for e in entries if e.entry_id == data.entry_id), None)
     if match is None:
-        raise HTTPException(status_code=404, detail="Late entry not found")
+        raise cashbox_error("cashbox.late_entry.not_found")
     return ApiResponse(data=match)

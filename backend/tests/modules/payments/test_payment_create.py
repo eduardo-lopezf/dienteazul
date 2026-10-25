@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
 from app.modules.patients.models import Patient
+from app.modules.payments.errors import ERROR_CATALOG
 
 
 async def _setup_clinic(db: AsyncSession, auth_headers: dict, client: AsyncClient) -> dict:
@@ -146,6 +147,10 @@ async def test_refund_partial_then_full(
         },
     )
     assert r2.status_code == 422, r2.text
+    definition = ERROR_CATALOG["payments.refund.exceeds_payment"]
+    assert r2.json()["code"] == definition.code
+    assert r2.json()["category"] == definition.category.value
+    assert r2.json()["reference"] == r2.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

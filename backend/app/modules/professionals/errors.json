@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "professionals.professional.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Professional not found",
+      "description": "The professional does not exist in the active clinic."
+    },
+    {
+      "code": "professionals.profile.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "This account has no professional profile in this clinic",
+      "description": "The signed-in account has no professional profile in the active clinic."
+    },
+    {
+      "code": "professionals.specialty.not_found",
+      "category": "validation",
+      "status_code": 400,
+      "message": "One or more specialties were not found",
+      "description": "Each specialty must belong to the active clinic."
+    },
+    {
+      "code": "professionals.account.not_in_clinic",
+      "category": "validation",
+      "status_code": 400,
+      "message": "That account has no access to this clinic",
+      "description": "A professional account link must belong to the active clinic."
+    },
+    {
+      "code": "professionals.account.already_linked",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "That account is already linked to another professional",
+      "description": "An account cannot be linked to multiple professional profiles in one clinic."
+    },
+    {
+      "code": "professionals.photo.unsupported_type",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Unsupported professional photo type",
+      "description": "The uploaded image format is not supported for professional photos."
+    },
+    {
+      "code": "professionals.photo.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Professional photo not found",
+      "description": "No photo is stored for this professional."
+    }
+  ]
+}

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-
 interface Props {
   /** ISO date string anchored to day 1 of the target month (YYYY-MM-01). */
   modelValue: string

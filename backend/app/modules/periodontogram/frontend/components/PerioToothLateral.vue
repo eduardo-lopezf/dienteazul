@@ -18,7 +18,6 @@
  * established SEPA convention for showing both faces of an arch
  * stacked vertically.
  */
-import { computed } from 'vue'
 import type { PerioSite, PerioTooth, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
 import {

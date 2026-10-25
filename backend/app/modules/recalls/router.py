@@ -12,7 +12,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ from app.core.auth.dependencies import (
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .errors import recalls_error, service_error
 from .schemas import (
     AttemptCreate,
     AttemptResponse,
@@ -123,7 +124,7 @@ async def create_recall(
             recommended_by=ctx.user_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise service_error(exc) from exc
     await db.commit()
     return ApiResponse(data=_serialise(recall))
 
@@ -265,7 +266,7 @@ async def get_recall(
 ) -> ApiResponse[RecallDetailResponse]:
     recall, attempts = await RecallService.get_with_attempts(db, ctx.clinic_id, recall_id)
     if not recall:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     payload = RecallDetailResponse.model_validate(recall)
     payload.attempts = [AttemptResponse.model_validate(a) for a in attempts]
     return ApiResponse(data=payload)
@@ -284,9 +285,9 @@ async def update_recall(
             db, ctx.clinic_id, recall_id, data.model_dump(exclude_unset=True)
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise service_error(exc) from exc
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.commit()
     return ApiResponse(data=RecallResponse.model_validate(recall))
 
@@ -308,7 +309,7 @@ async def snooze_recall(
         by_user=ctx.user_id,
     )
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.commit()
     return ApiResponse(data=RecallResponse.model_validate(recall))
 
@@ -329,7 +330,7 @@ async def cancel_recall(
         by_user=ctx.user_id,
     )
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.commit()
     return ApiResponse(data=RecallResponse.model_validate(recall))
 
@@ -343,7 +344,7 @@ async def mark_recall_done(
 ) -> ApiResponse[RecallResponse]:
     recall = await RecallService.mark_done(db, ctx.clinic_id, recall_id, by_user=ctx.user_id)
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.commit()
     return ApiResponse(data=RecallResponse.model_validate(recall))
 
@@ -361,7 +362,7 @@ async def log_attempt(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[AttemptResponse]:
     if not ctx.user_id:
-        raise HTTPException(status_code=400, detail="user_id required to log attempt")
+        raise recalls_error("recalls.attempt.user_required")
     result = await RecallService.log_attempt(
         db,
         ctx.clinic_id,
@@ -370,7 +371,7 @@ async def log_attempt(
         by_user=ctx.user_id,
     )
     if not result:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     _, attempt = result
     await db.commit()
     return ApiResponse(data=AttemptResponse.model_validate(attempt))
@@ -397,7 +398,7 @@ async def link_appointment(
 ) -> ApiResponse[RecallResponse]:
     recall = await RecallService.link_appointment(db, ctx.clinic_id, recall_id, data.appointment_id)
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.commit()
     return ApiResponse(data=RecallResponse.model_validate(recall))
 
@@ -411,7 +412,7 @@ async def delete_recall(
 ) -> None:
     recall = await RecallService.get(db, ctx.clinic_id, recall_id)
     if not recall:
-        raise HTTPException(status_code=404, detail="Recall not found")
+        raise recalls_error("recalls.recall.not_found")
     await db.delete(recall)
     await db.commit()
     return None

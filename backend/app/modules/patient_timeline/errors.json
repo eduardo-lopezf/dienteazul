@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "patient_timeline.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    }
+  ]
+}

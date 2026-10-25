@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { formatDateOnly } from '~~/app/utils/date'
-import { computed, ref, watch } from 'vue'
 import type { RecallReason, RecallPriority, Recall } from '../composables/useRecalls'
 
 interface Props {

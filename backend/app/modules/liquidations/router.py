@@ -9,13 +9,14 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import liquidation_error, service_error
 from .schemas import (
     CommissionResponse,
     CommissionUpsert,
@@ -29,10 +30,6 @@ from .service import CommissionService, LiquidationError, LiquidationService
 # No prefix: `_mount_one` mounts every module router at
 # ``/api/v1/<module name>``.
 router = APIRouter(tags=["liquidations"])
-
-
-def _bad_request(exc: Exception) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
 # --- The arrangement ---------------------------------------------------
@@ -61,7 +58,7 @@ async def upsert_commission(
     try:
         await CommissionService.upsert(db, ctx.clinic_id, professional_id, data.model_dump())
     except LiquidationError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     await db.commit()
     reloaded = await CommissionService.get(db, ctx.clinic_id, professional_id)
     return ApiResponse(data=CommissionResponse.model_validate(reloaded))
@@ -97,7 +94,7 @@ async def preview_liquidation(
             date_to,
         )
     except LiquidationError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     return ApiResponse(data=preview)
 
 
@@ -141,7 +138,7 @@ async def issue_liquidation(
             data.model_dump(),
         )
     except LiquidationError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     await db.commit()
     reloaded = await LiquidationService.get(db, ctx.clinic_id, liquidation.id)
     return ApiResponse(data=LiquidationResponse.model_validate(reloaded))
@@ -156,7 +153,7 @@ async def get_liquidation(
 ) -> ApiResponse[LiquidationResponse]:
     liquidation = await LiquidationService.get(db, ctx.clinic_id, liquidation_id)
     if liquidation is None:
-        raise HTTPException(status_code=404, detail="Liquidation not found")
+        raise liquidation_error("liquidations.settlement.not_found")
     return ApiResponse(data=LiquidationResponse.model_validate(liquidation))
 
 
@@ -188,9 +185,9 @@ async def pay_liquidation(
             data.model_dump(),
         )
     except LiquidationError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     if liquidation is None:
-        raise HTTPException(status_code=404, detail="Liquidation not found")
+        raise liquidation_error("liquidations.settlement.not_found")
     await db.commit()
     reloaded = await LiquidationService.get(db, ctx.clinic_id, liquidation_id)
     return ApiResponse(data=LiquidationResponse.model_validate(reloaded))
@@ -207,9 +204,9 @@ async def unpay_liquidation(
     try:
         liquidation = await LiquidationService.unpay(db, ctx.clinic_id, liquidation_id)
     except LiquidationError as exc:
-        raise _bad_request(exc) from exc
+        raise service_error(exc) from exc
     if liquidation is None:
-        raise HTTPException(status_code=404, detail="Liquidation not found")
+        raise liquidation_error("liquidations.settlement.not_found")
     await db.commit()
     reloaded = await LiquidationService.get(db, ctx.clinic_id, liquidation_id)
     return ApiResponse(data=LiquidationResponse.model_validate(reloaded))

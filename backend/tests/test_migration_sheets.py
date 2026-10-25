@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth.models import Clinic
 from app.modules.migration_import import service as import_service
 from app.modules.migration_import.dpmf import open_dpmf
+from app.modules.migration_import.errors import ERROR_CATALOG
 from app.modules.migration_import.models import ImportJob
 from app.modules.migration_import.sheets import (
     SheetError,
@@ -298,6 +299,10 @@ async def test_what_goes_wrong_is_said_in_spanish_and_handed_back_as_a_sheet(
     )
     assert empty.status_code == 422
     assert empty.json()["message"] == "El archivo está vacío."
+    definition = ERROR_CATALOG["migration_import.sheet.invalid_content"]
+    assert empty.json()["code"] == definition.code
+    assert empty.json()["category"] == definition.category.value
+    assert empty.json()["reference"] == empty.headers["x-request-id"]
 
     data = _xlsx(tmp_path / "pacientes.xlsx").read_bytes()
     up = await client.post(
@@ -312,6 +317,9 @@ async def test_what_goes_wrong_is_said_in_spanish_and_handed_back_as_a_sheet(
     )
     assert nameless.status_code == 422
     assert "Nombre" in nameless.json()["message"]
+    definition = ERROR_CATALOG["migration_import.sheet.mapping_required_field_missing"]
+    assert nameless.json()["code"] == definition.code
+    assert nameless.json()["reference"] == nameless.headers["x-request-id"]
 
     mapping = {
         str(c["index"]): c["suggested_field"] for c in body["columns"] if c["suggested_field"]

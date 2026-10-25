@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership, User
 from app.core.auth.service import hash_password
+from app.modules.professionals.errors import ERROR_CATALOG
 
 
 @pytest.mark.asyncio
@@ -251,6 +252,11 @@ async def test_specialty_from_another_clinic_is_rejected(
         },
     )
     assert response.status_code == 400
+    definition = ERROR_CATALOG["professionals.specialty.not_found"]
+    body = response.json()
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["reference"] == response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

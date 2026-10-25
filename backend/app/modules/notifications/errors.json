@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "notifications.template.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Template not found",
+      "description": "The template does not exist or is not available to the active clinic."
+    },
+    {
+      "code": "notifications.template.already_exists",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Template already exists",
+      "description": "A template with the same key and locale already exists for this clinic."
+    },
+    {
+      "code": "notifications.template.system_read_only",
+      "category": "auth",
+      "status_code": 403,
+      "message": "System templates cannot be changed",
+      "description": "System templates cannot be modified or deleted by clinic users."
+    },
+    {
+      "code": "notifications.template.other_clinic",
+      "category": "auth",
+      "status_code": 403,
+      "message": "Template belongs to another clinic",
+      "description": "A clinic cannot modify or delete a template owned by another clinic."
+    },
+    {
+      "code": "notifications.patients.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Patients app is unavailable",
+      "description": "Patient preferences and patient notifications cannot be accessed while the Patients app is disabled."
+    },
+    {
+      "code": "notifications.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "notifications.agenda.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Agenda is unavailable",
+      "description": "Appointment notifications cannot be sent manually while the Agenda app is disabled."
+    },
+    {
+      "code": "notifications.budget.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Budgets are unavailable",
+      "description": "Budget notifications cannot be sent manually while the Budgets app is disabled."
+    },
+    {
+      "code": "notifications.patient.email_missing",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Patient has no email address",
+      "description": "The manual email notification requires an email address on the selected patient."
+    },
+    {
+      "code": "notifications.appointment.id_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Appointment ID is required",
+      "description": "Manual appointment notifications require an appointment_id."
+    },
+    {
+      "code": "notifications.appointment.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Appointment not found",
+      "description": "The appointment does not exist in the active clinic."
+    },
+    {
+      "code": "notifications.budget.id_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Budget ID is required",
+      "description": "Manual budget notifications require a budget_id."
+    },
+    {
+      "code": "notifications.budget.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget not found",
+      "description": "The budget does not exist in the active clinic."
+    },
+    {
+      "code": "notifications.recipient.email_unavailable",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Recipient email could not be determined",
+      "description": "The recipient has no email address and the manual notification cannot be queued."
+    },
+    {
+      "code": "notifications.conversation.reply_unavailable",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Free-form reply is unavailable",
+      "description": "The 24-hour reply window is closed or the requested channel is not available for the patient."
+    },
+    {
+      "code": "notifications.request.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Notification request is invalid",
+      "description": "Request data failed schema validation, such as invalid field lengths, channel settings, or SMTP configuration values."
+    },
+    {
+      "code": "notifications.request.operation_invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Notification operation was rejected",
+      "description": "A notification operation failed a domain validation rule."
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "reports.integration.unavailable",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "This report's app is not enabled",
+      "description": "The report depends on an app that is currently disabled."
+    },
+    {
+      "code": "reports.date_range.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "The end date must be on or after the start date",
+      "description": "The requested report period ends before it starts."
+    },
+    {
+      "code": "reports.date_range.too_long",
+      "category": "validation",
+      "status_code": 400,
+      "message": "The report period exceeds the maximum allowed range",
+      "description": "Appointment lifecycle reports are limited to 365 days."
+    },
+    {
+      "code": "reports.request.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Report request is invalid",
+      "description": "The requested report parameters failed domain validation."
+    }
+  ]
+}

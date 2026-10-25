@@ -16,7 +16,6 @@
  * follows the same "actions live in the top of the card" convention
  * as the rest of the patient file.
  */
-import { computed, ref } from 'vue'
 import type { PerioIndices, PerioSnapshotSummary } from '../types'
 
 const props = defineProps<{

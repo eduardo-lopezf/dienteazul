@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "patients_clinical.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "patients_clinical.allergy.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Allergy not found",
+      "description": "The allergy does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.medication.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Medication not found",
+      "description": "The medication does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.disease.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Disease not found",
+      "description": "The systemic disease does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.surgery.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Surgery not found",
+      "description": "The surgical history entry does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.emergency_contact.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Emergency contact not found",
+      "description": "The emergency contact does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.legal_guardian.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Legal guardian not found",
+      "description": "The legal guardian does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.asa_assessment.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Assessment not found",
+      "description": "The ASA assessment does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.questionnaire.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Questionnaire not found",
+      "description": "The questionnaire does not exist for the requested patient."
+    },
+    {
+      "code": "patients_clinical.asa_assessment.rejected",
+      "category": "validation",
+      "status_code": 400,
+      "message": "ASA assessment rejected",
+      "description": "A rule of the ASA assessment domain rejected the submitted data."
+    },
+    {
+      "code": "patients_clinical.questionnaire.rejected",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Health questionnaire rejected",
+      "description": "A rule of the health questionnaire domain rejected the submitted data."
+    }
+  ]
+}

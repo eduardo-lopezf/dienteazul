@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "budget.budget.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget not found",
+      "description": "The budget does not exist in the active clinic or has been deleted."
+    },
+    {
+      "code": "budget.item.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget item not found",
+      "description": "The item does not exist in the requested budget."
+    },
+    {
+      "code": "budget.signature.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget has not been signed",
+      "description": "No acceptance signature exists for the budget."
+    },
+    {
+      "code": "budget.public_link.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget link not found",
+      "description": "The public token does not identify an available budget."
+    },
+    {
+      "code": "budget.public_link.not_accepted",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Budget has not been accepted",
+      "description": "A signed public PDF is available only after the budget is accepted."
+    },
+    {
+      "code": "budget.patient.not_found",
+      "category": "not_found",
+      "status_code": 400,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "budget.professional.not_found",
+      "category": "not_found",
+      "status_code": 400,
+      "message": "Professional not found in this clinic",
+      "description": "An assigned professional must belong to the active clinic."
+    },
+    {
+      "code": "budget.patients.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Patients app is unavailable",
+      "description": "Creating or sending a budget that requires patient data is refused while the Patients app is disabled."
+    },
+    {
+      "code": "budget.patient.email_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Patient has no email address",
+      "description": "A budget cannot be sent by email when the patient has no email address."
+    },
+    {
+      "code": "budget.catalog.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Treatment catalog is unavailable",
+      "description": "Budget items cannot be created or copied while the treatment catalog is disabled."
+    },
+    {
+      "code": "budget.professionals.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Professionals app is unavailable",
+      "description": "A professional cannot be assigned while the Professionals app is disabled."
+    },
+    {
+      "code": "budget.catalog_item.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Invalid catalog item",
+      "description": "The selected catalog item is unavailable or does not belong to the active clinic."
+    },
+    {
+      "code": "budget.workflow.invalid_transition",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Budget status transition is not allowed",
+      "description": "The requested send, accept, reject, cancel, or renegotiate action is not allowed from the budget's current status."
+    },
+    {
+      "code": "budget.workflow.empty_budget",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Budget has no items",
+      "description": "A budget must contain at least one item before it can be sent or accepted."
+    },
+    {
+      "code": "budget.budget.draft_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Only draft budgets can be edited",
+      "description": "Budget fields and items can only be changed while the budget is in draft status."
+    },
+    {
+      "code": "budget.budget.plan_owned",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Budget belongs to a treatment plan",
+      "description": "A budget linked to a treatment plan must be deleted with that plan."
+    },
+    {
+      "code": "budget.budget.reminder_not_sent",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Reminders only apply to sent budgets",
+      "description": "A reminder can only be sent for a budget whose status is sent."
+    },
+    {
+      "code": "budget.plan.unavailable",
+      "category": "dependency",
+      "status_code": 400,
+      "message": "Treatment plans are not available",
+      "description": "Budget generation and addendum operations require the Treatment Plans app contract."
+    },
+    {
+      "code": "budget.plan.not_found",
+      "category": "not_found",
+      "status_code": 400,
+      "message": "Plan not found",
+      "description": "The requested treatment plan does not exist in the active clinic."
+    },
+    {
+      "code": "budget.plan.already_linked",
+      "category": "conflict",
+      "status_code": 400,
+      "message": "Plan already has a budget linked",
+      "description": "A primary budget cannot be generated while a live budget is already linked to the plan."
+    },
+    {
+      "code": "budget.plan.no_catalog_items",
+      "category": "validation",
+      "status_code": 400,
+      "message": "No catalog items found in plan",
+      "description": "A budget can be generated from a plan only when it contains treatments linked to catalog items."
+    },
+    {
+      "code": "budget.plan.addendum_data_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Addendum requires a patient and at least one item",
+      "description": "An addendum cannot be created unless its plan snapshot contains a patient and one or more items."
+    },
+    {
+      "code": "budget.plan.addendum_invalid_status",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Plan is not in progress",
+      "description": "An addendum can only be created for a plan in pending or active status."
+    },
+    {
+      "code": "budget.plan.treatments_already_budgeted",
+      "category": "conflict",
+      "status_code": 400,
+      "message": "Every treatment in this plan is already budgeted",
+      "description": "No addendum can be created because all plan treatments already have budget items."
+    },
+    {
+      "code": "budget.public_link.invalid_method",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Invalid verification method",
+      "description": "The public-link verification method must match the method configured for the budget."
+    },
+    {
+      "code": "budget.public_link.verification_required",
+      "category": "auth",
+      "status_code": 401,
+      "message": "Verification required",
+      "description": "A valid token-scoped verification session is required to access this public budget."
+    },
+    {
+      "code": "budget.public_link.verification_failed",
+      "category": "auth",
+      "status_code": 401,
+      "message": "Verification failed",
+      "description": "The submitted verification value is invalid or uses a method that does not match the configured method."
+    },
+    {
+      "code": "budget.public_link.locked",
+      "category": "conflict",
+      "status_code": 423,
+      "message": "Public budget link is locked",
+      "description": "The public token was locked after repeated failed verification attempts or by a staff action."
+    },
+    {
+      "code": "budget.public_link.expired",
+      "category": "conflict",
+      "status_code": 410,
+      "message": "Budget link has expired",
+      "description": "The budget is past its validity date and cannot be accessed or decided through the public link."
+    },
+    {
+      "code": "budget.public_link.rate_limited",
+      "category": "limit",
+      "status_code": 429,
+      "message": "Too many verification attempts",
+      "description": "The public-link verification attempt limit has been reached; retry after the rate-limit window."
+    },
+    {
+      "code": "budget.public_link.already_decided",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Budget already decided",
+      "description": "An accepted or rejected budget cannot be accepted or rejected again through its public link."
+    },
+    {
+      "code": "budget.public_link.invalid_rejection_reason",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Invalid rejection reason",
+      "description": "A public rejection reason must be one of the supported options: price, time, second_opinion, or other."
+    },
+    {
+      "code": "budget.public_code.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Manual code must be 4-6 numeric digits",
+      "description": "A manual verification code must contain 4 to 6 digits."
+    },
+    {
+      "code": "budget.request.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Budget request is invalid",
+      "description": "Request data failed schema validation, including invalid amounts, quantities, discounts, signatures, status filters, or unsupported locales."
+    },
+    {
+      "code": "budget.request.operation_invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Budget operation was rejected",
+      "description": "A budget operation failed a domain validation rule."
+    }
+  ]
+}

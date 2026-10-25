@@ -14,6 +14,7 @@ from app.modules.catalog.models import (
     TreatmentOdontogramMapping,
     VatType,
 )
+from app.modules.odontogram.errors import ERROR_CATALOG
 
 
 async def _ensure_clinic_and_patient(
@@ -379,6 +380,10 @@ async def test_catalog_clinical_type_conflict_rejected(
         },
     )
     assert r.status_code == 400
+    definition = ERROR_CATALOG["odontogram.treatment.catalog_mapping_conflict"]
+    assert r.json()["code"] == definition.code
+    assert r.json()["category"] == definition.category.value
+    assert r.json()["reference"] == r.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

@@ -31,6 +31,10 @@ function loadModuleLayers(): string[] {
   }
 }
 
+// Resolved once here so the auto-import below carries an absolute path
+// instead of a bare specifier (see the `imports:extend` hook).
+const vueI18nEntry = resolve(__dirname, 'node_modules/vue-i18n/dist/vue-i18n.esm-bundler.js')
+
 const moduleLayers = loadModuleLayers()
 const modulesJsonPath = resolve(__dirname, process.env.DIENTEAZUL_MODULES_JSON ?? 'modules.json')
 
@@ -169,6 +173,20 @@ export default defineNuxtConfig({
         '@vue/devtools-core',
         '@vue/devtools-kit'
       ]
+    }
+  },
+
+  // `@nuxtjs/i18n` registers `useI18n` with the bare specifier
+  // `vue-i18n`, which the auto-import transform can only resolve from
+  // the host. Module layers live outside `frontend/`, so there the
+  // resolution fails and the injection is silently skipped — the call
+  // then throws `useI18n is not defined` at runtime and takes the whole
+  // page down (the Tratamientos pipeline did exactly that). Pointing the
+  // registration at the resolved file makes it inject in every layer.
+  hooks: {
+    'imports:extend'(imports) {
+      const useI18nImport = imports.find(i => i.name === 'useI18n' && i.from === 'vue-i18n')
+      if (useI18nImport) useI18nImport.from = vueI18nEntry
     }
   },
 

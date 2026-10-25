@@ -10,6 +10,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.treatment_plan.errors import ERROR_CATALOG
 from tests.test_treatment_plan import (
     _create_plan_with_items,
     _ensure_clinic_and_patient,
@@ -82,6 +83,10 @@ async def test_a_paid_plan_cannot_be_deleted(
     r = await client.delete(f"{PLANS}/{plan_id}", headers=auth_headers)
     assert r.status_code == 409, r.text
     assert r.json()["message"] == CODE
+    definition = ERROR_CATALOG["treatment_plan.plan.has_collections"]
+    assert r.json()["code"] == definition.code
+    assert r.json()["category"] == definition.category.value
+    assert r.json()["reference"] == r.headers["x-request-id"]
 
     # Nothing moved: the plan and its budget are both still there.
     assert await _status(client, auth_headers, plan_id) == "pending"

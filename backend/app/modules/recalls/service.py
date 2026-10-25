@@ -41,7 +41,8 @@ async def _validate_professional_in_clinic(
 
     Mirrors ``treatment_plan``'s validation of the same name — avoids
     leaking professionals across tenants or assigning a non-clinical
-    profile. Raises ``ValueError`` so the router maps it to a 400.
+    profile. Raises ``ValueError`` for translation into a catalogued
+    application error at the HTTP boundary.
     """
     # Asked of the directory's contract, not read from its table
     # (ADR 0039). With the Professionals App off nobody can be assigned.

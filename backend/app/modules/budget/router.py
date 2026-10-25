@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .errors import budget_http_error, service_error, workflow_error
 from .integrations import PATIENTS_UNAVAILABLE, AppUnavailableError, patients_available
 from .pdf import BudgetPDFService
 from .schemas import (
@@ -107,7 +108,7 @@ async def get_budget(
     """Get a budget by ID with full details."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Reverse lookup of the linked treatment plan via raw SQL — the
     # treatment_plans table is owned by the treatment_plan module and
@@ -156,13 +157,15 @@ async def create_budget(
 ) -> ApiResponse[BudgetDetailResponse]:
     """Create a new budget."""
     if not patients_available():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+        raise budget_http_error(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE
+        )
     # Verify patient exists
     from app.modules.patients.models import Patient
 
     patient = await db.get(Patient, data.patient_id)
     if not patient or patient.clinic_id != ctx.clinic_id:
-        raise HTTPException(
+        raise budget_http_error(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Patient not found",
         )
@@ -172,7 +175,7 @@ async def create_budget(
             db, ctx.clinic_id, ctx.user_id, data.model_dump()
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
     # Reload with relationships
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget.id, include_items=True)
@@ -190,14 +193,14 @@ async def update_budget(
     """Update a budget (only allowed in draft status)."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     try:
         budget = await BudgetService.update_budget(
             db, budget, data.model_dump(exclude_unset=True), ctx.user_id
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
     # Reload with relationships
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget.id, include_items=True)
@@ -219,9 +222,9 @@ async def delete_budget(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=False)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     if await BudgetService.belongs_to_plan(db, budget):
-        raise HTTPException(
+        raise budget_http_error(
             status_code=409,
             detail="This budget belongs to a treatment plan and is deleted with the plan.",
         )
@@ -249,12 +252,12 @@ async def add_budget_item(
     """Add an item to a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     try:
         item = await BudgetService.add_item(db, budget, data.model_dump(), ctx.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
     return ApiResponse(data=BudgetItemResponse.model_validate(item))
 
@@ -274,10 +277,10 @@ async def update_budget_item(
     """Update a budget item."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     if budget.status != "draft":
-        raise HTTPException(
+        raise budget_http_error(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Items can only be updated in draft budgets",
         )
@@ -285,7 +288,7 @@ async def update_budget_item(
     # Find item
     item = next((i for i in budget.items if i.id == item_id), None)
     if not item:
-        raise HTTPException(status_code=404, detail="Budget item not found")
+        raise budget_http_error(status_code=404, detail="Budget item not found")
 
     item = await BudgetItemService.update_item(db, item, data.model_dump(exclude_unset=True))
 
@@ -309,17 +312,17 @@ async def remove_budget_item(
     """Remove an item from a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Find item
     item = next((i for i in budget.items if i.id == item_id), None)
     if not item:
-        raise HTTPException(status_code=404, detail="Budget item not found")
+        raise budget_http_error(status_code=404, detail="Budget item not found")
 
     try:
         await BudgetService.remove_item(db, budget, item, ctx.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
 
 # ============================================================================
@@ -342,7 +345,7 @@ async def send_budget(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     try:
         # Determine send method
@@ -373,7 +376,7 @@ async def send_budget(
         )
 
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise workflow_error(e)
 
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
@@ -393,7 +396,7 @@ async def accept_budget(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Get client info for audit
     ip_address = request.client.host if request.client else None
@@ -409,7 +412,7 @@ async def accept_budget(
             user_agent=user_agent,
         )
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise workflow_error(e)
 
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
@@ -426,7 +429,7 @@ async def reject_budget(
     """Reject a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Get client info for audit
     ip_address = request.client.host if request.client else None
@@ -445,7 +448,7 @@ async def reject_budget(
             user_agent=user_agent,
         )
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise workflow_error(e)
 
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
@@ -461,12 +464,12 @@ async def cancel_budget(
     """Cancel a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     try:
         budget = await BudgetWorkflowService.cancel_budget(db, budget, ctx.user_id, data.reason)
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise workflow_error(e)
 
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
@@ -510,11 +513,11 @@ async def renegotiate_budget(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     try:
         budget = await BudgetWorkflowService.cancel_for_renegotiation(db, budget, ctx.user_id)
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e)
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
 
@@ -533,7 +536,7 @@ async def accept_budget_in_clinic(
     """Reception captures patient acceptance with optional tablet signature."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     sig_payload = {
         "signed_by_name": body.signer_name,
         "relationship_to_patient": "patient",
@@ -551,7 +554,7 @@ async def accept_budget_in_clinic(
             accepted_via="in_clinic",
         )
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e)
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
 
@@ -567,11 +570,11 @@ async def resend_budget(
     can then edit and send the new draft."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     try:
         new_budget = await BudgetWorkflowService.clone_to_new_draft(db, budget, ctx.user_id)
     except AppUnavailableError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
     return ApiResponse(data=BudgetResponse.model_validate(new_budget))
 
 
@@ -590,9 +593,9 @@ async def send_budget_reminder(
     outside the cron schedule."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     if budget.status != "sent":
-        raise HTTPException(status_code=400, detail="Reminders only apply to sent budgets")
+        raise budget_http_error(status_code=400, detail="Reminders only apply to sent budgets")
     budget = await BudgetWorkflowService.send_reminder(
         db, budget, milestone_days=body.milestone_days
     )
@@ -615,11 +618,11 @@ async def set_public_code(
     is expected to share it verbally with the patient."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     try:
         budget = await BudgetWorkflowService.set_public_code(db, budget, body.code)
     except BudgetWorkflowError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise workflow_error(e)
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
 
@@ -636,7 +639,7 @@ async def unlock_public_link(
     """Clear the lockout on the public link so the patient can retry."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
     budget = await BudgetWorkflowService.unlock_public(db, budget)
     return ApiResponse(data=BudgetResponse.model_validate(budget))
 
@@ -660,12 +663,12 @@ async def duplicate_budget(
     """Create a new version of a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     try:
         new_budget = await BudgetService.duplicate_budget(db, budget, ctx.user_id)
     except AppUnavailableError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
     # Reload with relationships
     new_budget = await BudgetService.get_budget(
@@ -692,7 +695,7 @@ async def get_budget_versions(
     """Get all versions of a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=False)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     versions = await BudgetService.get_versions(db, ctx.clinic_id, budget.budget_number)
 
@@ -730,7 +733,7 @@ async def get_budget_history(
     """Get history/audit log for a budget."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=False)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     history = await BudgetHistoryService.get_history(db, ctx.clinic_id, budget_id)
 
@@ -753,7 +756,7 @@ async def download_budget_pdf(
     """Download budget as PDF."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Get clinic for branding
     from app.core.auth.models import Clinic
@@ -792,7 +795,7 @@ async def download_signed_budget_pdf(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     from .models import BudgetSignature
 
@@ -808,7 +811,7 @@ async def download_signed_budget_pdf(
     )
     signature = (await db.execute(sig_q)).scalar_one_or_none()
     if signature is None:
-        raise HTTPException(status_code=404, detail="Budget has not been signed")
+        raise budget_http_error(status_code=404, detail="Budget has not been signed")
 
     from app.core.auth.models import Clinic
 
@@ -848,7 +851,7 @@ async def get_budget_signature_meta(
     """
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=False)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     from .models import BudgetSignature
 
@@ -864,7 +867,7 @@ async def get_budget_signature_meta(
     )
     signature = (await db.execute(sig_q)).scalar_one_or_none()
     if signature is None:
-        raise HTTPException(status_code=404, detail="Budget has not been signed")
+        raise budget_http_error(status_code=404, detail="Budget has not been signed")
 
     return ApiResponse(data=SignatureMetaResponse.model_validate(signature))
 
@@ -880,7 +883,7 @@ async def preview_budget_pdf(
     """Preview budget PDF (with watermark for drafts)."""
     budget = await BudgetService.get_budget(db, ctx.clinic_id, budget_id, include_items=True)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget not found")
+        raise budget_http_error(status_code=404, detail="Budget not found")
 
     # Get clinic for branding
     from app.core.auth.models import Clinic
@@ -939,7 +942,7 @@ async def generate_plan_budget(
     try:
         budget = await plan_quotes.generate_for_plan(db, ctx.clinic_id, plan_id, ctx.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(
         data=PlanBudgetResponse(budget_id=budget.id, budget_number=budget.budget_number)
     )
@@ -969,7 +972,7 @@ async def price_plan_additions(
             db, ctx.clinic_id, plan_id, ctx.user_id
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(
         data=PlanAddendumResponse(
             budget_id=budget.id,

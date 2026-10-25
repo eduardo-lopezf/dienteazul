@@ -135,6 +135,8 @@ class ImportJobService:
         """Open the file (decrypt/decompress), populate `_meta` columns,
         recompute and compare the integrity hash."""
         job.status = "validating"
+        job.error = None
+        job.error_code = None
         await db.flush()
 
         try:
@@ -156,10 +158,12 @@ class ImportJobService:
         except (DpmeError, DpmfFormatError) as exc:
             job.status = "failed"
             job.error = str(exc)
+            job.error_code = "migration_import.dpmf.invalid_file"
             logger.warning("DPMF validation failed for job %s: %s", job.id, exc)
         except Exception as exc:
             job.status = "failed"
             job.error = f"unexpected validation error: {exc}"
+            job.error_code = "migration_import.dpmf.validation_failed"
             logger.exception("Unexpected DPMF validation error for job %s", job.id)
         await db.flush()
         return job
@@ -351,6 +355,7 @@ class ImportJobService:
                 job.import_fiscal_compliance = import_fiscal_compliance
                 job.execute_options = execute_options
                 job.error = None
+                job.error_code = None
                 # Drop warnings from the previous run so the audit log
                 # shows only the latest execution. Without this prune,
                 # every re-run doubles ``non_clinical_entry`` /
@@ -382,6 +387,7 @@ class ImportJobService:
                     if job is not None:
                         job.status = "failed"
                         job.error = str(exc)
+                        job.error_code = "migration_import.job.execution_failed"
                         await failure_session.commit()
                         await publish_job_failed(job.id, job.clinic_id, str(exc))
 
@@ -1053,6 +1059,7 @@ class ImportUndoService:
                 if plan.blockers:
                     job.status = previous
                     job.undo_error = describe_blockers(plan)
+                    job.undo_error_code = "migration_import.undo.blocked"
                     await db.commit()
                     return
                 files = await apply_undo(db, job, plan)
@@ -1060,6 +1067,7 @@ class ImportUndoService:
                 job.undone_at = datetime.now(UTC)
                 job.undone_by = user_id
                 job.undo_error = None
+                job.undo_error_code = None
                 await db.commit()
             except Exception as exc:
                 logger.exception("undo of job %s failed", job_id)
@@ -1068,6 +1076,7 @@ class ImportUndoService:
                 if job is not None:
                     job.status = previous
                     job.undo_error = f"No se pudo deshacer: {exc}"
+                    job.undo_error_code = "migration_import.undo.failed"
                     await db.commit()
                 return
         await remove_files(files)

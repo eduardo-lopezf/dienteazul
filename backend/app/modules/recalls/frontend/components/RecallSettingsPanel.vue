@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
 import type { RecallSettings } from '../composables/useRecalls'
 
 const { t } = useI18n()

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "media.document.not_found", "category": "not_found", "status_code": 404, "message": "Document not found", "description": "The document does not exist in the active clinic."},
+    {"code": "media.attachment.not_found", "category": "not_found", "status_code": 404, "message": "Attachment not found", "description": "The attachment does not exist in the active clinic."},
+    {"code": "media.patient.not_found", "category": "not_found", "status_code": 404, "message": "Patient not found", "description": "The patient does not exist in the active clinic."},
+    {"code": "media.owner.not_found", "category": "not_found", "status_code": 404, "message": "Attachment owner not found", "description": "The polymorphic owner does not exist in the active clinic."},
+    {"code": "media.document.wrong_patient", "category": "validation", "status_code": 422, "message": "Document and owner belong to different patients", "description": "Documents and their owners must belong to the same patient."},
+    {"code": "media.file.too_large", "category": "limit", "status_code": 400, "message": "File exceeds the configured size limit", "description": "The uploaded file is larger than the configured limit."},
+    {"code": "media.file.type_not_allowed", "category": "validation", "status_code": 400, "message": "File type is not allowed", "description": "The uploaded MIME type is not in the configured allowlist."},
+    {"code": "media.document.invalid_type", "category": "validation", "status_code": 400, "message": "Invalid document type", "description": "The document type is not one of the supported values."},
+    {"code": "media.photo.invalid_taxonomy", "category": "validation", "status_code": 400, "message": "Invalid media taxonomy", "description": "The media kind, category, or subtype combination is not supported."},
+    {"code": "media.document.self_pair", "category": "validation", "status_code": 400, "message": "Cannot pair a document with itself", "description": "A document cannot be paired with itself."},
+    {"code": "media.attachment.owner_type_invalid", "category": "validation", "status_code": 400, "message": "Unknown attachment owner type", "description": "The requested attachment owner type is not registered."}
+  ]
+}

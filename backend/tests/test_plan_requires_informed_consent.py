@@ -17,6 +17,7 @@ from app.core.auth.models import Clinic
 from app.modules.consents.providers import requires_informed_for_plan
 from app.modules.professionals.models import Professional
 from app.modules.treatment_plan import service as plan_service
+from app.modules.treatment_plan.errors import ERROR_CATALOG
 from tests.test_treatment_plan import (
     _create_plan_with_items,
     _ensure_clinic_and_patient,
@@ -108,6 +109,10 @@ async def test_a_plan_is_not_confirmed_without_its_signed_consent(
     refused = await _confirm(client, auth_headers, plan_id)
     assert refused.status_code == 409, refused.text
     assert refused.json()["message"] == "informed_consent_required"
+    definition = ERROR_CATALOG["treatment_plan.plan.consent_required"]
+    assert refused.json()["code"] == definition.code
+    assert refused.json()["category"] == definition.category.value
+    assert refused.json()["reference"] == refused.headers["x-request-id"]
     # And the plan is where it was.
     plan = (await client.get(f"{PLANS}/{plan_id}", headers=auth_headers)).json()["data"]
     assert plan["status"] == "draft"

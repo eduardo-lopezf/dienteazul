@@ -15,6 +15,7 @@ from app.core.events import EventType, event_bus
 from app.core.list_query import parse_sort
 from app.core.utils.search import FOLD_FROM, FOLD_TO, search_tokens
 
+from .errors import invalid_patient_sort
 from .models import Patient
 
 # Public field name → SQL column. Decouples the URL from internal naming
@@ -207,10 +208,7 @@ class PatientService:
 
         if sort_field == _SORT_LAST_VISIT:
             if sort_dir not in ("asc", "desc"):
-                raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Invalid sort direction {sort_dir!r}. Use 'asc' or 'desc'.",
-                )
+                raise invalid_patient_sort()
             last_visit_sq = (
                 select(
                     _appointments_t.c.patient_id.label("patient_id"),
@@ -238,10 +236,17 @@ class PatientService:
                 .limit(page_size)
             )
         else:
+            try:
+                sort_clause = parse_sort(sort, _SORT_ALLOW, _SORT_DEFAULT)
+            except HTTPException as exc:
+                if exc.status_code != status.HTTP_422_UNPROCESSABLE_ENTITY:
+                    raise
+                raise invalid_patient_sort() from exc
+
             query = (
                 select(Patient)
                 .where(*conditions)
-                .order_by(parse_sort(sort, _SORT_ALLOW, _SORT_DEFAULT), Patient.first_name)
+                .order_by(sort_clause, Patient.first_name)
                 .offset(offset)
                 .limit(page_size)
             )

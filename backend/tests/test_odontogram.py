@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership, User
 from app.core.auth.service import hash_password
+from app.modules.odontogram.errors import ERROR_CATALOG
 
 
 @pytest.fixture
@@ -292,6 +293,10 @@ async def test_invalid_tooth_number(
     )
     assert response.status_code == 400
     assert "Invalid tooth number" in response.json()["message"]
+    definition = ERROR_CATALOG["odontogram.tooth.invalid_number"]
+    assert response.json()["code"] == definition.code
+    assert response.json()["category"] == definition.category.value
+    assert response.json()["reference"] == response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

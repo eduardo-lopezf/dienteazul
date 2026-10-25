@@ -10,6 +10,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
+from app.modules.catalog.errors import ERROR_CATALOG
 from app.modules.catalog.models import (
     TreatmentCatalogItem,
     TreatmentCategory,
@@ -144,6 +145,12 @@ async def test_create_category_duplicate_key(
         headers=auth_headers,
     )
     assert response.status_code == 409
+    definition = ERROR_CATALOG["catalog.category.duplicate"]
+    body = response.json()
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["reference"] == response.headers["x-request-id"]
+    assert "duplicate_key" in body["message"]
 
 
 @pytest.mark.asyncio
@@ -201,6 +208,11 @@ async def test_delete_category(client: AsyncClient, auth_headers: dict, catalog_
         headers=auth_headers,
     )
     assert get_response.status_code == 404
+    definition = ERROR_CATALOG["catalog.category.not_found"]
+    body = get_response.json()
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["reference"] == get_response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio
@@ -859,6 +871,13 @@ async def test_clinic_cannot_hold_the_same_specialty_twice(
             "/api/v1/catalog/specialties", json={"names": attempt}, headers=auth_headers
         )
         assert clash.status_code == 409, attempt
+        if attempt == {"es": "Ortodoncia"}:
+            definition = ERROR_CATALOG["catalog.specialty.duplicate"]
+            body = clash.json()
+            assert body["code"] == definition.code
+            assert body["category"] == definition.category.value
+            assert body["reference"] == clash.headers["x-request-id"]
+            assert "Specialty already exists: Ortodoncia (active)" == body["message"]
 
     # Another language of the same row is still that row.
     across = await client.post(

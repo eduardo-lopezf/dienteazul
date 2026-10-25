@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import HTTPException, status
-
 from app.core.plugins.registry import module_registry
+
+from .errors import reports_error
 
 #: What a hidden name reads as, the same placeholder the reports already use.
 NO_NAME = "-"
@@ -30,9 +30,6 @@ def needs(*modules: str) -> Callable[[], None]:
 
     def _check() -> None:
         if not running(*modules):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="This report's app is not enabled",
-            )
+            raise reports_error("reports.integration.unavailable")
 
     return _check

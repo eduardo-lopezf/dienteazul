@@ -8,7 +8,7 @@
  * viewed from a Madrid browser would shift its 9 AM into 3 PM.
  */
 import { useScheduleAvailability } from './useScheduleAvailability'
-import { parseIsoParts } from '../utils/date'
+import { formatLocalDate, parseIsoParts } from '../utils/date'
 
 const DEFAULT_START = 8
 const DEFAULT_END = 21
@@ -22,8 +22,8 @@ export function useCalendarBounds() {
   const { fetchOpenRanges } = useScheduleAvailability()
 
   async function compute(range: { start: Date, end: Date }): Promise<CalendarBounds> {
-    const isoStart = range.start.toISOString().slice(0, 10)
-    const isoEnd = range.end.toISOString().slice(0, 10)
+    const isoStart = formatLocalDate(range.start)
+    const isoEnd = formatLocalDate(range.end)
     const open = await fetchOpenRanges({ start: isoStart, end: isoEnd })
     if (!open || open.length === 0) {
       return { startHour: DEFAULT_START, endHour: DEFAULT_END }

@@ -23,6 +23,7 @@ from app.core.plugins.registry import module_registry
 from app.core.plugins.router import _nav_visible
 from app.modules.agenda.models import Appointment
 from app.modules.patients.models import Patient
+from app.modules.professionals.errors import ERROR_CATALOG
 from app.modules.professionals.events import (
     on_clinic_account_tier_changed,
     on_clinic_created,
@@ -103,6 +104,11 @@ async def test_a_professional_keeps_their_own_details_and_nothing_else(
 ) -> None:
     missing = await client.get("/api/v1/professionals/me", headers=auth_headers)
     assert missing.status_code == 404
+    missing_body = missing.json()
+    missing_definition = ERROR_CATALOG["professionals.profile.not_found"]
+    assert missing_body["code"] == missing_definition.code
+    assert missing_body["category"] == missing_definition.category.value
+    assert missing_body["reference"] == missing.headers["x-request-id"]
 
     user_id = await _admin_id(client, auth_headers)
     db_session.add(

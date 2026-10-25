@@ -11,6 +11,7 @@ from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
+from app.modules.media.errors import ERROR_CATALOG
 from app.modules.patients.models import Patient
 
 
@@ -109,6 +110,10 @@ async def test_invalid_subtype_rejected(
     assert response.status_code == 400
     body = response.json()
     assert "Invalid media_subtype" in body.get("detail", body.get("message", ""))
+    definition = ERROR_CATALOG["media.photo.invalid_taxonomy"]
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["reference"] == response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio
@@ -223,6 +228,10 @@ async def test_pair_rejects_cross_patient(
         headers=auth_headers,
     )
     assert response.status_code == 422
+    definition = ERROR_CATALOG["media.document.wrong_patient"]
+    assert response.json()["code"] == definition.code
+    assert response.json()["category"] == definition.category.value
+    assert response.json()["reference"] == response.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

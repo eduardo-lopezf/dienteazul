@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, ClinicMembership
 from app.modules.patients.models import Patient
+from app.modules.payments.errors import ERROR_CATALOG
 from app.modules.payments.models import PatientEarnedEntry, Payment, PaymentAllocation
 
 BASE = "/api/v1/payments"
@@ -197,6 +198,10 @@ async def test_the_schedule_and_the_earned_ledger_are_separate_views(
 async def test_an_instalment_of_zero_is_refused(client, auth_headers, ctx):
     r = await _create(client, auth_headers, ctx, [{"label": "Nada", "amount": "0"}])
     assert r.status_code == 422
+    definition = ERROR_CATALOG["payments.schedule.instalment_amount_invalid"]
+    assert r.json()["code"] == definition.code
+    assert r.json()["category"] == definition.category.value
+    assert r.json()["reference"] == r.headers["x-request-id"]
 
 
 @pytest.mark.asyncio
@@ -413,6 +418,10 @@ async def test_an_empty_line_up_is_refused(client, auth_headers, ctx):
     )
     # 422 is this module's mapping for a ValueError from the service layer.
     assert updated.status_code == 422
+    definition = ERROR_CATALOG["payments.schedule.instalment_required"]
+    assert updated.json()["code"] == definition.code
+    assert updated.json()["category"] == definition.category.value
+    assert updated.json()["reference"] == updated.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

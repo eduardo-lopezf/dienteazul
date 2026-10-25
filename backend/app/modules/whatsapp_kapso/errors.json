@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "whatsapp_kapso.settings.not_configured",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Kapso is not configured",
+      "description": "A business account ID is required before syncing WhatsApp templates."
+    },
+    {
+      "code": "whatsapp_kapso.provider.unavailable",
+      "category": "dependency",
+      "status_code": 502,
+      "message": "Could not communicate with Kapso",
+      "description": "The Kapso API request failed during template synchronization."
+    },
+    {
+      "code": "whatsapp_kapso.webhook.invalid_json",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Invalid webhook JSON",
+      "description": "The webhook request body is not valid JSON."
+    },
+    {
+      "code": "whatsapp_kapso.webhook.invalid_payload",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Invalid webhook payload",
+      "description": "The webhook JSON root must be an object."
+    },
+    {
+      "code": "whatsapp_kapso.webhook.invalid_signature",
+      "category": "auth",
+      "status_code": 401,
+      "message": "Invalid webhook signature",
+      "description": "The webhook signature does not match the configured clinic secret."
+    }
+  ]
+}

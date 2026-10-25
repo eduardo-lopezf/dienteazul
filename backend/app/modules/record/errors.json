@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "record.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "record.disclosure.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Disclosure not found",
+      "description": "The disclosure does not exist in the active clinic."
+    },
+    {
+      "code": "record.disclosure.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Disclosure cannot be created",
+      "description": "Disclosure evidence, scope, or selected record sections are invalid."
+    },
+    {
+      "code": "record.section.collection_failed",
+      "category": "internal",
+      "status_code": 500,
+      "message": "A record section could not be loaded",
+      "description": "A module failed while contributing its section to the composed record."
+    }
+  ]
+}

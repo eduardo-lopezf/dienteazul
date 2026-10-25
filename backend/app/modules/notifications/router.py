@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -11,6 +11,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.professionals.models import Professional
 
+from .errors import notifications_http_error, service_error
 from .gateway import NotificationGateway
 from .integrations import PATIENTS_UNAVAILABLE, running
 from .schemas import (
@@ -82,7 +83,7 @@ async def get_template(
     """Get an email template by ID."""
     template = await NotificationService.get_template_by_id(db, ctx.clinic_id, template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise notifications_http_error(status_code=404, detail="Template not found")
     return ApiResponse(data=EmailTemplateResponse.model_validate(template))
 
 
@@ -106,7 +107,7 @@ async def create_template(
         db, ctx.clinic_id, data.template_key, data.locale
     )
     if existing and existing.clinic_id == ctx.clinic_id:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Template '{data.template_key}' for locale '{data.locale}' already exists",
         )
@@ -126,16 +127,16 @@ async def update_template(
     """Update an email template."""
     template = await NotificationService.get_template_by_id(db, ctx.clinic_id, template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise notifications_http_error(status_code=404, detail="Template not found")
 
     if template.is_system:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot modify system templates",
         )
 
     if template.clinic_id != ctx.clinic_id:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot modify templates from other clinics",
         )
@@ -146,7 +147,7 @@ async def update_template(
         )
         return ApiResponse(data=EmailTemplateResponse.model_validate(updated))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
 
 @router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -162,16 +163,16 @@ async def delete_template(
     """
     template = await NotificationService.get_template_by_id(db, ctx.clinic_id, template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise notifications_http_error(status_code=404, detail="Template not found")
 
     if template.is_system:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete system templates",
         )
 
     if template.clinic_id != ctx.clinic_id:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete templates from other clinics",
         )
@@ -179,7 +180,7 @@ async def delete_template(
     try:
         await NotificationService.delete_template(db, template)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise service_error(e)
 
 
 # ============================================================================
@@ -204,13 +205,15 @@ async def get_patient_preferences(
     answering would write a row pointing at another clinic's patient.
     """
     if not running("patients"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+        raise notifications_http_error(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE
+        )
     try:
         prefs = await NotificationService.get_or_create_patient_preferences(
             db, ctx.clinic_id, patient_id
         )
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    except ValueError as e:
+        raise service_error(e)
     return ApiResponse(data=NotificationPreferenceResponse.model_validate(prefs))
 
 
@@ -227,13 +230,15 @@ async def update_patient_preferences(
 ) -> ApiResponse[NotificationPreferenceResponse]:
     """Update notification preferences for a patient."""
     if not running("patients"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+        raise notifications_http_error(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE
+        )
     try:
         prefs = await NotificationService.update_patient_preferences(
             db, ctx.clinic_id, patient_id, data.model_dump(exclude_unset=True)
         )
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    except ValueError as e:
+        raise service_error(e)
     return ApiResponse(data=NotificationPreferenceResponse.model_validate(prefs))
 
 
@@ -331,19 +336,21 @@ async def send_notification(
     appointment or budget notice while the agenda or budgets is (ADR 0037).
     """
     if not running("patients"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+        raise notifications_http_error(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE
+        )
     appointment_types = (
         "appointment_confirmation",
         "appointment_reminder",
         "appointment_cancelled",
     )
     if data.notification_type in appointment_types and not running("agenda"):
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The agenda is not enabled: appointment notices cannot be sent",
         )
     if data.notification_type in ("budget_sent", "budget_accepted") and not running("budget"):
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Budgets is not enabled: budget notices cannot be sent",
         )
@@ -366,9 +373,9 @@ async def send_notification(
         )
         patient = result.scalar_one_or_none()
         if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
+            raise notifications_http_error(status_code=404, detail="Patient not found")
         if not patient.email:
-            raise HTTPException(
+            raise notifications_http_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Patient has no email address",
             )
@@ -397,7 +404,7 @@ async def send_notification(
         "appointment_cancelled",
     ]:
         if not data.appointment_id:
-            raise HTTPException(
+            raise notifications_http_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="appointment_id is required for appointment notifications",
             )
@@ -410,7 +417,7 @@ async def send_notification(
         )
         appointment = result.scalar_one_or_none()
         if not appointment:
-            raise HTTPException(status_code=404, detail="Appointment not found")
+            raise notifications_http_error(status_code=404, detail="Appointment not found")
 
         context["appointment_date"] = appointment.start_time.strftime("%d/%m/%Y")
         context["appointment_time"] = appointment.start_time.strftime("%H:%M")
@@ -435,7 +442,7 @@ async def send_notification(
     # Handle budget notifications
     if data.notification_type in ["budget_sent", "budget_accepted"]:
         if not data.budget_id:
-            raise HTTPException(
+            raise notifications_http_error(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="budget_id is required for budget notifications",
             )
@@ -450,7 +457,7 @@ async def send_notification(
         )
         budget = result.scalar_one_or_none()
         if not budget:
-            raise HTTPException(status_code=404, detail="Budget not found")
+            raise notifications_http_error(status_code=404, detail="Budget not found")
 
         context["budget_number"] = budget.budget_number
         context["budget_date"] = budget.valid_from.strftime("%d/%m/%Y")
@@ -498,7 +505,7 @@ async def send_notification(
                 patient_email = patient.email
 
     if not patient_email:
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not determine recipient email address",
         )
@@ -572,7 +579,9 @@ async def reply_to_conversation(
 ) -> ApiResponse[ConversationMessageResponse]:
     """Send a free-form reply to the patient (within the 24h session window)."""
     if not running("patients"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE)
+        raise notifications_http_error(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=PATIENTS_UNAVAILABLE
+        )
     msg = await NotificationGateway.enqueue(
         db,
         ctx.clinic_id,
@@ -588,7 +597,7 @@ async def reply_to_conversation(
     if msg is None or msg.status == "skipped":
         reason = msg.error_message if msg else "no se pudo enviar"
         # Most common: the 24h free-form window is closed → needs a template.
-        raise HTTPException(
+        raise notifications_http_error(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "No se puede responder en texto libre: la ventana de 24h está "

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-
 // Slot entry into `appointment.completed.followup`. Receives an
 // `appointment` ctx with at least patient_id + treatment_type +
 // professional_id. Emits `done` to dismiss the host modal.

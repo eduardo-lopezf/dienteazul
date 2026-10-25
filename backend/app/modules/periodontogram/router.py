@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.patients.models import Patient
 
+from .errors import periodontogram_error
 from .schemas import (
     IndicesResponse,
     SitePatch,
@@ -47,7 +48,7 @@ async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -
         Patient.status != "archived",
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise periodontogram_error("periodontogram.patient.not_found")
 
 
 def _serialise_snapshot(snap) -> SnapshotDetail:

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "clinical_notes.owner.not_found", "category": "not_found", "status_code": 404, "message": "Clinical note owner not found", "description": "The patient, treatment, plan, or appointment owner does not exist in the active clinic."},
+    {"code": "clinical_notes.owner.unavailable", "category": "dependency", "status_code": 404, "message": "Appointments are not available — notes cannot be added to one", "description": "The Agenda app is disabled, so appointment notes cannot be attached."},
+    {"code": "clinical_notes.owner.patient_required", "category": "validation", "status_code": 404, "message": "Appointment has no patient; clinical notes require a patient binding", "description": "Appointment notes require the appointment to be linked to a patient."},
+    {"code": "clinical_notes.owner.invalid", "category": "validation", "status_code": 404, "message": "Clinical note owner is invalid", "description": "The owner type or owner relationship is not valid for a clinical note."},
+    {"code": "clinical_notes.note.not_found", "category": "not_found", "status_code": 404, "message": "Note not found", "description": "The note does not exist in the active clinic or was deleted."},
+    {"code": "clinical_notes.note.forbidden", "category": "auth", "status_code": 403, "message": "Only the author or an admin can change this note", "description": "Only the note author or a clinic administrator may amend or delete it."},
+    {"code": "clinical_notes.note.invalid_types", "category": "validation", "status_code": 422, "message": "Unknown note_type values", "description": "One or more requested note types are unsupported."},
+    {"code": "clinical_notes.attachment.patient_mismatch", "category": "validation", "status_code": 400, "message": "Document does not belong to the owner's patient", "description": "A note can only attach documents belonging to the same patient."},
+    {"code": "clinical_notes.attachment.documents_not_found", "category": "not_found", "status_code": 404, "message": "Documents not found", "description": "One or more selected documents do not exist in the active clinic."},
+    {"code": "clinical_notes.attachment.owner_invalid", "category": "validation", "status_code": 400, "message": "Attachment owner type is invalid", "description": "The requested attachment owner type is not supported by this proxy."}
+  ]
+}

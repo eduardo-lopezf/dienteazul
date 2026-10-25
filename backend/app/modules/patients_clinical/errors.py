@@ -1,44 +1,65 @@
-"""The ways this module refuses, each with a name.
-
-Every refusal here is the same shape — a record of this patient's
-clinical file that is not there — so it is one function over the
-resource rather than a dozen near-identical constants. The code reads
-``patients_clinical.<resource>.not_found``, which is what the catalogue
-would have spelled out anyway.
-
-Read ``app/core/errors.py`` for what a code is and what travels with it.
-"""
+"""Load stable patients_clinical error codes from ``errors.json``."""
 
 from __future__ import annotations
 
-from fastapi import status
+import json
+from pathlib import Path
+from typing import Final
 
-from app.core.errors import AppError, not_found
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-#: Spelled here so a reader sees the shape without running it.
-CODE_TEMPLATE = "patients_clinical.{resource}.not_found"
+from app.core.errors import AppError, ErrorCategory
+
+ERRORS_FILE: Final[Path] = Path(__file__).with_name("errors.json")
 
 
-def record_not_found(resource: str, label: str) -> AppError:
-    """``resource`` names the code; ``label`` is what the person reads.
+class ErrorDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    Both are given rather than derived from one another: the code is a
-    contract and must not move when the wording is improved, and the
-    wording is a sentence that should not be forced to match a key.
-    """
-    return not_found(CODE_TEMPLATE.format(resource=resource), f"{label} not found")
+    code: str = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+    category: ErrorCategory
+    status_code: int = Field(ge=400, lt=600)
+    message: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+
+
+class ErrorCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(ge=1)
+    errors: list[ErrorDefinition]
+
+    @model_validator(mode="after")
+    def _unique_codes(self) -> ErrorCatalog:
+        codes = [error.code for error in self.errors]
+        if len(codes) != len(set(codes)):
+            raise ValueError("error codes must be unique")
+        return self
+
+
+def _load_catalog() -> dict[str, ErrorDefinition]:
+    data = json.loads(ERRORS_FILE.read_text(encoding="utf-8"))
+    catalog = ErrorCatalog.model_validate(data)
+    return {error.code: error for error in catalog.errors}
+
+
+# Fail at startup if the module's error contract is malformed.
+ERROR_CATALOG: Final[dict[str, ErrorDefinition]] = _load_catalog()
+
+
+def _app_error(code: str, *, detail: str | None = None) -> AppError:
+    definition = ERROR_CATALOG[code]
+    return AppError(
+        definition.code,
+        status_code=definition.status_code,
+        detail=detail or definition.message,
+        category=definition.category,
+    )
+
+
+def record_not_found(resource: str) -> AppError:
+    return _app_error(f"patients_clinical.{resource}.not_found")
 
 
 def rejected(resource: str, reason: str) -> AppError:
-    """A rule of this module's own refused the write.
-
-    The service raises ``ValueError`` with the sentence to show — a
-    questionnaire with neither signature nor scan, an ASA class that is
-    not offered. The code says which record refused; the reason is the
-    service's own words and stays unaltered.
-    """
-    return AppError(
-        f"patients_clinical.{resource}.rejected",
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=reason,
-    )
+    return _app_error(f"patients_clinical.{resource}.rejected", detail=reason)

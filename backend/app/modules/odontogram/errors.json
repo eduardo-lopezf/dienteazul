@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "odontogram.patient.not_found", "category": "not_found", "status_code": 404, "message": "Patient not found", "description": "The patient does not exist or is archived in the active clinic."},
+    {"code": "odontogram.tooth.invalid_number", "category": "validation", "status_code": 400, "message": "Invalid tooth number", "description": "The tooth number is not valid FDI notation."},
+    {"code": "odontogram.tooth.not_found", "category": "not_found", "status_code": 404, "message": "Tooth not found for this patient", "description": "No tooth record exists for this patient and tooth number."},
+    {"code": "odontogram.treatment.not_found", "category": "not_found", "status_code": 404, "message": "Treatment not found", "description": "The treatment does not exist in the active clinic."},
+    {"code": "odontogram.eruption.invalid_primary_tooth", "category": "validation", "status_code": 400, "message": "Only a primary tooth with a successor can be exchanged", "description": "The selected tooth is not a primary tooth with a permanent successor."},
+    {"code": "odontogram.treatment.catalog_item_not_found", "category": "validation", "status_code": 400, "message": "Catalog item not found", "description": "The catalog item is unavailable in the active clinic."},
+    {"code": "odontogram.treatment.catalog_mapping_conflict", "category": "validation", "status_code": 400, "message": "Clinical type conflicts with the catalog mapping", "description": "The treatment clinical type must match the catalog item's odontogram mapping."},
+    {"code": "odontogram.treatment.clinical_type_required", "category": "validation", "status_code": 400, "message": "Clinical type is required without a catalog item", "description": "A treatment without a catalog item must specify a clinical type."},
+    {"code": "odontogram.treatment.bridge_requires_pillar", "category": "validation", "status_code": 400, "message": "A bridge requires at least one pillar tooth", "description": "At least one tooth in a bridge must be marked as a pillar."},
+    {"code": "odontogram.treatment.dentition_mismatch", "category": "validation", "status_code": 400, "message": "Treatment is not valid for the selected dentition", "description": "The catalog treatment does not apply to one or more selected teeth."},
+    {"code": "odontogram.treatment.atomic_tooth_count_invalid", "category": "validation", "status_code": 400, "message": "Treatment requires more teeth", "description": "This clinical treatment type requires at least two teeth."},
+    {"code": "odontogram.treatment.invalid", "category": "validation", "status_code": 400, "message": "Treatment data is invalid", "description": "A treatment-domain rule rejected the request."}
+  ]
+}

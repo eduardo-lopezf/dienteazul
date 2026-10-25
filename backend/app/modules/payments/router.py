@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -21,6 +21,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
+from .errors import payments_error, schedule_error, workflow_error
 from .schedules import ScheduleService
 from .schemas import (
     AgingBuckets,
@@ -87,7 +88,9 @@ async def _ensure_patient(
     """
     if not patients_available():
         if writing:
-            raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
+            raise payments_error(
+                "payments.patients.unavailable", detail=PATIENTS_UNAVAILABLE
+            )
         return
 
     from sqlalchemy import select
@@ -101,11 +104,11 @@ async def _ensure_patient(
         )
     )
     if owned is None:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise payments_error("payments.patient.not_found")
 
 
-def _bad_request(exc: Exception) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+def _bad_request(exc: Exception):
+    return workflow_error(str(exc))
 
 
 # --- Payments ---------------------------------------------------------
@@ -163,7 +166,7 @@ async def create_payment_schedule(
             db, ctx.clinic_id, ctx.user_id, payload.model_dump()
         )
     except ValueError as exc:
-        raise _bad_request(exc) from exc
+        raise schedule_error(str(exc)) from exc
     await db.commit()
     reloaded = await ScheduleService.get(db, ctx.clinic_id, schedule.id)
     return ApiResponse(data=await _schedule_response(db, ctx.clinic_id, reloaded))
@@ -178,7 +181,7 @@ async def get_payment_schedule(
 ) -> ApiResponse[PaymentScheduleResponse]:
     schedule = await ScheduleService.get(db, ctx.clinic_id, schedule_id)
     if schedule is None:
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise payments_error("payments.schedule.not_found")
     return ApiResponse(data=await _schedule_response(db, ctx.clinic_id, schedule))
 
 
@@ -196,15 +199,15 @@ async def update_payment_schedule(
     payments, so the new instalments are simply re-covered in order.
     """
     if not patients_available():
-        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
+        raise payments_error("payments.patients.unavailable", detail=PATIENTS_UNAVAILABLE)
     try:
         schedule = await ScheduleService.update(
             db, ctx.clinic_id, schedule_id, payload.model_dump(exclude_unset=True)
         )
     except ValueError as exc:
-        raise _bad_request(exc) from exc
+        raise schedule_error(str(exc)) from exc
     if schedule is None:
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise payments_error("payments.schedule.not_found")
     await db.commit()
     reloaded = await ScheduleService.get(db, ctx.clinic_id, schedule_id)
     return ApiResponse(data=await _schedule_response(db, ctx.clinic_id, reloaded))
@@ -219,9 +222,9 @@ async def cancel_payment_schedule(
 ) -> None:
     """Supersede an agreement. Never deleted — it is part of what happened."""
     if not patients_available():
-        raise HTTPException(status_code=400, detail=PATIENTS_UNAVAILABLE)
+        raise payments_error("payments.patients.unavailable", detail=PATIENTS_UNAVAILABLE)
     if not await ScheduleService.cancel(db, ctx.clinic_id, schedule_id):
-        raise HTTPException(status_code=404, detail="Schedule not found")
+        raise payments_error("payments.schedule.not_found")
     await db.commit()
 
 
@@ -527,7 +530,7 @@ async def create_payment(
 
     fresh = await PaymentService.get(db, ctx.clinic_id, payment.id)
     if fresh is None:  # pragma: no cover - defensive
-        raise HTTPException(status_code=500, detail="Payment vanished after create")
+        raise RuntimeError("Payment vanished after create")
     return ApiResponse(data=PaymentResponse.from_model(fresh))
 
 
@@ -540,7 +543,7 @@ async def get_payment(
 ) -> ApiResponse[PaymentResponse]:
     payment = await PaymentService.get(db, ctx.clinic_id, payment_id)
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise payments_error("payments.payment.not_found")
     return ApiResponse(data=PaymentResponse.from_model(payment))
 
 
@@ -554,7 +557,7 @@ async def reallocate(
 ) -> ApiResponse[PaymentResponse]:
     payment = await PaymentService.get(db, ctx.clinic_id, payment_id)
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise payments_error("payments.payment.not_found")
     try:
         await reallocate_payment(
             db,
@@ -582,7 +585,7 @@ async def list_refunds(
 ) -> ApiResponse[list[RefundResponse]]:
     payment = await PaymentService.get(db, ctx.clinic_id, payment_id)
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise payments_error("payments.payment.not_found")
     return ApiResponse(data=[RefundResponse.model_validate(r) for r in payment.refunds])
 
 
@@ -596,7 +599,7 @@ async def create_refund(
 ) -> ApiResponse[RefundResponse]:
     payment = await PaymentService.get(db, ctx.clinic_id, payment_id)
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise payments_error("payments.payment.not_found")
     try:
         refund = await refund_payment(
             db,

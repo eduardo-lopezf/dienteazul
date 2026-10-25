@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "patients.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "patients.patient.invalid_sort",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Invalid patient sort option",
+      "description": "The requested sort field or direction is not supported."
+    }
+  ]
+}

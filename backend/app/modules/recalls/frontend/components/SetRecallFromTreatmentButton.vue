@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { RecallReason } from '../composables/useRecalls'
 
 // Slot entry into `odontogram.condition.actions`. Host ctx (per

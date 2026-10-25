@@ -130,7 +130,7 @@ class RecordService:
                 # record. It is logged loudly and the section comes back empty
                 # rather than absent, so the gap is visible instead of silent.
                 logger.exception(
-                    "record: section %s.%s failed for patient %s",
+                    "record.section.collection_failed: section %s.%s failed for patient %s",
                     module_name,
                     section.name,
                     patient_id,

@@ -9,7 +9,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import (
@@ -22,6 +22,7 @@ from app.core.auth.permissions import has_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import schedules_http_error
 from .models import (
     ClinicOverride,
     ClinicWeeklySchedule,
@@ -153,7 +154,7 @@ def _require_professional_access(ctx: ClinicContext, action: str) -> None:
     perm_general = f"schedules.professional.{action}"
     if has_permission(ctx.role, perm_general):
         return
-    raise HTTPException(
+    raise schedules_http_error(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=f"Permission denied: {perm_general}",
     )
@@ -251,7 +252,7 @@ async def update_clinic_override(
 ) -> ApiResponse[ClinicOverrideResponse]:
     override = await ClinicHoursService.get_override(db, ctx.clinic_id, override_id)
     if override is None:
-        raise HTTPException(status_code=404, detail="Override not found")
+        raise schedules_http_error(status_code=404, detail="Override not found")
     override = await ClinicHoursService.update_override(
         db,
         override,
@@ -280,7 +281,7 @@ async def delete_clinic_override(
 ) -> None:
     override = await ClinicHoursService.get_override(db, ctx.clinic_id, override_id)
     if override is None:
-        raise HTTPException(status_code=404, detail="Override not found")
+        raise schedules_http_error(status_code=404, detail="Override not found")
     await ClinicHoursService.delete_override(db, override)
 
 
@@ -299,7 +300,7 @@ async def get_professional_hours(
 ) -> ApiResponse[ProfessionalHoursResponse]:
     _require_professional_access(ctx, "read")
     if not await ProfessionalHoursService.is_professional(db, ctx.clinic_id, professional_id):
-        raise HTTPException(status_code=404, detail="Professional not found")
+        raise schedules_http_error(status_code=404, detail="Professional not found")
     weekly = await ProfessionalHoursService.get_or_create_weekly(db, ctx.clinic_id, professional_id)
     return ApiResponse(data=_professional_weekly_to_response(weekly))
 
@@ -317,7 +318,7 @@ async def update_professional_hours(
 ) -> ApiResponse[ProfessionalHoursResponse]:
     _require_professional_access(ctx, "write")
     if not await ProfessionalHoursService.is_professional(db, ctx.clinic_id, professional_id):
-        raise HTTPException(status_code=404, detail="Professional not found")
+        raise schedules_http_error(status_code=404, detail="Professional not found")
     weekly = await ProfessionalHoursService.get_or_create_weekly(db, ctx.clinic_id, professional_id)
     weekly = await ProfessionalHoursService.replace_weekly_shifts(
         db,
@@ -347,7 +348,7 @@ async def list_professional_overrides(
 ) -> ApiResponse[list[ProfessionalOverrideResponse]]:
     _require_professional_access(ctx, "read")
     if not await ProfessionalHoursService.is_professional(db, ctx.clinic_id, professional_id):
-        raise HTTPException(status_code=404, detail="Professional not found")
+        raise schedules_http_error(status_code=404, detail="Professional not found")
     overrides = await ProfessionalHoursService.list_overrides(
         db, ctx.clinic_id, professional_id, start, end
     )
@@ -368,7 +369,7 @@ async def create_professional_override(
 ) -> ApiResponse[ProfessionalOverrideResponse]:
     _require_professional_access(ctx, "write")
     if not await ProfessionalHoursService.is_professional(db, ctx.clinic_id, professional_id):
-        raise HTTPException(status_code=404, detail="Professional not found")
+        raise schedules_http_error(status_code=404, detail="Professional not found")
     override = await ProfessionalHoursService.create_override(
         db,
         ctx.clinic_id,
@@ -403,7 +404,7 @@ async def update_professional_override(
         db, ctx.clinic_id, professional_id, override_id
     )
     if override is None:
-        raise HTTPException(status_code=404, detail="Override not found")
+        raise schedules_http_error(status_code=404, detail="Override not found")
     override = await ProfessionalHoursService.update_override(
         db,
         override,
@@ -436,7 +437,7 @@ async def delete_professional_override(
         db, ctx.clinic_id, professional_id, override_id
     )
     if override is None:
-        raise HTTPException(status_code=404, detail="Override not found")
+        raise schedules_http_error(status_code=404, detail="Override not found")
     await ProfessionalHoursService.delete_override(db, override)
 
 
@@ -453,7 +454,7 @@ async def get_availability(
     professional_id: UUID | None = Query(default=None),
 ) -> ApiResponse[AvailabilityResponse]:
     if end < start:
-        raise HTTPException(status_code=400, detail="end must be on or after start")
+        raise schedules_http_error(status_code=400, detail="end must be on or after start")
     timezone, ranges = await AvailabilityService.resolve(
         db, ctx.clinic_id, start, end, professional_id
     )
@@ -487,7 +488,7 @@ async def get_occupancy(
     cabinet_id: UUID | None = Query(default=None),
 ) -> ApiResponse[OccupancyResponse]:
     if end < start:
-        raise HTTPException(status_code=400, detail="end must be on or after start")
+        raise schedules_http_error(status_code=400, detail="end must be on or after start")
     rows = await AnalyticsService.occupancy(db, ctx.clinic_id, start, end, cabinet_id)
     return ApiResponse(
         data=OccupancyResponse(
@@ -508,7 +509,7 @@ async def get_utilization(
     professional_id: UUID | None = Query(default=None),
 ) -> ApiResponse[UtilizationResponse]:
     if end < start:
-        raise HTTPException(status_code=400, detail="end must be on or after start")
+        raise schedules_http_error(status_code=400, detail="end must be on or after start")
     rows = await AnalyticsService.utilization(db, ctx.clinic_id, start, end, professional_id)
     return ApiResponse(
         data=UtilizationResponse(
@@ -528,7 +529,7 @@ async def get_peak_hours(
     end: date = Query(...),
 ) -> ApiResponse[PeakHoursResponse]:
     if end < start:
-        raise HTTPException(status_code=400, detail="end must be on or after start")
+        raise schedules_http_error(status_code=400, detail="end must be on or after start")
     rows = await AnalyticsService.peak_hours(db, ctx.clinic_id, start, end)
     return ApiResponse(
         data=PeakHoursResponse(

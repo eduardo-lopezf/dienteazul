@@ -24,6 +24,7 @@ class ExportJobResponse(BaseModel):
     created_by: UUID
     status: str
     error: str | None
+    error_code: str | None = None
     file_size: int
     entity_counts: dict[str, int]
     created_at: datetime
@@ -42,6 +43,7 @@ class ImportJobResponse(BaseModel):
     created_by: UUID
     status: str
     error: str | None
+    error_code: str | None = None
 
     original_filename: str
     file_size: int
@@ -63,6 +65,7 @@ class ImportJobResponse(BaseModel):
     tracks_created: bool = False
     undone_at: datetime | None = None
     undo_error: str | None = None
+    undo_error_code: str | None = None
     expected_storage_bytes: int | None = None
 
     started_at: datetime | None

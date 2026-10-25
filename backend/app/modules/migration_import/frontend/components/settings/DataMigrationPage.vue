@@ -3,7 +3,6 @@
 // Polls /jobs/{id} every 2s while a background step is running so the
 // status, progress and error fields stay current without push.
 
-import { computed, onUnmounted, ref } from 'vue'
 import { PERMISSIONS } from '~~/app/config/permissions'
 import { errorMessage } from '~~/app/utils/error'
 

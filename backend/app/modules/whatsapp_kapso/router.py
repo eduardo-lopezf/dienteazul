@@ -12,7 +12,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -21,6 +21,8 @@ from app.core.schemas import ApiResponse
 from app.database import get_db
 from app.modules.notifications.gateway import NotificationGateway
 
+from .client import KapsoError
+from .errors import template_sync_error, whatsapp_kapso_error
 from .schemas import (
     KapsoSettingsResponse,
     KapsoSettingsUpdate,
@@ -78,7 +80,9 @@ async def sync_templates(
     try:
         templates = await KapsoService.sync_templates(db, ctx.clinic_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise template_sync_error(exc) from exc
+    except KapsoError as exc:
+        raise template_sync_error(exc) from exc
     return ApiResponse(data=[KapsoTemplateResponse.model_validate(t) for t in templates])
 
 
@@ -124,7 +128,9 @@ async def webhook(
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid json")
+        raise whatsapp_kapso_error("whatsapp_kapso.webhook.invalid_json")
+    if not isinstance(payload, dict):
+        raise whatsapp_kapso_error("whatsapp_kapso.webhook.invalid_payload")
 
     phone_number_id = payload.get("phone_number_id")
     if not phone_number_id:
@@ -137,7 +143,7 @@ async def webhook(
 
     signature = request.headers.get("X-Webhook-Signature", "")
     if not KapsoService.verify_signature(settings, raw, signature):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid signature")
+        raise whatsapp_kapso_error("whatsapp_kapso.webhook.invalid_signature")
 
     await _process_event(db, settings.clinic_id, payload)
     return {"ok": True}

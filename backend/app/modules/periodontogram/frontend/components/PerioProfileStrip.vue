@@ -17,7 +17,6 @@
  * wasn't taken. The indices banner anchors the denominator to total
  * present sites separately.
  */
-import { computed } from 'vue'
 import type { PerioTooth, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
 

@@ -7,7 +7,6 @@
  * history banner when viewing a frozen state.
  */
 
-import { computed, onMounted, ref, watch } from 'vue'
 import { usePeriodontogram } from '../composables/usePeriodontogram'
 
 const props = defineProps<{

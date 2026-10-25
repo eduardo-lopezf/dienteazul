@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -14,6 +14,7 @@ from app.database import get_db
 
 from .coverage import requirement_keys
 from .disclosure import DisclosureError, DisclosureService
+from .errors import record_error
 from .format import SETTINGS_KEY, RecordFormat, read_format
 from .schemas import (
     DisclosureCreate,
@@ -54,7 +55,7 @@ async def get_patient_record(
         db, ctx.clinic_id, patient_id, include_retracted=include_retracted
     )
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise record_error("record.patient.not_found")
     return ApiResponse(data=RecordResponse.model_validate(record))
 
 
@@ -84,9 +85,9 @@ async def disclose_patient_record(
             db, ctx.clinic_id, patient_id, ctx.user_id, data.model_dump()
         )
     except DisclosureError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+        raise record_error("record.disclosure.invalid", detail=str(error)) from error
     if disclosure is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise record_error("record.patient.not_found")
     return ApiResponse(data=DisclosureResponse.model_validate(disclosure))
 
 
@@ -114,7 +115,7 @@ async def disclosure_document(
     """The document exactly as it left — stored, never regenerated."""
     disclosure = await DisclosureService.get(db, ctx.clinic_id, disclosure_id, with_document=True)
     if disclosure is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Disclosure not found")
+        raise record_error("record.disclosure.not_found")
     return Response(
         content=disclosure.document,
         media_type="application/pdf",

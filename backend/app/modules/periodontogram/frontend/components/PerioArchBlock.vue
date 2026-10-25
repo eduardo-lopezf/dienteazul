@@ -22,7 +22,6 @@
  * directly above or below it, so a vertical scan reads cleanly per
  * FDI number.
  */
-import { computed } from 'vue'
 import type { Furcation, PerioSite, PerioTooth, Prognosis, SiteCode } from '../types'
 import { PALATAL_SITES, VESTIBULAR_SITES } from '../types'
 import { isNarrowKeratinizedGingiva, isPathologicalDepth } from '../utils/perioConvention'

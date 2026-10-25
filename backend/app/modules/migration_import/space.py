@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.limits import clinic_limits
 from app.core.tenancy import TenantContext
+
+from .errors import migration_error
 
 _MB = 1024 * 1024
 
@@ -40,8 +41,10 @@ async def ensure_room(
         return
     free = await free_bytes(db, tenant, clinic_id)
     if free is not None and needed > free:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            f"No hay espacio suficiente para {what}: hacen falta {megabytes(needed)} y quedan "
-            f"{megabytes(free)} en el espacio de la clínica. Libera espacio o amplía el plan.",
+        raise migration_error(
+            "migration_import.storage.insufficient_space",
+            detail=(
+                f"No hay espacio suficiente para {what}: hacen falta {megabytes(needed)} y quedan "
+                f"{megabytes(free)} en el espacio de la clínica. Libera espacio o amplía el plan."
+            ),
         )

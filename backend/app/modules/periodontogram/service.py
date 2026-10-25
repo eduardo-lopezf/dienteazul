@@ -15,7 +15,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +23,7 @@ from sqlalchemy.orm import selectinload
 from app.core.events import EventType, event_bus
 
 from .constants import PERIO_TEETH, SITE_CODES, SnapshotStatus
+from .errors import periodontogram_error
 from .indices import compute_indices
 from .models import PeriodontogramSite, PeriodontogramSnapshot, PeriodontogramTooth
 from .schemas import SitePatch, ToothPatch
@@ -79,10 +79,7 @@ class PeriodontogramService:
         )
         snap = (await db.execute(stmt)).scalar_one_or_none()
         if snap is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Snapshot not found",
-            )
+            raise periodontogram_error("periodontogram.snapshot.not_found")
         return snap
 
     @staticmethod
@@ -186,10 +183,7 @@ class PeriodontogramService:
             # was created between get_active_draft and flush. Surface as
             # 409 so the client retries.
             await db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Another draft already exists for this patient",
-            ) from exc
+            raise periodontogram_error("periodontogram.snapshot.draft_conflict") from exc
 
         # Pre-fill from odontogram (read-only — never imported via FK).
         # Missing teeth come out as ``is_present=False`` and implants as
@@ -267,10 +261,7 @@ class PeriodontogramService:
     ) -> PeriodontogramTooth:
         snap = await PeriodontogramService.get_snapshot(db, clinic_id, snapshot_id)
         if snap.status == SnapshotStatus.CLOSED.value:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Snapshot is closed and immutable",
-            )
+            raise periodontogram_error("periodontogram.snapshot.closed")
 
         stmt = select(PeriodontogramTooth).where(
             PeriodontogramTooth.snapshot_id == snapshot_id,
@@ -278,8 +269,8 @@ class PeriodontogramService:
         )
         tooth = (await db.execute(stmt)).scalar_one_or_none()
         if tooth is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+            raise periodontogram_error(
+                "periodontogram.tooth.not_in_snapshot",
                 detail=f"Tooth {tooth_number} not part of snapshot",
             )
 
@@ -299,17 +290,13 @@ class PeriodontogramService:
         patch: SitePatch,
     ) -> PeriodontogramSite:
         if site_code not in SITE_CODES:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid site code: {site_code}",
+            raise periodontogram_error(
+                "periodontogram.site.invalid_code", detail=f"Invalid site code: {site_code}"
             )
 
         snap = await PeriodontogramService.get_snapshot(db, clinic_id, snapshot_id)
         if snap.status == SnapshotStatus.CLOSED.value:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Snapshot is closed and immutable",
-            )
+            raise periodontogram_error("periodontogram.snapshot.closed")
 
         tooth_stmt = select(PeriodontogramTooth).where(
             PeriodontogramTooth.snapshot_id == snapshot_id,
@@ -317,8 +304,8 @@ class PeriodontogramService:
         )
         tooth = (await db.execute(tooth_stmt)).scalar_one_or_none()
         if tooth is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+            raise periodontogram_error(
+                "periodontogram.tooth.not_in_snapshot",
                 detail=f"Tooth {tooth_number} not part of snapshot",
             )
 
@@ -353,10 +340,7 @@ class PeriodontogramService:
     ) -> PeriodontogramSnapshot:
         snap = await PeriodontogramService.get_snapshot(db, clinic_id, snapshot_id)
         if snap.status == SnapshotStatus.CLOSED.value:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Snapshot is already closed",
-            )
+            raise periodontogram_error("periodontogram.snapshot.already_closed")
 
         # Compute indices over the snapshot's teeth and freeze them on
         # the row as JSONB. Avoids re-walking every site for read
@@ -393,9 +377,6 @@ class PeriodontogramService:
     ) -> None:
         snap = await PeriodontogramService.get_snapshot(db, clinic_id, snapshot_id)
         if snap.status != SnapshotStatus.DRAFT.value:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Only draft snapshots can be discarded",
-            )
+            raise periodontogram_error("periodontogram.snapshot.not_draft")
         await db.delete(snap)
         await db.flush()

@@ -24,10 +24,11 @@ import hashlib
 import logging
 from typing import Any
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..errors import migration_error
 from ..events import publish_binary_resolved
 from ..mappers.document import DOCUMENT_ENTITY_TYPE
 from ..models import EntityMapping, FileStaging, ImportJob
@@ -46,15 +47,15 @@ async def ingest_binary(
     body = await file.read()
     actual_sha = hashlib.sha256(body).hexdigest()
     if actual_sha != claimed_sha256.lower():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise migration_error(
+            "migration_import.binary.hash_mismatch",
             detail=f"sha256 mismatch: claimed={claimed_sha256} actual={actual_sha}",
         )
 
     staging = await _find_staging(db, job_id=job.id, sha256=actual_sha)
     if staging is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+        raise migration_error(
+            "migration_import.binary.staging_not_found",
             detail=f"no FileStaging row for sha256={actual_sha} in job {job.id}",
         )
     if staging.status == "received":
@@ -68,10 +69,7 @@ async def ingest_binary(
     if patient_id is None:
         # Agent should retry — the patient_document mapping likely
         # hasn't been written yet (execute pipeline still running).
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="parent patient not yet mapped — retry once execute completes",
-        )
+        raise migration_error("migration_import.binary.patient_mapping_pending")
 
     # Late import keeps the module loadable when media isn't installed
     # (e.g. uninstall test of media; though we depend on it so this is

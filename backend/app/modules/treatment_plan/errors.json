@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "treatment_plan.pipeline.invalid_tab", "category": "validation", "status_code": 400, "message": "Unknown treatment plan pipeline tab", "description": "The requested pipeline tab is not supported."},
+    {"code": "treatment_plan.plan.not_found", "category": "not_found", "status_code": 404, "message": "Treatment plan not found", "description": "The plan does not exist in the active clinic."},
+    {"code": "treatment_plan.plan.invalid", "category": "validation", "status_code": 400, "message": "Treatment plan operation was rejected", "description": "A domain rule rejected the requested plan operation."},
+    {"code": "treatment_plan.plan.invalid_transition", "category": "validation", "status_code": 400, "message": "Invalid treatment plan status transition", "description": "The requested status transition is not allowed."},
+    {"code": "treatment_plan.plan.locked", "category": "conflict", "status_code": 409, "message": "Plan is locked by an active budget", "description": "The plan cannot be changed while an active budget locks it."},
+    {"code": "treatment_plan.plan.has_collections", "category": "conflict", "status_code": 409, "message": "PLAN_HAS_COLLECTIONS", "description": "A plan with collected payments cannot be deleted or cancelled."},
+    {"code": "treatment_plan.plan.consent_required", "category": "conflict", "status_code": 409, "message": "informed_consent_required", "description": "The clinic requires signed informed consent before confirming this plan."},
+    {"code": "treatment_plan.plan.reopen_forbidden", "category": "auth", "status_code": 403, "message": "Only an administrator or an assigned professional can reopen this plan", "description": "Only an administrator or a professional assigned to this case can reopen the plan."},
+    {"code": "treatment_plan.patient.invalid", "category": "validation", "status_code": 400, "message": "Invalid patient", "description": "The patient is not available in the active clinic."},
+    {"code": "treatment_plan.professional.invalid", "category": "validation", "status_code": 400, "message": "Invalid professional for this clinic", "description": "The professional is not bookable in the active clinic."},
+    {"code": "treatment_plan.professionals.unavailable", "category": "dependency", "status_code": 400, "message": "Professionals are not available — nobody can be assigned", "description": "The Professionals app is disabled, so no professional can be assigned."},
+    {"code": "treatment_plan.budget.invalid", "category": "validation", "status_code": 400, "message": "Invalid budget", "description": "The budget is invalid or belongs to a different patient."},
+    {"code": "treatment_plan.budgets.unavailable", "category": "dependency", "status_code": 400, "message": "Budgets are not available — a plan cannot be linked to one", "description": "The Budgets app is disabled, so a plan cannot be linked to a budget."},
+    {"code": "treatment_plan.budget.not_linked", "category": "validation", "status_code": 400, "message": "Cannot sync: plan not found or no budget linked", "description": "Budget synchronization requires an existing plan with a linked budget."},
+    {"code": "treatment_plan.item.not_found", "category": "not_found", "status_code": 404, "message": "Treatment item not found", "description": "The planned treatment item does not exist in the active clinic."},
+    {"code": "treatment_plan.item.invalid", "category": "validation", "status_code": 400, "message": "Treatment item operation was rejected", "description": "A domain rule rejected the requested item operation."},
+    {"code": "treatment_plan.session.not_found", "category": "not_found", "status_code": 404, "message": "Session not found", "description": "The treatment session does not exist in the active clinic."},
+    {"code": "treatment_plan.session.invalid", "category": "validation", "status_code": 400, "message": "Treatment session operation was rejected", "description": "A domain rule rejected the requested session operation."},
+    {"code": "treatment_plan.template.not_found", "category": "not_found", "status_code": 404, "message": "Template not found", "description": "The template does not exist in the active clinic."},
+    {"code": "treatment_plan.template.invalid", "category": "validation", "status_code": 400, "message": "Treatment plan template operation was rejected", "description": "A domain rule rejected the requested template operation."},
+    {"code": "treatment_plan.template.needs_teeth", "category": "validation", "status_code": 422, "message": "Template needs teeth for selected treatments", "description": "Per-tooth treatments need one or more teeth selected."},
+    {"code": "treatment_plan.proposal.invalid", "category": "validation", "status_code": 400, "message": "Treatment plan proposal was rejected", "description": "A domain rule rejected the requested proposal operation."},
+    {"code": "treatment_plan.prescription.not_found", "category": "not_found", "status_code": 404, "message": "Prescription not found", "description": "The prescription does not exist in the active clinic."},
+    {"code": "treatment_plan.prescription.invalid", "category": "validation", "status_code": 400, "message": "Prescription operation was rejected", "description": "A domain rule rejected the requested prescription operation."},
+    {"code": "treatment_plan.prescription.professional_invalid", "category": "validation", "status_code": 400, "message": "Professional is unavailable for this prescription", "description": "A prescription requires a professional from the active clinic."}
+  ]
+}

@@ -17,8 +17,13 @@ from app.core.auth.dependencies import (
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import accounting_export_error
 from .schemas import ExportPreview
-from .service import EXPORTABLE_STATUSES, AccountingExportService
+from .service import (
+    EXPORTABLE_STATUSES,
+    AccountingExportError,
+    AccountingExportService,
+)
 
 router = APIRouter()
 
@@ -42,9 +47,12 @@ async def preview(
     date_to: date | None = Query(default=None),
     status: list[str] | None = Query(default=None),
 ) -> ApiResponse[ExportPreview]:
-    invoices = await AccountingExportService.fetch(
-        db, ctx.clinic_id, date_from, date_to, _statuses(status)
-    )
+    try:
+        invoices = await AccountingExportService.fetch(
+            db, ctx.clinic_id, date_from, date_to, _statuses(status)
+        )
+    except AccountingExportError as exc:
+        raise accounting_export_error("accounting_export.period.invalid") from exc
     inv_rows = AccountingExportService.invoice_rows(invoices)
     pay_rows = AccountingExportService.payment_rows(invoices)
     base, cuota, total = AccountingExportService.totals(inv_rows)
@@ -71,9 +79,12 @@ async def run(
     status: list[str] | None = Query(default=None),
     separator: str = Query(default=",", pattern="^[,;]$"),
 ) -> Response:
-    invoices = await AccountingExportService.fetch(
-        db, ctx.clinic_id, date_from, date_to, _statuses(status)
-    )
+    try:
+        invoices = await AccountingExportService.fetch(
+            db, ctx.clinic_id, date_from, date_to, _statuses(status)
+        )
+    except AccountingExportError as exc:
+        raise accounting_export_error("accounting_export.period.invalid") from exc
     content = AccountingExportService.build_zip(invoices, separator)
     suffix = f"{date_from or 'inicio'}_{date_to or 'fin'}"
     return Response(

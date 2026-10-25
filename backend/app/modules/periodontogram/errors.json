@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "periodontogram.patient.not_found", "category": "not_found", "status_code": 404, "message": "Patient not found", "description": "The patient does not exist or is archived in the active clinic."},
+    {"code": "periodontogram.snapshot.not_found", "category": "not_found", "status_code": 404, "message": "Snapshot not found", "description": "The snapshot does not exist in the active clinic."},
+    {"code": "periodontogram.snapshot.draft_conflict", "category": "conflict", "status_code": 409, "message": "Another draft already exists for this patient", "description": "A patient can have only one active periodontal chart draft."},
+    {"code": "periodontogram.snapshot.closed", "category": "conflict", "status_code": 409, "message": "Snapshot is closed and immutable", "description": "Closed periodontal snapshots cannot be edited."},
+    {"code": "periodontogram.snapshot.already_closed", "category": "conflict", "status_code": 409, "message": "Snapshot is already closed", "description": "The periodontal snapshot has already been finalized."},
+    {"code": "periodontogram.snapshot.not_draft", "category": "conflict", "status_code": 409, "message": "Only draft snapshots can be discarded", "description": "Only an active draft can be discarded."},
+    {"code": "periodontogram.tooth.not_in_snapshot", "category": "not_found", "status_code": 404, "message": "Tooth not part of snapshot", "description": "The tooth is not present in this snapshot."},
+    {"code": "periodontogram.site.invalid_code", "category": "validation", "status_code": 422, "message": "Invalid site code", "description": "The periodontal site code is not one of the six supported sites."}
+  ]
+}

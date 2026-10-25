@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.patients.models import Patient
 from app.modules.patients_clinical import PatientsClinicalModule
+from app.modules.patients_clinical.errors import ERROR_CATALOG
 from app.modules.patients_clinical.models import AsaAssessment
 
 
@@ -109,6 +110,10 @@ async def test_a_judgement_is_not_dated_in_the_future(
         _url(test_patient), headers=auth_headers, json={"asa_class": 1, "assessed_at": tomorrow}
     )
     assert refused.status_code == 400
+    definition = ERROR_CATALOG["patients_clinical.asa_assessment.rejected"]
+    assert refused.json()["code"] == definition.code
+    assert refused.json()["category"] == definition.category.value
+    assert refused.json()["reference"] == refused.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

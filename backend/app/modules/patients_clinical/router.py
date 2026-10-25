@@ -61,7 +61,7 @@ router = APIRouter()
 async def _ensure_patient(db: AsyncSession, clinic_id: UUID, patient_id: UUID) -> None:
     patient = await PatientService.get_patient(db, clinic_id, patient_id)
     if patient is None:
-        raise record_not_found("patient", "Patient")
+        raise record_not_found("patient")
 
 
 # --- Medical context (1:1) ----------------------------------------------
@@ -169,7 +169,7 @@ async def update_allergy(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
-        raise record_not_found("allergy", "Allergy")
+        raise record_not_found("allergy")
     allergy = await PatientsClinicalService.update_allergy(
         db, allergy, data.model_dump(exclude_unset=True)
     )
@@ -192,7 +192,7 @@ async def delete_allergy(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     allergy = await PatientsClinicalService.get_allergy(db, allergy_id)
     if allergy is None or allergy.patient_id != patient_id:
-        raise record_not_found("allergy", "Allergy")
+        raise record_not_found("allergy")
     await PatientsClinicalService.delete_allergy(db, allergy, user_id=ctx.user_id)
     await db.commit()
 
@@ -251,7 +251,7 @@ async def update_medication(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
-        raise record_not_found("medication", "Medication")
+        raise record_not_found("medication")
     med = await PatientsClinicalService.update_medication(
         db, med, data.model_dump(exclude_unset=True)
     )
@@ -274,7 +274,7 @@ async def delete_medication(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     med = await PatientsClinicalService.get_medication(db, medication_id)
     if med is None or med.patient_id != patient_id:
-        raise record_not_found("medication", "Medication")
+        raise record_not_found("medication")
     await PatientsClinicalService.delete_medication(db, med, user_id=ctx.user_id)
     await db.commit()
 
@@ -333,7 +333,7 @@ async def update_systemic_disease(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
-        raise record_not_found("disease", "Disease")
+        raise record_not_found("disease")
     disease = await PatientsClinicalService.update_systemic_disease(
         db, disease, data.model_dump(exclude_unset=True)
     )
@@ -356,7 +356,7 @@ async def delete_systemic_disease(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     disease = await PatientsClinicalService.get_systemic_disease(db, disease_id)
     if disease is None or disease.patient_id != patient_id:
-        raise record_not_found("disease", "Disease")
+        raise record_not_found("disease")
     await PatientsClinicalService.delete_systemic_disease(db, disease, user_id=ctx.user_id)
     await db.commit()
 
@@ -415,7 +415,7 @@ async def update_surgical_history(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
-        raise record_not_found("surgery", "Surgery")
+        raise record_not_found("surgery")
     surgery = await PatientsClinicalService.update_surgical_history(
         db, surgery, data.model_dump(exclude_unset=True)
     )
@@ -438,7 +438,7 @@ async def delete_surgical_history(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     surgery = await PatientsClinicalService.get_surgical_history(db, surgery_id)
     if surgery is None or surgery.patient_id != patient_id:
-        raise record_not_found("surgery", "Surgery")
+        raise record_not_found("surgery")
     await PatientsClinicalService.delete_surgical_history(db, surgery, user_id=ctx.user_id)
     await db.commit()
 
@@ -496,7 +496,7 @@ async def delete_emergency_contact(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     contact = await PatientsClinicalService.get_emergency_contact(db, patient_id)
     if contact is None:
-        raise record_not_found("emergency_contact", "Emergency contact")
+        raise record_not_found("emergency_contact")
     await PatientsClinicalService.delete_emergency_contact(db, contact)
     await db.commit()
 
@@ -554,7 +554,7 @@ async def delete_legal_guardian(
     await _ensure_patient(db, ctx.clinic_id, patient_id)
     guardian = await PatientsClinicalService.get_legal_guardian(db, patient_id)
     if guardian is None:
-        raise record_not_found("legal_guardian", "Legal guardian")
+        raise record_not_found("legal_guardian")
     await PatientsClinicalService.delete_legal_guardian(db, guardian)
     await db.commit()
 
@@ -734,7 +734,7 @@ async def retract_asa_assessment(
         db, ctx.clinic_id, patient_id, assessment_id
     )
     if assessment is None:
-        raise record_not_found("asa_assessment", "Assessment")
+        raise record_not_found("asa_assessment")
     await PatientsClinicalService.retract_entry(
         db, assessment, reason=data.reason, user_id=ctx.user_id
     )
@@ -800,7 +800,7 @@ async def retract_questionnaire(
         db, ctx.clinic_id, patient_id, questionnaire_id
     )
     if questionnaire is None:
-        raise record_not_found("questionnaire", "Questionnaire")
+        raise record_not_found("questionnaire")
     await PatientsClinicalService.retract_entry(
         db, questionnaire, reason=data.reason, user_id=ctx.user_id
     )
@@ -820,7 +820,7 @@ async def blank_questionnaire_form(
     the adult form, or the pediatric one a parent or guardian signs."""
     patient = await PatientService.get_patient(db, ctx.clinic_id, patient_id)
     if patient is None:
-        raise record_not_found("patient", "Patient")
+        raise record_not_found("patient")
     directory = provider(ProfessionalDirectory)
     professional_id = (
         await directory.for_account(db, ctx.clinic_id, ctx.user_id) if directory else None

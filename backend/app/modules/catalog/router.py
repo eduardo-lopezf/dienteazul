@@ -3,13 +3,15 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.errors import AppError
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
+from .errors import catalog_error
 from .packs import SpecialtyPackService, UnknownSpecialtyError
 from .schemas import (
     CatalogItemBrief,
@@ -81,7 +83,7 @@ async def get_category(
     """Get a treatment category by ID."""
     category = await CategoryService.get_category(db, ctx.clinic_id, category_id)
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise catalog_error("catalog.category.not_found")
     return ApiResponse(data=CategoryResponse.model_validate(category))
 
 
@@ -100,9 +102,8 @@ async def create_category(
     # Check for duplicate key
     existing = await CategoryService.get_category_by_key(db, ctx.clinic_id, data.key)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Category with key '{data.key}' already exists",
+        raise catalog_error(
+            "catalog.category.duplicate", detail=f"Category with key '{data.key}' already exists"
         )
 
     category = await CategoryService.create_category(db, ctx.clinic_id, data.model_dump())
@@ -120,20 +121,17 @@ async def update_category(
     """Update a treatment category."""
     category = await CategoryService.get_category(db, ctx.clinic_id, category_id)
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise catalog_error("catalog.category.not_found")
 
     if category.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot modify system category",
-        )
+        raise catalog_error("catalog.category.system_protected", detail="Cannot modify system category")
 
     # Check key uniqueness if changing
     if data.key and data.key != category.key:
         existing = await CategoryService.get_category_by_key(db, ctx.clinic_id, data.key)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
+            raise catalog_error(
+                "catalog.category.duplicate",
                 detail=f"Category with key '{data.key}' already exists",
             )
 
@@ -153,13 +151,10 @@ async def delete_category(
     """Soft-delete a treatment category."""
     category = await CategoryService.get_category(db, ctx.clinic_id, category_id)
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise catalog_error("catalog.category.not_found")
 
     if category.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot delete system category",
-        )
+        raise catalog_error("catalog.category.system_protected", detail="Cannot delete system category")
 
     await CategoryService.delete_category(db, category, soft=True)
 
@@ -204,7 +199,7 @@ async def get_vat_type(
     """Get a VAT type by ID."""
     vat_type = await VatTypeService.get_vat_type(db, ctx.clinic_id, vat_type_id)
     if not vat_type:
-        raise HTTPException(status_code=404, detail="VAT type not found")
+        raise catalog_error("catalog.vat_type.not_found")
     return ApiResponse(data=VatTypeResponse.model_validate(vat_type))
 
 
@@ -235,7 +230,7 @@ async def update_vat_type(
     """Update a VAT type."""
     vat_type = await VatTypeService.get_vat_type(db, ctx.clinic_id, vat_type_id)
     if not vat_type:
-        raise HTTPException(status_code=404, detail="VAT type not found")
+        raise catalog_error("catalog.vat_type.not_found")
 
     if vat_type.is_system:
         # System VAT types can only have is_default changed
@@ -244,8 +239,8 @@ async def update_vat_type(
             k: v for k, v in data.model_dump(exclude_unset=True).items() if k in allowed_updates
         }
         if not update_data:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+            raise catalog_error(
+                "catalog.vat_type.system_protected",
                 detail="Cannot modify system VAT type (only default status can be changed)",
             )
     else:
@@ -265,19 +260,13 @@ async def delete_vat_type(
     """Soft-delete a VAT type."""
     vat_type = await VatTypeService.get_vat_type(db, ctx.clinic_id, vat_type_id)
     if not vat_type:
-        raise HTTPException(status_code=404, detail="VAT type not found")
+        raise catalog_error("catalog.vat_type.not_found")
 
     if vat_type.is_system:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot delete system VAT type",
-        )
+        raise catalog_error("catalog.vat_type.system_protected", detail="Cannot delete system VAT type")
 
     if vat_type.is_default:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete the default VAT type. Set another VAT type as default first.",
-        )
+        raise catalog_error("catalog.vat_type.default_protected")
 
     await VatTypeService.delete_vat_type(db, vat_type)
 
@@ -287,7 +276,7 @@ async def delete_vat_type(
 # ============================================================================
 
 
-def _specialty_conflict(exc: DuplicateSpecialtyError) -> HTTPException:
+def _specialty_conflict(exc: DuplicateSpecialtyError) -> AppError:
     """409 naming the specialty that is in the way.
 
     A plain message, like every other conflict here: the app flattens an
@@ -305,10 +294,7 @@ def _specialty_conflict(exc: DuplicateSpecialtyError) -> HTTPException:
         or next(iter(existing.names.values()), "")
     )
     state = "active" if existing.is_active else "inactive"
-    return HTTPException(
-        status_code=409,
-        detail=f"Specialty already exists: {name} ({state})",
-    )
+    return catalog_error("catalog.specialty.duplicate", detail=f"Specialty already exists: {name} ({state})")
 
 
 @router.get("/specialties", response_model=ApiResponse[list[SpecialtyResponse]])
@@ -328,8 +314,8 @@ async def list_specialties(
 # --- Specialty packs ---------------------------------------------------------
 
 
-def _pack_or_404(key: str, error: Exception) -> HTTPException:
-    return HTTPException(status_code=404, detail=f"Unknown specialty: {key}")
+def _pack_or_404(key: str) -> AppError:
+    return catalog_error("catalog.specialty.not_found", detail=f"Unknown specialty: {key}")
 
 
 @router.get("/specialty-packs", response_model=ApiResponse[list[SpecialtyPackResponse]])
@@ -356,7 +342,7 @@ async def get_specialty_pack(
     try:
         detail = await SpecialtyPackService.detail(db, ctx.clinic_id, key)
     except UnknownSpecialtyError as error:
-        raise _pack_or_404(key, error) from error
+        raise _pack_or_404(key) from error
     return ApiResponse(
         data=SpecialtyPackDetailResponse(
             **SpecialtyPackResponse.model_validate(detail.status).model_dump(),
@@ -385,7 +371,7 @@ async def enable_specialty_pack(
     try:
         pack = await SpecialtyPackService.enable(db, ctx.clinic_id, key)
     except UnknownSpecialtyError as error:
-        raise _pack_or_404(key, error) from error
+        raise _pack_or_404(key) from error
     return ApiResponse(data=SpecialtyPackResponse.model_validate(pack))
 
 
@@ -401,7 +387,7 @@ async def disable_specialty_pack(
     try:
         pack = await SpecialtyPackService.disable(db, ctx.clinic_id, key)
     except UnknownSpecialtyError as error:
-        raise _pack_or_404(key, error) from error
+        raise _pack_or_404(key) from error
     return ApiResponse(data=SpecialtyPackResponse.model_validate(pack))
 
 
@@ -420,9 +406,9 @@ async def restore_specialty_pack(
     try:
         pack = await SpecialtyPackService.restore(db, ctx.clinic_id, key)
     except UnknownSpecialtyError as error:
-        raise _pack_or_404(key, error) from error
+        raise _pack_or_404(key) from error
     except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
+        raise catalog_error("catalog.specialty.restore_requires_enabled", detail=str(error)) from error
     return ApiResponse(data=SpecialtyPackResponse.model_validate(pack))
 
 
@@ -454,7 +440,7 @@ async def get_specialty(
     """Get a specialty by ID."""
     specialty = await SpecialtyService.get_specialty(db, ctx.clinic_id, specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found")
+        raise catalog_error("catalog.specialty.not_found")
     return ApiResponse(data=SpecialtyResponse.model_validate(specialty))
 
 
@@ -472,7 +458,7 @@ async def create_specialty(
     """Create a new specialty, unless the clinic already has it."""
     payload = data.model_dump()
     if payload.get("key") and payload["key"] not in {s["key"] for s in SUGGESTED_SPECIALTIES}:
-        raise HTTPException(status_code=400, detail="Unknown specialty key")
+        raise catalog_error("catalog.specialty.unknown_key")
 
     try:
         specialty = await SpecialtyService.create_specialty(db, ctx.clinic_id, payload)
@@ -492,7 +478,7 @@ async def update_specialty(
     """Update a specialty."""
     specialty = await SpecialtyService.get_specialty(db, ctx.clinic_id, specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found")
+        raise catalog_error("catalog.specialty.not_found")
 
     try:
         updated = await SpecialtyService.update_specialty(
@@ -513,7 +499,7 @@ async def delete_specialty(
     """Soft-delete a specialty."""
     specialty = await SpecialtyService.get_specialty(db, ctx.clinic_id, specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found")
+        raise catalog_error("catalog.specialty.not_found")
 
     await SpecialtyService.delete_specialty(db, specialty)
 
@@ -531,7 +517,7 @@ async def list_specialty_items(
     """List the treatments assigned to a specialty."""
     specialty = await SpecialtyService.get_specialty(db, ctx.clinic_id, specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found")
+        raise catalog_error("catalog.specialty.not_found")
 
     items = await SpecialtyService.list_items(db, ctx.clinic_id, specialty_id)
     return ApiResponse(data=[CatalogItemBrief.model_validate(i) for i in items])
@@ -555,12 +541,12 @@ async def set_specialty_items(
     """
     specialty = await SpecialtyService.get_specialty(db, ctx.clinic_id, specialty_id)
     if not specialty:
-        raise HTTPException(status_code=404, detail="Specialty not found")
+        raise catalog_error("catalog.specialty.not_found")
 
     try:
         items = await SpecialtyService.set_items(db, ctx.clinic_id, specialty, data.item_ids)
     except UnknownCatalogItemError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise catalog_error("catalog.specialty.items_invalid", detail=str(exc)) from exc
 
     return ApiResponse(data=[CatalogItemBrief.model_validate(i) for i in items])
 
@@ -670,7 +656,7 @@ async def get_item(
     """Get a catalog item by ID."""
     item = await CatalogService.get_item(db, ctx.clinic_id, item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Catalog item not found")
+        raise catalog_error("catalog.item.not_found")
     return ApiResponse(data=CatalogItemResponse.model_validate(item))
 
 
@@ -689,28 +675,23 @@ async def create_item(
     # Verify category exists
     category = await CategoryService.get_category(db, ctx.clinic_id, data.category_id)
     if not category:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category not found",
-        )
+        raise catalog_error("catalog.item.category_not_found")
 
     # Check for duplicate code
     existing = await CatalogService.get_item_by_code(db, ctx.clinic_id, data.internal_code)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+        raise catalog_error(
+            "catalog.item.duplicate_code",
             detail=f"Item with code '{data.internal_code}' already exists",
         )
 
     try:
         item = await CatalogService.create_item(db, ctx.clinic_id, data.model_dump())
     except SessionTemplateError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+        raise catalog_error("catalog.item.session_template_invalid", detail=str(exc)) from exc
     except ValueError as exc:
         # Unknown / other-clinic specialty id.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise catalog_error("catalog.item.specialties_invalid", detail=str(exc)) from exc
 
     # Reload to get relationships
     item = await CatalogService.get_item(db, ctx.clinic_id, item.id)
@@ -740,29 +721,23 @@ async def update_item(
     """
     item = await CatalogService.get_item(db, ctx.clinic_id, item_id, include_deleted=True)
     if not item:
-        raise HTTPException(status_code=404, detail="Catalog item not found")
+        raise catalog_error("catalog.item.not_found")
 
     if item.is_system and data.internal_code and data.internal_code != item.internal_code:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot change the internal code of a system catalog item",
-        )
+        raise catalog_error("catalog.item.system_code_protected")
 
     # Verify category if changing
     if data.category_id and data.category_id != item.category_id:
         category = await CategoryService.get_category(db, ctx.clinic_id, data.category_id)
         if not category:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Category not found",
-            )
+            raise catalog_error("catalog.item.category_not_found")
 
     # Check code uniqueness if changing
     if data.internal_code and data.internal_code != item.internal_code:
         existing = await CatalogService.get_item_by_code(db, ctx.clinic_id, data.internal_code)
         if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
+            raise catalog_error(
+                "catalog.item.duplicate_code",
                 detail=f"Item with code '{data.internal_code}' already exists",
             )
 
@@ -771,12 +746,10 @@ async def update_item(
             db, ctx.clinic_id, item, data.model_dump(exclude_unset=True)
         )
     except SessionTemplateError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+        raise catalog_error("catalog.item.session_template_invalid", detail=str(exc)) from exc
     except ValueError as exc:
         # Unknown / other-clinic specialty id.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise catalog_error("catalog.item.specialties_invalid", detail=str(exc)) from exc
 
     # Reload to get fresh relationships
     updated = await CatalogService.get_item(db, ctx.clinic_id, item_id)
@@ -805,7 +778,7 @@ async def delete_item(
     """
     item = await CatalogService.get_item(db, ctx.clinic_id, item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Catalog item not found")
+        raise catalog_error("catalog.item.not_found")
 
     await CatalogService.delete_item(db, item, hard=False)
 

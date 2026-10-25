@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic, User
 from app.core.plugins.registry import module_registry
+from app.modules.consents.errors import ERROR_CATALOG
 from app.modules.media.models import Document
 from app.modules.patients.models import Patient
 from app.modules.professionals.models import Professional
@@ -126,9 +127,12 @@ async def test_a_signed_consent_is_a_record_it_is_revoked_never_edited(
     url = f"{BASE}/{consent['id']}"
     await client.post(f"{url}/sign", headers=auth_headers, json=SIGNATURE)
 
-    assert (
-        await client.put(url, headers=auth_headers, json={"body": "cambiado"})
-    ).status_code == 409
+    refused = await client.put(url, headers=auth_headers, json={"body": "cambiado"})
+    assert refused.status_code == 409
+    definition = ERROR_CATALOG["consents.consent.invalid_state"]
+    assert refused.json()["code"] == definition.code
+    assert refused.json()["category"] == definition.category.value
+    assert refused.json()["reference"] == refused.headers["x-request-id"]
     assert (await client.post(f"{url}/discard", headers=auth_headers)).status_code == 409
     assert (
         await client.post(f"{url}/sign", headers=auth_headers, json=SIGNATURE)
@@ -258,7 +262,12 @@ async def test_another_clinics_consent_is_not_found(
     db_session.add(foreign)
     await db_session.commit()
 
-    assert (await client.get(f"{BASE}/{foreign.id}", headers=auth_headers)).status_code == 404
+    missing = await client.get(f"{BASE}/{foreign.id}", headers=auth_headers)
+    assert missing.status_code == 404
+    definition = ERROR_CATALOG["consents.consent.not_found"]
+    assert missing.json()["code"] == definition.code
+    assert missing.json()["category"] == definition.category.value
+    assert missing.json()["reference"] == missing.headers["x-request-id"]
     refused = await client.post(
         f"{BASE}/patients/{foreign_patient.id}",
         headers=auth_headers,

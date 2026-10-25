@@ -21,6 +21,7 @@ from httpx import AsyncClient
 
 from app.core.auth.models import Clinic
 from app.modules.patients.models import Patient
+from app.modules.periodontogram.errors import ERROR_CATALOG
 
 pytestmark = pytest.mark.asyncio
 
@@ -107,6 +108,10 @@ async def test_patch_tooth_and_site_then_close_freezes_state(
         json={"mobility": 3},
     )
     assert retry.status_code == 409
+    definition = ERROR_CATALOG["periodontogram.snapshot.closed"]
+    assert retry.json()["code"] == definition.code
+    assert retry.json()["category"] == definition.category.value
+    assert retry.json()["reference"] == retry.headers["x-request-id"]
 
 
 async def test_delete_only_works_on_drafts(
@@ -130,6 +135,10 @@ async def test_delete_only_works_on_drafts(
         headers=auth_headers,
     )
     assert delete_response.status_code == 409
+    definition = ERROR_CATALOG["periodontogram.snapshot.not_draft"]
+    assert delete_response.json()["code"] == definition.code
+    assert delete_response.json()["category"] == definition.category.value
+    assert delete_response.json()["reference"] == delete_response.headers["x-request-id"]
 
 
 async def test_discard_draft_returns_204_and_removes_snapshot(
@@ -151,6 +160,10 @@ async def test_discard_draft_returns_204_and_removes_snapshot(
         headers=auth_headers,
     )
     assert follow.status_code == 404
+    definition = ERROR_CATALOG["periodontogram.snapshot.not_found"]
+    assert follow.json()["code"] == definition.code
+    assert follow.json()["category"] == definition.category.value
+    assert follow.json()["reference"] == follow.headers["x-request-id"]
 
 
 async def test_timeline_lists_closed_snapshots_with_change_count(

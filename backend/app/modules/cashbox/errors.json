@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "cashbox.movement.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Cash movement not found",
+      "description": "The cash movement does not exist in the active clinic."
+    },
+    {
+      "code": "cashbox.closing.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Cash closing not found",
+      "description": "The cash closing does not exist in the active clinic."
+    },
+    {
+      "code": "cashbox.late_entry.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Late entry not found",
+      "description": "The late entry could not be found after it was acknowledged."
+    },
+    {
+      "code": "cashbox.movement.closed_day",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "Movement belongs to a closed day",
+      "description": "A cash movement stamped by a closing cannot be updated or deleted until the day is reopened."
+    },
+    {
+      "code": "cashbox.movement.settlement_payout",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "Settlement payouts cannot be changed here",
+      "description": "A professional payout must be undone from its settlement, which owns the payout."
+    },
+    {
+      "code": "cashbox.closing.future_date",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A future day cannot be counted",
+      "description": "A cash closing cannot be created for a date after today in the clinic timezone."
+    },
+    {
+      "code": "cashbox.closing.already_closed",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This day is already counted",
+      "description": "A standing closing already exists for this clinic and date; reopen it before counting again."
+    },
+    {
+      "code": "cashbox.closing.difference_notes_required",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Explain the difference before closing the day",
+      "description": "A non-zero difference between counted cash and expected cash requires notes."
+    },
+    {
+      "code": "cashbox.closing.float_exceeds_count",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Closing float cannot exceed counted cash",
+      "description": "The cash left in the drawer for tomorrow cannot exceed the amount counted today."
+    },
+    {
+      "code": "cashbox.closing.already_superseded",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This count has already been superseded",
+      "description": "Only a closing that is still closed can be reopened."
+    },
+    {
+      "code": "cashbox.period.kind_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Invalid cash period kind",
+      "description": "Cash period summaries support week, fortnight, or month."
+    },
+    {
+      "code": "cashbox.late_entry.already_acknowledged",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This entry has already been dealt with",
+      "description": "A late entry can be acknowledged only once."
+    },
+    {
+      "code": "cashbox.movement.amount_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Movement amount must be greater than zero",
+      "description": "Cash movement amounts must be positive; direction determines whether the amount is added or subtracted."
+    },
+    {
+      "code": "cashbox.movement.concept_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Movement concept is invalid",
+      "description": "A movement concept must contain non-whitespace text and be no longer than 160 characters."
+    },
+    {
+      "code": "cashbox.movement.enum_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Movement details are invalid",
+      "description": "Direction, method, and category must use one of the values supported by the cashbox API."
+    },
+    {
+      "code": "cashbox.closing.amount_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Cash amounts cannot be negative",
+      "description": "Counted cash, opening float, and closing float must be zero or greater."
+    },
+    {
+      "code": "cashbox.closing.reopen_reason_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A valid reopening reason is required",
+      "description": "The reopening reason must contain non-whitespace text and be no longer than 500 characters."
+    },
+    {
+      "code": "cashbox.late_entry.resolution_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A valid resolution is required",
+      "description": "The late-entry resolution must contain non-whitespace text and be no longer than 300 characters."
+    },
+    {
+      "code": "cashbox.late_entry.kind_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Invalid late-entry kind",
+      "description": "Late entries can be payments, refunds, or cash movements."
+    },
+    {
+      "code": "cashbox.request.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Cashbox request is invalid",
+      "description": "A cashbox operation failed a domain validation rule."
+    }
+  ]
+}

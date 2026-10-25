@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { ApiResponse, PaginatedResponse, Professional } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
 

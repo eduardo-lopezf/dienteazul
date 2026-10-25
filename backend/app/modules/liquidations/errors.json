@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "liquidations.settlement.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Liquidation not found",
+      "description": "The liquidation does not exist in the active clinic."
+    },
+    {
+      "code": "liquidations.professional.not_found",
+      "category": "validation",
+      "status_code": 422,
+      "message": "That professional is not in this clinic.",
+      "description": "A commission or liquidation requires a professional in the active clinic."
+    },
+    {
+      "code": "liquidations.apps.unavailable",
+      "category": "dependency",
+      "status_code": 422,
+      "message": "Settlements cannot be calculated",
+      "description": "The Payments and Professionals apps must be enabled to calculate settlements."
+    },
+    {
+      "code": "liquidations.period.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "The period ends before it starts.",
+      "description": "The settlement end date must be on or after its start date."
+    },
+    {
+      "code": "liquidations.settlement.already_issued",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This period has already been settled with this professional.",
+      "description": "A professional can only receive one settlement for a given period."
+    },
+    {
+      "code": "liquidations.commission.required",
+      "category": "validation",
+      "status_code": 422,
+      "message": "There is no agreed percentage for this professional yet.",
+      "description": "A commission arrangement must exist before issuing a settlement."
+    },
+    {
+      "code": "liquidations.settlement.already_paid",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This settlement has already been paid.",
+      "description": "A paid settlement cannot be paid again."
+    },
+    {
+      "code": "liquidations.settlement.not_paid",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "This settlement has not been paid.",
+      "description": "Only a paid settlement can have its payout undone."
+    },
+    {
+      "code": "liquidations.cashbox.closing_conflict",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "The till movement for this payout belongs to a day that has been counted. Reopen the day first.",
+      "description": "A payout cannot be undone after its cash movement is included in a closed day."
+    },
+    {
+      "code": "liquidations.operation.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Liquidation operation is invalid",
+      "description": "The requested liquidation operation failed domain validation."
+    }
+  ]
+}

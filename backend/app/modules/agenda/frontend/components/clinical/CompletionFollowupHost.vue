@@ -6,7 +6,6 @@
  * ``AppointmentQuickActions`` (dropdown) and ``AppointmentKanbanView``
  * (drag-drop) share the same UI surface.
  */
-import { computed } from 'vue'
 
 const { t } = useI18n()
 const { resolve } = useModuleSlots()

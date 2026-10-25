@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Appointment } from '~~/app/types'
-import { defineAsyncComponent } from 'vue'
 import { formatLocalDate } from '../../utils/date'
 
 // Mode-specific scheduler views are heavy (drag grids, overlap math, day

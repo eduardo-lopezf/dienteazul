@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
@@ -21,6 +21,7 @@ from .constants import (
     dentition_for_age,
     is_valid_tooth_number,
 )
+from .errors import odontogram_error, treatment_service_error
 from .schemas import (
     BulkUpdateRequest,
     DentitionResponse,
@@ -67,7 +68,7 @@ async def validate_patient_access(db: AsyncSession, clinic_id: UUID, patient_id:
     )
     patient = result.scalar_one_or_none()
     if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        raise odontogram_error("odontogram.patient.not_found")
     return patient
 
 
@@ -134,7 +135,9 @@ async def exchange_tooth(
             db, ctx.clinic_id, patient_id, data.primary_tooth, ctx.user_id
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise odontogram_error(
+            "odontogram.eruption.invalid_primary_tooth", detail=str(exc)
+        ) from exc
     return ApiResponse(
         data=ExchangeResponse(
             primary=ToothRecordResponse.model_validate(primary),
@@ -205,11 +208,14 @@ async def get_tooth(
 ) -> ApiResponse[ToothRecordResponse]:
     await validate_patient_access(db, ctx.clinic_id, patient_id)
     if not is_valid_tooth_number(tooth_number):
-        raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
+        raise odontogram_error(
+            "odontogram.tooth.invalid_number", detail=f"Invalid tooth number: {tooth_number}"
+        )
     tooth = await OdontogramService.get_tooth_record(db, ctx.clinic_id, patient_id, tooth_number)
     if not tooth:
-        raise HTTPException(
-            status_code=404, detail=f"Tooth {tooth_number} not found for this patient"
+        raise odontogram_error(
+            "odontogram.tooth.not_found",
+            detail=f"Tooth {tooth_number} not found for this patient",
         )
     return ApiResponse(data=ToothRecordResponse.model_validate(tooth))
 
@@ -228,7 +234,9 @@ async def create_or_update_tooth(
 ) -> ApiResponse[ToothRecordResponse]:
     await validate_patient_access(db, ctx.clinic_id, patient_id)
     if not is_valid_tooth_number(tooth_number):
-        raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
+        raise odontogram_error(
+            "odontogram.tooth.invalid_number", detail=f"Invalid tooth number: {tooth_number}"
+        )
     surface_updates = None
     if data.surface_updates:
         surface_updates = [u.model_dump() for u in data.surface_updates]
@@ -265,7 +273,10 @@ async def bulk_update_teeth(
     await validate_patient_access(db, ctx.clinic_id, patient_id)
     for u in data.updates:
         if not is_valid_tooth_number(u.tooth_number):
-            raise HTTPException(status_code=400, detail=f"Invalid tooth number: {u.tooth_number}")
+            raise odontogram_error(
+                "odontogram.tooth.invalid_number",
+                detail=f"Invalid tooth number: {u.tooth_number}",
+            )
     updates = []
     for u in data.updates:
         d = {
@@ -316,7 +327,9 @@ async def get_tooth_history(
 ) -> PaginatedApiResponse[HistoryEntryWithUser]:
     await validate_patient_access(db, ctx.clinic_id, patient_id)
     if not is_valid_tooth_number(tooth_number):
-        raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
+        raise odontogram_error(
+            "odontogram.tooth.invalid_number", detail=f"Invalid tooth number: {tooth_number}"
+        )
     history, total = await OdontogramService.get_tooth_history(
         db, ctx.clinic_id, patient_id, tooth_number, page, page_size
     )
@@ -449,7 +462,7 @@ async def create_treatment(
             arch=data.arch,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise treatment_service_error(exc) from exc
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))
 
 
@@ -501,7 +514,7 @@ async def get_treatment(
 ) -> ApiResponse[TreatmentResponse]:
     treatment = await TreatmentService.get_treatment(db, ctx.clinic_id, treatment_id)
     if not treatment:
-        raise HTTPException(status_code=404, detail="Treatment not found")
+        raise odontogram_error("odontogram.treatment.not_found")
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))
 
 
@@ -526,7 +539,7 @@ async def update_treatment(
         surfaces=data.surfaces,
     )
     if not treatment:
-        raise HTTPException(status_code=404, detail="Treatment not found")
+        raise odontogram_error("odontogram.treatment.not_found")
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))
 
 
@@ -539,7 +552,7 @@ async def delete_treatment(
 ) -> None:
     deleted = await TreatmentService.delete(db, ctx.clinic_id, treatment_id, ctx.user_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Treatment not found")
+        raise odontogram_error("odontogram.treatment.not_found")
 
 
 @router.patch(
@@ -561,7 +574,7 @@ async def perform_treatment(
         notes=data.notes,
     )
     if not treatment:
-        raise HTTPException(status_code=404, detail="Treatment not found")
+        raise odontogram_error("odontogram.treatment.not_found")
     return ApiResponse(data=TreatmentResponse.model_validate(build_treatment_response(treatment)))
 
 
@@ -578,12 +591,16 @@ async def get_tooth_with_treatments(
 ) -> ApiResponse[ToothRecordWithTreatmentsResponse]:
     await validate_patient_access(db, ctx.clinic_id, patient_id)
     if not is_valid_tooth_number(tooth_number):
-        raise HTTPException(status_code=400, detail=f"Invalid tooth number: {tooth_number}")
+        raise odontogram_error(
+            "odontogram.tooth.invalid_number", detail=f"Invalid tooth number: {tooth_number}"
+        )
     tooth, treatments = await OdontogramService.get_tooth_with_treatments(
         db, ctx.clinic_id, patient_id, tooth_number
     )
     if not tooth:
-        raise HTTPException(status_code=404, detail=f"Tooth {tooth_number} not found")
+        raise odontogram_error(
+            "odontogram.tooth.not_found", detail=f"Tooth {tooth_number} not found"
+        )
     response = ToothRecordWithTreatmentsResponse.model_validate(tooth)
     response.treatments = [
         TreatmentResponse.model_validate(build_treatment_response(t)) for t in treatments

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "recalls.recall.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Recall not found",
+      "description": "The recall does not exist in the active clinic."
+    },
+    {
+      "code": "recalls.patient.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Patient not found",
+      "description": "The patient does not exist in the active clinic."
+    },
+    {
+      "code": "recalls.professional.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Professional not found in this clinic",
+      "description": "The professional is not bookable in the active clinic."
+    },
+    {
+      "code": "recalls.professionals.unavailable",
+      "category": "dependency",
+      "status_code": 404,
+      "message": "Professionals are not available",
+      "description": "The Professionals app is disabled, so a recall cannot be assigned."
+    },
+    {
+      "code": "recalls.attempt.user_required",
+      "category": "validation",
+      "status_code": 400,
+      "message": "A user is required to log a contact attempt",
+      "description": "A contact attempt must be attributed to an authenticated user."
+    },
+    {
+      "code": "recalls.operation.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "Recall operation is invalid",
+      "description": "The requested recall operation failed domain validation."
+    }
+  ]
+}

@@ -31,7 +31,7 @@ from typing import Annotated
 from uuid import UUID
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +40,7 @@ from app.core.auth.router import limiter
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import budget_http_error
 from .integrations import patients_available
 from .schemas import BudgetDetailResponse
 from .service import BudgetService
@@ -174,7 +175,7 @@ async def get_public_budget_meta(
 ) -> ApiResponse[PublicBudgetMeta]:
     budget = await BudgetService.get_by_public_token(db, token)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget link not found")
+        raise budget_http_error(status_code=404, detail="Budget link not found")
 
     locked = budget.public_locked_at is not None
     today = datetime.now(UTC).date()
@@ -263,13 +264,13 @@ async def verify_public_budget(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     if body.method not in PUBLIC_AUTH_METHODS:
-        raise HTTPException(status_code=400, detail="Invalid method")
+        raise budget_http_error(status_code=400, detail="Invalid method")
 
     budget = await BudgetService.get_by_public_token(db, token)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget link not found")
+        raise budget_http_error(status_code=404, detail="Budget link not found")
     if budget.status in {"accepted", "rejected"}:
-        raise HTTPException(
+        raise budget_http_error(
             status_code=409,
             detail="Budget already decided",
         )
@@ -282,13 +283,13 @@ async def verify_public_budget(
 
     if not ok:
         if err == "locked":
-            raise HTTPException(status_code=423, detail="locked")
+            raise budget_http_error(status_code=423, detail="locked")
         if err == "expired":
-            raise HTTPException(status_code=410, detail="expired")
+            raise budget_http_error(status_code=410, detail="expired")
         if err == "rate_limited":
-            raise HTTPException(status_code=429, detail="rate_limited")
+            raise budget_http_error(status_code=429, detail="rate_limited")
         # method_mismatch / invalid both surface as 401 to the SPA.
-        raise HTTPException(status_code=401, detail=err or "invalid")
+        raise budget_http_error(status_code=401, detail=err or "invalid")
 
     _issue_session_cookie(response, budget.id, token)
 
@@ -306,13 +307,13 @@ async def _require_session(
     """Resolve the budget for a public-cookie-protected route."""
     budget = await BudgetService.get_by_public_token(db, token)
     if not budget:
-        raise HTTPException(status_code=404, detail="Budget link not found")
+        raise budget_http_error(status_code=404, detail="Budget link not found")
     if budget.public_auth_method != "none":
         # method=none does not need a cookie; otherwise the cookie must
         # match the budget id and not be expired.
         sub = _verify_session_cookie(token, cookie_value)
         if sub is None or sub != budget.id:
-            raise HTTPException(status_code=401, detail="verification_required")
+            raise budget_http_error(status_code=401, detail="verification_required")
     return budget
 
 
@@ -331,7 +332,7 @@ async def get_public_budget(
 
     today = datetime.now(UTC).date()
     if budget.valid_until is not None and budget.valid_until < today:
-        raise HTTPException(status_code=410, detail="expired")
+        raise budget_http_error(status_code=410, detail="expired")
 
     ip_hash = _hash_ip(request.client.host if request.client else None)
     await BudgetWorkflowService.mark_viewed(db, budget, ip_hash=ip_hash)
@@ -356,7 +357,7 @@ async def accept_public_budget(
     cookie_value = request.cookies.get(_cookie_name(token))
     budget = await _require_session(token, db, cookie_value)
     if budget.status in {"accepted", "rejected"}:
-        raise HTTPException(status_code=409, detail="Budget already decided")
+        raise budget_http_error(status_code=409, detail="Budget already decided")
 
     sig_payload = {
         "signed_by_name": body.signer_name,
@@ -380,7 +381,7 @@ async def accept_public_budget(
         )
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise budget_http_error(status_code=400, detail=str(e))
     await db.commit()
     return ApiResponse(
         data=PublicBudgetMeta(
@@ -409,7 +410,7 @@ async def download_public_signed_budget_pdf(
     cookie_value = request.cookies.get(_cookie_name(token))
     budget = await _require_session(token, db, cookie_value)
     if budget.status != "accepted":
-        raise HTTPException(status_code=404, detail="Budget has not been accepted")
+        raise budget_http_error(status_code=404, detail="Budget has not been accepted")
 
     from sqlalchemy import select as _select
 
@@ -427,7 +428,7 @@ async def download_public_signed_budget_pdf(
     )
     signature = (await db.execute(sig_q)).scalar_one_or_none()
     if signature is None:
-        raise HTTPException(status_code=404, detail="Budget has not been signed")
+        raise budget_http_error(status_code=404, detail="Budget has not been signed")
 
     full_budget = await BudgetService.get_budget(
         db, budget.clinic_id, budget.id, include_items=True
@@ -492,9 +493,9 @@ async def reject_public_budget(
     cookie_value = request.cookies.get(_cookie_name(token))
     budget = await _require_session(token, db, cookie_value)
     if budget.status in {"accepted", "rejected"}:
-        raise HTTPException(status_code=409, detail="Budget already decided")
+        raise budget_http_error(status_code=409, detail="Budget already decided")
     if body.reason not in PUBLIC_REJECTION_REASONS:
-        raise HTTPException(status_code=400, detail="Invalid reason")
+        raise budget_http_error(status_code=400, detail="Invalid reason")
 
     try:
         full_budget = await BudgetService.get_budget(
@@ -511,7 +512,7 @@ async def reject_public_budget(
         )
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise budget_http_error(status_code=400, detail=str(e))
     await db.commit()
     return ApiResponse(
         data=PublicBudgetMeta(

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "agenda.appointment.not_found", "category": "not_found", "status_code": 404, "message": "Appointment not found", "description": "The appointment does not exist in the active clinic."},
+    {"code": "agenda.patient.not_found", "category": "not_found", "status_code": 404, "message": "Patient not found", "description": "The patient does not exist in the active clinic."},
+    {"code": "agenda.professional.invalid", "category": "validation", "status_code": 400, "message": "Invalid professional for this clinic", "description": "The professional is not bookable in the active clinic."},
+    {"code": "agenda.professional.required", "category": "validation", "status_code": 400, "message": "A professional is required", "description": "Appointments require a professional while the Professionals app is enabled."},
+    {"code": "agenda.appointment.invalid", "category": "validation", "status_code": 400, "message": "Appointment data is invalid", "description": "Appointment data or its linked records failed domain validation."},
+    {"code": "agenda.appointment.slot_conflict", "category": "conflict", "status_code": 409, "message": "Time slot is already occupied", "description": "Another appointment occupies the requested time slot."},
+    {"code": "agenda.appointment.already_in_state", "category": "conflict", "status_code": 409, "message": "Appointment is already in the requested status", "description": "The requested transition would not change the appointment status."},
+    {"code": "agenda.appointment.invalid_transition", "category": "validation", "status_code": 400, "message": "Appointment status transition is not allowed", "description": "The requested status transition is not allowed from the current state."},
+    {"code": "agenda.appointment.cabinet_required", "category": "validation", "status_code": 400, "message": "Assign a cabinet before starting treatment", "description": "An appointment must have a cabinet before it moves to in-treatment."},
+    {"code": "agenda.cabinet.not_found", "category": "not_found", "status_code": 404, "message": "Cabinet not found", "description": "The cabinet does not exist in the active clinic."},
+    {"code": "agenda.cabinet.name_conflict", "category": "conflict", "status_code": 409, "message": "Cabinet name already exists", "description": "Cabinet names must be unique within a clinic."},
+    {"code": "agenda.cabinet.in_use", "category": "conflict", "status_code": 409, "message": "Cabinet has active appointments", "description": "A cabinet cannot be deleted while active appointments use it."},
+    {"code": "agenda.appointment_treatment.not_found", "category": "not_found", "status_code": 404, "message": "Appointment treatment not found", "description": "The appointment treatment does not exist in the active clinic."},
+    {"code": "agenda.patients.unavailable", "category": "dependency", "status_code": 400, "message": "Patients cannot be assigned while the Patients app is disabled", "description": "Patient links cannot be created while the Patients app is disabled."},
+    {"code": "agenda.professionals.unavailable", "category": "dependency", "status_code": 400, "message": "Professionals cannot be assigned while the Professionals app is disabled", "description": "Professional links cannot be created while the Professionals app is disabled."},
+    {"code": "agenda.treatments.unavailable", "category": "dependency", "status_code": 409, "message": "Treatments are unavailable while the Treatments app is disabled", "description": "Planned treatment links cannot be updated while the Treatments app is disabled."}
+  ]
+}

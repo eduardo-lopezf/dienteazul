@@ -8,7 +8,6 @@
  * periodontogram aligned with the rest of the patient file's "main
  * actions live up top" convention.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import type { PerioIndices, PerioSnapshotDetail, PerioSnapshotSummary, PerioTooth, SiteCode } from '../types'
 import { usePeriodontogramSession } from '../composables/usePeriodontogramSession'

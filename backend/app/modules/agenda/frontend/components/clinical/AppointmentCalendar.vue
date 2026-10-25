@@ -601,9 +601,8 @@ const allAppointmentsWithDayIndex = computed(() => {
             <div
               v-for="(day, dayIdx) in weekDays"
               :key="`${day.toISOString()}-${slot}`"
-              class="border-r border-[var(--color-border-subtle)] last:border-r-0 cursor-cell hover:bg-[var(--color-primary-soft)]/50 transition-colors relative"
+              class="border-r border-[var(--color-border-subtle)] last:border-r-0 cursor-cell bg-[var(--color-surface)] hover:bg-[var(--color-primary-soft)]/50 transition-colors relative"
               :class="{
-                'bg-[var(--color-primary-soft)]/40': isToday(day),
                 'border-[var(--color-border)]': slotIndex % SLOTS_PER_HOUR === 0
               }"
               @pointerdown="onCellPointerDown(dayIdx, slotIndex, $event)"

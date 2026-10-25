@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,8 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 
-from .integrations import TREATMENTS_UNAVAILABLE, treatments_available
+from .errors import agenda_error, service_error
+from .integrations import treatments_available
 from .kanban_service import KanbanDayService
 from .models import Appointment
 from .presenter import present, present_one
@@ -104,18 +105,12 @@ async def create_appointment(
     """Create a new appointment."""
     if data.patient_id:
         if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found",
-            )
+            raise agenda_error("agenda.patient.not_found")
 
     if data.professional_id and not await AppointmentService.validate_professional_access(
         db, ctx.clinic_id, data.professional_id
     ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid professional: must be a dentist or hygienist in this clinic",
-        )
+        raise agenda_error("agenda.professional.invalid")
 
     try:
         appointment = await AppointmentService.create_appointment(
@@ -125,15 +120,9 @@ async def create_appointment(
             created_by=ctx.user_id,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise service_error(e) from e
     except IntegrityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Time slot is already occupied",
-        ) from e
+        raise agenda_error("agenda.appointment.slot_conflict") from e
 
     return ApiResponse(data=await present_one(db, appointment))
 
@@ -148,10 +137,7 @@ async def get_appointment(
     """Get an appointment by ID, including the status audit trail."""
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     response = await present_one(db, appointment)
     response.history = [AppointmentStatusEventResponse.model_validate(e) for e in events]
@@ -169,26 +155,17 @@ async def update_appointment(
     """Update an appointment."""
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
 
     if data.patient_id:
         if not await AppointmentService.validate_patient_access(db, ctx.clinic_id, data.patient_id):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found",
-            )
+            raise agenda_error("agenda.patient.not_found")
 
     if data.professional_id:
         if not await AppointmentService.validate_professional_access(
             db, ctx.clinic_id, data.professional_id
         ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid professional: must be a dentist or hygienist in this clinic",
-            )
+            raise agenda_error("agenda.professional.invalid")
 
     try:
         appointment = await AppointmentService.update_appointment(
@@ -198,15 +175,9 @@ async def update_appointment(
             changed_by=ctx.user_id,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise service_error(e) from e
     except IntegrityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Time slot is already occupied",
-        ) from e
+        raise agenda_error("agenda.appointment.slot_conflict") from e
 
     return ApiResponse(data=await present_one(db, appointment))
 
@@ -221,17 +192,13 @@ async def delete_appointment(
     """Cancel an appointment."""
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     try:
         await AppointmentService.cancel_appointment(db, appointment, changed_by=ctx.user_id)
+    except InvalidTransitionError as e:
+        raise agenda_error("agenda.appointment.invalid_transition", detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise service_error(e) from e
 
 
 @router.post(
@@ -252,29 +219,17 @@ async def transition_appointment(
     """
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     try:
         await AppointmentService.transition(
             db, appointment, data.to_status, changed_by=ctx.user_id, note=data.note
         )
     except AlreadyInStateError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        ) from e
+        raise agenda_error("agenda.appointment.already_in_state", detail=str(e)) from e
     except CabinetRequiredError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise agenda_error("agenda.appointment.cabinet_required", detail=str(e)) from e
     except InvalidTransitionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise agenda_error("agenda.appointment.invalid_transition", detail=str(e)) from e
 
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     response = await present_one(db, appointment)
@@ -298,10 +253,7 @@ async def check_appointment_completion(
     """
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     lacking = await AppointmentService.plans_lacking_consent(db, appointment)
     return ApiResponse(
         data=AppointmentCompletionCheck(
@@ -326,10 +278,7 @@ async def list_appointment_transitions(
     """Return the full status audit trail for an appointment (asc)."""
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     events = await AppointmentService.list_status_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentStatusEventResponse.model_validate(e) for e in events])
 
@@ -352,10 +301,7 @@ async def assign_appointment_cabinet(
     """
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     try:
         await AppointmentService.assign_cabinet(
             db,
@@ -365,15 +311,9 @@ async def assign_appointment_cabinet(
             note=data.note,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise service_error(e) from e
     except IntegrityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Time slot is already occupied in that cabinet",
-        ) from e
+        raise agenda_error("agenda.appointment.slot_conflict") from e
 
     events = await AppointmentService.list_cabinet_events(db, ctx.clinic_id, appointment.id)
     response = await present_one(db, appointment)
@@ -394,10 +334,7 @@ async def list_appointment_cabinet_history(
     """Return the cabinet assignment audit trail (asc)."""
     appointment = await AppointmentService.get_appointment(db, ctx.clinic_id, appointment_id)
     if not appointment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Appointment not found",
-        )
+        raise agenda_error("agenda.appointment.not_found")
     events = await AppointmentService.list_cabinet_events(db, ctx.clinic_id, appointment.id)
     return ApiResponse(data=[AppointmentCabinetEventResponse.model_validate(e) for e in events])
 
@@ -453,10 +390,7 @@ async def create_cabinet(
     """Create a new cabinet in the clinic."""
     existing = await CabinetService.get_by_name(db, ctx.clinic_id, data.name)
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cabinet name already exists",
-        )
+        raise agenda_error("agenda.cabinet.name_conflict")
 
     cabinet = await CabinetService.create_cabinet(
         db, ctx.clinic_id, data.model_dump(exclude_unset=True)
@@ -477,18 +411,12 @@ async def update_cabinet(
     """Update a cabinet."""
     cabinet = await CabinetService.get_cabinet(db, ctx.clinic_id, cabinet_id)
     if cabinet is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cabinet not found",
-        )
+        raise agenda_error("agenda.cabinet.not_found")
 
     if data.name and data.name != cabinet.name:
         clash = await CabinetService.get_by_name(db, ctx.clinic_id, data.name)
         if clash is not None and clash.id != cabinet.id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cabinet name already exists",
-            )
+            raise agenda_error("agenda.cabinet.name_conflict")
 
     cabinet = await CabinetService.update_cabinet(db, cabinet, data.model_dump(exclude_unset=True))
     await db.commit()
@@ -506,10 +434,7 @@ async def delete_cabinet(
     """Delete a cabinet. Blocks when any non-cancelled appointment still uses it."""
     cabinet = await CabinetService.get_cabinet(db, ctx.clinic_id, cabinet_id)
     if cabinet is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cabinet not found",
-        )
+        raise agenda_error("agenda.cabinet.not_found")
 
     from sqlalchemy import func as sql_func
 
@@ -524,9 +449,8 @@ async def delete_cabinet(
         )
     ).scalar() or 0
     if in_use:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cabinet has {in_use} active appointments",
+        raise agenda_error(
+            "agenda.cabinet.in_use", detail=f"Cabinet has {in_use} active appointments"
         )
 
     await CabinetService.delete_cabinet(db, cabinet)
@@ -554,7 +478,7 @@ async def update_appointment_treatment_note(
     though the row is owned by the agenda module (issue #60).
     """
     if not treatments_available():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=TREATMENTS_UNAVAILABLE)
+        raise agenda_error("agenda.treatments.unavailable")
 
     row = await AppointmentService.update_appointment_treatment_note(
         db,
@@ -565,5 +489,5 @@ async def update_appointment_treatment_note(
         completed_in_appointment=data.completed_in_appointment,
     )
     if row is None:
-        raise HTTPException(status_code=404, detail="Appointment treatment not found")
+        raise agenda_error("agenda.appointment_treatment.not_found")
     return ApiResponse(data=AppointmentTreatmentResponse.model_validate(row))

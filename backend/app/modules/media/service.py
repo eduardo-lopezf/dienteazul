@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -15,7 +15,9 @@ from app.core.events import EventType, event_bus
 from .attachment_registry import attachment_registry
 from .errors import (
     ATTACHMENT_NOT_FOUND,
+    ATTACHMENT_OWNER_TYPE_INVALID,
     DOCUMENT_NOT_FOUND,
+    DOCUMENT_SELF_PAIR,
     OWNER_NOT_FOUND,
     WRONG_PATIENT,
     media_error,
@@ -370,7 +372,8 @@ class PhotoService:
         document_b_id: UUID,
     ) -> tuple[Document, Document]:
         if document_a_id == document_b_id:
-            raise HTTPException(
+            raise media_error(
+                DOCUMENT_SELF_PAIR,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot pair a document with itself",
             )
@@ -470,7 +473,8 @@ class AttachmentService:
         display_order: int = 0,
     ) -> MediaAttachment:
         if not attachment_registry.has(owner_type):
-            raise HTTPException(
+            raise media_error(
+                ATTACHMENT_OWNER_TYPE_INVALID,
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     f"Unknown owner_type '{owner_type}'. "

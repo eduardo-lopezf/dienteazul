@@ -11,7 +11,7 @@ sites only depend on ``validate_media_classification``.
 
 from __future__ import annotations
 
-from fastapi import HTTPException, status
+from fastapi import status
 
 from .errors import PHOTO_TAXONOMY_INVALID, media_error
 
@@ -147,7 +147,8 @@ def validate_media_classification(
         category = media_category
 
     if media_subtype is not None and media_subtype not in MEDIA_SUBTYPES[category]:
-        raise HTTPException(
+        raise media_error(
+            PHOTO_TAXONOMY_INVALID,
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Invalid media_subtype '{media_subtype}' for category '{category}'. "

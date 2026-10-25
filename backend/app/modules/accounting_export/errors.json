@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "accounting_export.period.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "The end date must be on or after the start date",
+      "description": "The requested accounting export period ends before it starts."
+    }
+  ]
+}

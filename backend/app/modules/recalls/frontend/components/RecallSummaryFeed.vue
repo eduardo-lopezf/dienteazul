@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { formatDateOnly } from '~~/app/utils/date'
-import { computed, onMounted } from 'vue'
 import type { Recall } from '../composables/useRecalls'
 
 // Slot entry into `patient.summary.feed`. `<ModuleSlot>` passes the

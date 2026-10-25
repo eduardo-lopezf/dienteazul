@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import type { RecallDashboardStats } from '../composables/useRecalls'
 
 const { t } = useI18n()

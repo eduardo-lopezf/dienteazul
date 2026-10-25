@@ -42,6 +42,10 @@ INVOICE_HEADERS = [
 PAYMENT_HEADERS = ["fecha_pago", "factura", "importe", "metodo", "referencia"]
 
 
+class AccountingExportError(ValueError):
+    """A request that cannot produce a meaningful accounting export."""
+
+
 def _vat_rate(invoice) -> str:
     """Single rate as ``21``/``10``; ``varios`` when the invoice mixes rates."""
     rates = {item.vat_rate for item in invoice.items}
@@ -60,6 +64,8 @@ class AccountingExportService:
         statuses: list[str] | None,
     ) -> list:
         """Issued invoices with items + allocated payments eager-loaded."""
+        if date_from is not None and date_to is not None and date_to < date_from:
+            raise AccountingExportError("The end date must be on or after the start date")
         return await InvoiceService.list_for_export(
             db,
             clinic_id,

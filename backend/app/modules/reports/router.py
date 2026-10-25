@@ -11,6 +11,7 @@ from app.core.auth.dependencies import ClinicContext, get_clinic_context, requir
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import service_error
 from .integrations import needs
 from .schemas import (
     AppointmentFunnel,
@@ -369,10 +370,7 @@ async def get_waiting_times(
             professional_id=professional_id,
         )
     except ValueError as e:
-        from fastapi import HTTPException
-        from fastapi import status as http_status
-
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(data=WaitingTimeStats(**data))
 
 
@@ -401,10 +399,7 @@ async def get_punctuality(
             professional_id=professional_id,
         )
     except ValueError as e:
-        from fastapi import HTTPException
-        from fastapi import status as http_status
-
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(data=PunctualityStats(**data))
 
 
@@ -433,10 +428,7 @@ async def get_duration_variance(
             professional_id=professional_id,
         )
     except ValueError as e:
-        from fastapi import HTTPException
-        from fastapi import status as http_status
-
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(data=DurationVarianceStats(**data))
 
 
@@ -465,8 +457,5 @@ async def get_appointment_funnel(
             professional_id=professional_id,
         )
     except ValueError as e:
-        from fastapi import HTTPException
-        from fastapi import status as http_status
-
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        raise service_error(e) from e
     return ApiResponse(data=AppointmentFunnel(**data))

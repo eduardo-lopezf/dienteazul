@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "schedules.professional.access_denied",
+      "category": "auth",
+      "status_code": 403,
+      "message": "Permission denied",
+      "description": "The user does not have permission to read or manage professional schedules."
+    },
+    {
+      "code": "schedules.override.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Override not found",
+      "description": "The clinic or professional schedule override does not exist in the active clinic."
+    },
+    {
+      "code": "schedules.professional.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Professional not found",
+      "description": "The professional does not exist or is not bookable in the active clinic."
+    },
+    {
+      "code": "schedules.date_range.invalid",
+      "category": "validation",
+      "status_code": 400,
+      "message": "End must be on or after start",
+      "description": "Availability and analytics queries require the end date to be on or after the start date."
+    },
+    {
+      "code": "schedules.shift.invalid_time_range",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Shift end time must be after its start time",
+      "description": "A shift must end later than it starts on the same day."
+    },
+    {
+      "code": "schedules.weekday.out_of_range",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Weekday must be between 0 and 6",
+      "description": "Weekly schedule weekdays use 0 for Monday through 6 for Sunday."
+    },
+    {
+      "code": "schedules.override.invalid_date_range",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Override end date must be on or after its start date",
+      "description": "A clinic or professional override cannot end before it starts."
+    },
+    {
+      "code": "schedules.clinic_override.closed_with_shifts",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Closed overrides cannot contain shifts",
+      "description": "A clinic override with kind closed must not include working-hour shifts."
+    },
+    {
+      "code": "schedules.clinic_override.custom_hours_without_shifts",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Custom-hours overrides require at least one shift",
+      "description": "A clinic override with kind custom_hours must include one or more shifts."
+    },
+    {
+      "code": "schedules.professional_override.unavailable_with_shifts",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Unavailable overrides cannot contain shifts",
+      "description": "A professional override with kind unavailable must not include working-hour shifts."
+    },
+    {
+      "code": "schedules.professional_override.custom_hours_without_shifts",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Custom-hours overrides require at least one shift",
+      "description": "A professional override with kind custom_hours must include one or more shifts."
+    },
+    {
+      "code": "schedules.override.invalid_kind",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Invalid override kind",
+      "description": "Clinic overrides accept closed or custom_hours; professional overrides accept unavailable or custom_hours."
+    },
+    {
+      "code": "schedules.override.reason_too_long",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Override reason is too long",
+      "description": "An override reason must not exceed 200 characters."
+    },
+    {
+      "code": "schedules.request.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Schedule request is invalid",
+      "description": "Request data failed schedule schema validation."
+    }
+  ]
+}

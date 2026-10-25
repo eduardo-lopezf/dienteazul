@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "consents.template.not_found", "category": "not_found", "status_code": 404, "message": "Template not found", "description": "The consent template does not exist in the active clinic."},
+    {"code": "consents.consent.not_found", "category": "not_found", "status_code": 404, "message": "Consent not found", "description": "The consent does not exist in the active clinic."},
+    {"code": "consents.consent.invalid_state", "category": "conflict", "status_code": 409, "message": "Consent cannot be changed in its current state", "description": "The requested operation is not allowed for the consent's current state."},
+    {"code": "consents.patient.not_found", "category": "not_found", "status_code": 400, "message": "Patient not found in this clinic", "description": "The patient is unavailable in the active clinic."},
+    {"code": "consents.professional.not_found", "category": "validation", "status_code": 400, "message": "Professional not found in this clinic", "description": "The selected professional is not bookable in the active clinic."},
+    {"code": "consents.professionals.unavailable", "category": "dependency", "status_code": 400, "message": "Professionals are not available — an informed consent must name who explained it", "description": "The Professionals app is disabled, so an informed consent cannot name its explainer."},
+    {"code": "consents.template.invalid_for_kind", "category": "validation", "status_code": 400, "message": "Template not found for this kind of consent", "description": "The selected template does not match the consent kind."},
+    {"code": "consents.consent.content_required", "category": "validation", "status_code": 400, "message": "A consent needs a title and a text", "description": "A consent requires both a title and body text."},
+    {"code": "consents.consent.professional_required", "category": "validation", "status_code": 400, "message": "An informed consent must name the professional who explained it", "description": "An informed consent must identify its explaining professional."},
+    {"code": "consents.documents.unavailable", "category": "dependency", "status_code": 400, "message": "Documents are not available — a scan cannot be filed", "description": "The Media app is unavailable, so a paper-signed consent cannot be filed."},
+    {"code": "consents.scan.not_found", "category": "not_found", "status_code": 400, "message": "The scanned document is not one of this patient's files", "description": "The scan must be a document belonging to the consent's patient."},
+    {"code": "consents.consent.invalid", "category": "validation", "status_code": 400, "message": "Consent request was rejected", "description": "A consent-domain validation rule rejected the request."}
+  ]
+}

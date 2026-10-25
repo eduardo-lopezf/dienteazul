@@ -90,3 +90,6 @@ backend/app/core/plugins/README.md
 # boilerplate, not documentation of ours. `backend/pyproject.toml`
 # declares `readme = "README.md"`, so do not add a rule that would catch
 # a `backend/README.md` someone writes for it.
+
+# Jenkins local
+/jenkins-local/

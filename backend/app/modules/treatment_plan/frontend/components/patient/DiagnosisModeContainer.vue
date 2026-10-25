@@ -11,7 +11,6 @@
  * UI stays identical to the pre-slot world when no optional module is
  * installed. Preserves the uninstall promise.
  */
-import { computed, onMounted, ref, watch } from 'vue'
 import { useModuleSlots } from '~~/app/composables/useModuleSlots'
 
 const props = defineProps<{

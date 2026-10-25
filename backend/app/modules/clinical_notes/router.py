@@ -12,13 +12,14 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import clinical_notes_error, owner_error
 from .models import ClinicalNote
 from .schemas import (
     NOTE_OWNER_PATTERN,
@@ -144,7 +145,7 @@ async def list_notes(
         await resolve_owner_patient(db, ctx.clinic_id, owner_type, owner_id)
         notes = await NoteService.list_for_owner(db, ctx.clinic_id, owner_type, owner_id)
     except NoteOwnerError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise owner_error(str(e)) from e
     decorated = [await _decorate_note(db, ctx.clinic_id, n) for n in notes]
     return ApiResponse(data=decorated)
 
@@ -175,9 +176,11 @@ async def create_note(
             attachment_document_ids=data.attachment_document_ids,
         )
     except NoteOwnerError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise owner_error(str(e)) from e
     except AttachmentPatientMismatchError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise clinical_notes_error(
+            "clinical_notes.attachment.patient_mismatch", detail=str(e)
+        ) from e
     return ApiResponse(data=await _decorate_note(db, ctx.clinic_id, note))
 
 
@@ -208,9 +211,9 @@ async def update_note(
             reason=data.reason,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e)) from e
+        raise clinical_notes_error("clinical_notes.note.forbidden", detail=str(e)) from e
     if note is None:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise clinical_notes_error("clinical_notes.note.not_found")
     return ApiResponse(data=await _decorate_note(db, ctx.clinic_id, note))
 
 
@@ -254,9 +257,9 @@ async def delete_note(
             is_admin=_is_admin_role(ctx),
         )
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e)) from e
+        raise clinical_notes_error("clinical_notes.note.forbidden", detail=str(e)) from e
     if not ok:
-        raise HTTPException(status_code=404, detail="Note not found")
+        raise clinical_notes_error("clinical_notes.note.not_found")
 
 
 @router.get(
@@ -299,7 +302,9 @@ async def list_attachments(
     try:
         rows = await list_attachments_for_owner(db, ctx.clinic_id, owner_type, owner_id)
     except NoteOwnerError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise clinical_notes_error(
+            "clinical_notes.attachment.owner_invalid", detail=str(e)
+        ) from e
     return ApiResponse(data=[NoteAttachmentResponse.model_validate(r) for r in rows])
 
 
@@ -327,8 +332,8 @@ async def list_patient_recent_notes(
     if types:
         invalid = [t for t in types if t not in NOTE_TYPES]
         if invalid:
-            raise HTTPException(
-                status_code=422,
+            raise clinical_notes_error(
+                "clinical_notes.note.invalid_types",
                 detail=f"Unknown note_type values: {invalid}",
             )
     try:
@@ -341,7 +346,7 @@ async def list_patient_recent_notes(
             before=before,
         )
     except NoteOwnerError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise owner_error(str(e)) from e
     for e in entries:
         e["attachments"] = [_decorate_attachment(a) for a in e["attachments"]]
     return ApiResponse(data=[RecentNoteEntry.model_validate(e) for e in entries])

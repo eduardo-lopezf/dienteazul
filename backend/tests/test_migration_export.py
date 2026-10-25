@@ -22,6 +22,7 @@ from app.modules.agenda.models import Appointment, Cabinet
 from app.modules.migration_import import service as import_service
 from app.modules.migration_import.dpmf import open_dpmf
 from app.modules.migration_import.dpmf.crypto import DpmeError
+from app.modules.migration_import.errors import ERROR_CATALOG
 from app.modules.migration_import.export import write_clinic_export
 from app.modules.migration_import.models import ImportJob, ImportWarning
 from app.modules.patients.models import Patient
@@ -1572,6 +1573,10 @@ async def test_an_export_file_expires_and_its_record_stays(
     late = await client.get(f"{EXPORTS}/{export_id}/download", headers=auth_headers)
     assert late.status_code == 409
     assert "caducó" in late.json()["message"]
+    definition = ERROR_CATALOG["migration_import.export.expired"]
+    assert late.json()["code"] == definition.code
+    assert late.json()["category"] == definition.category.value
+    assert late.json()["reference"] == late.headers["x-request-id"]
 
     await expire_exports()
     db_session.expire_all()

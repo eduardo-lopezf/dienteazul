@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { formatDateOnly } from '~~/app/utils/date'
-import { computed, onMounted, ref } from 'vue'
 
 // Slot entry into `patient.summary.actions`. `<ModuleSlot>` passes
 // the slot ctx as a single `ctx` prop. Reads `do_not_contact` to

@@ -15,6 +15,7 @@ from app.core.auth.models import Clinic, ClinicMembership
 from app.core.plugins.registry import module_registry
 from app.modules.agenda.models import Appointment
 from app.modules.agenda.service import AppointmentService
+from app.modules.clinical_notes.errors import ERROR_CATALOG
 from app.modules.odontogram.models import Treatment
 
 
@@ -191,6 +192,16 @@ async def test_recent_feed_filters_by_type(
     client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
 ):
     ctx = await _seed_clinic_and_patient(db_session, client, auth_headers)
+
+    invalid = await client.get(
+        f"/api/v1/clinical_notes/patients/{ctx['patient_id']}/recent?types=unknown",
+        headers=auth_headers,
+    )
+    assert invalid.status_code == 422
+    invalid_definition = ERROR_CATALOG["clinical_notes.note.invalid_types"]
+    assert invalid.json()["code"] == invalid_definition.code
+    assert invalid.json()["category"] == invalid_definition.category.value
+    assert invalid.json()["reference"] == invalid.headers["x-request-id"]
 
     # Two notes of different types
     await client.post(
@@ -424,6 +435,10 @@ async def test_appointment_owner_404_when_not_found(
         },
     )
     assert resp.status_code == 404, resp.text
+    definition = ERROR_CATALOG["clinical_notes.owner.not_found"]
+    assert resp.json()["code"] == definition.code
+    assert resp.json()["category"] == definition.category.value
+    assert resp.json()["reference"] == resp.headers["x-request-id"]
 
 
 @pytest.mark.asyncio

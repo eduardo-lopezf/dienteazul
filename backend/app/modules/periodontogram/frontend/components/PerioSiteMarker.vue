@@ -6,7 +6,6 @@
  * Bleeding and plaque state is shown in the metric table rows (Sangrado
  * / Placa) — keeping it out of the marker avoids visual duplication.
  */
-import { computed } from 'vue'
 import type { PerioSite } from '../types'
 import { probingDepthClasses } from '../composables/usePerioHeatmap'
 

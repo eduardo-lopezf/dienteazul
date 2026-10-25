@@ -26,6 +26,7 @@ from app.core.auth.models import Clinic
 from app.core.events import EventType, event_bus
 from app.database import async_session_maker, engine
 from app.modules.patient_timeline import events as timeline_events
+from app.modules.patient_timeline.errors import ERROR_CATALOG
 from app.modules.patient_timeline.models import PatientTimeline
 from app.modules.patients.models import Patient
 
@@ -487,3 +488,9 @@ async def test_endpoint_returns_404_for_unknown_patient(
         headers=auth_headers,
     )
     assert response.status_code == 404
+    definition = ERROR_CATALOG["patient_timeline.patient.not_found"]
+    body = response.json()
+    assert body["code"] == definition.code
+    assert body["category"] == definition.category.value
+    assert body["message"] == definition.message
+    assert body["reference"] == response.headers["x-request-id"]

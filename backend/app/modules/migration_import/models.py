@@ -73,10 +73,12 @@ class ImportJob(Base, TimestampMixin):
     undone_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     #: Why the last attempt to undo it was refused or failed.
     undo_error: Mapped[str | None] = mapped_column(Text)
+    undo_error_code: Mapped[str | None] = mapped_column(String(120))
     #: What the file's documents will take in the clinic's storage.
     expected_storage_bytes: Mapped[int | None] = mapped_column(BigInteger)
     # State transitions write here so the UI surfaces actionable errors.
     error: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(120))
 
     # File staging on disk — kept out of `media` storage because these
     # are raw DPMF blobs, not patient assets. Removed on job deletion.
@@ -369,6 +371,7 @@ class ExportJob(Base, TimestampMixin):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     error: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(120))
     file_path: Mapped[str | None] = mapped_column(String(500))
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     #: Rows written per entity type.

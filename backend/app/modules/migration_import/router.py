@@ -50,6 +50,7 @@ from app.core.tenancy import TenantContext, get_tenant
 from app.database import get_db
 
 from .binaries.ingest import ingest_binary
+from .errors import migration_error
 from .export import ExportJobService
 from .export import expires_at as export_expires_at
 from .lifecycle import _staging_root
@@ -141,8 +142,8 @@ async def create_job(
                     break
                 written += len(chunk)
                 if written > _MAX_UPLOAD_BYTES:
-                    raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    raise migration_error(
+                        "migration_import.upload.too_large",
                         detail=f"DPMF exceeds {_MAX_UPLOAD_BYTES} bytes",
                     )
                 await out.write(chunk)
@@ -150,12 +151,9 @@ async def create_job(
         # 413 — clean up the partial file before re-raising.
         staged_path.unlink(missing_ok=True)
         raise
-    except Exception as exc:
+    except Exception:
         staged_path.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"failed to stage upload: {exc}",
-        ) from exc
+        raise
 
     job = await ImportJobService.create_job(
         db,
@@ -210,7 +208,7 @@ async def preview_job(
     try:
         preview = await ImportJobService.preview(db, job, passphrase=request.passphrase)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise migration_error("migration_import.job.invalid_state", detail=str(exc)) from exc
     preview.storage_needed_bytes = job.expected_storage_bytes or 0
     preview.storage_free_bytes = await free_bytes(db, tenant, ctx.clinic_id)
     return ApiResponse(data=preview)
@@ -237,8 +235,8 @@ async def execute_job(
 ) -> ApiResponse[ImportJobResponse]:
     job = await _get_job_or_404(db, ctx.clinic_id, job_id)
     if job.status not in {"validated", "previewing", "completed", "failed"}:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+        raise migration_error(
+            "migration_import.job.invalid_state",
             detail=f"cannot execute job in status {job.status}",
         )
     # The documents the file brings land in the clinic's storage.
@@ -427,11 +425,9 @@ async def patch_proposal(
             operator_notes=patch.operator_notes,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+        raise migration_error("migration_import.proposal.invalid", detail=str(exc)) from exc
     if decision is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="proposal not found")
+        raise migration_error("migration_import.proposal.not_found")
     return ApiResponse(data=MappingDecisionResponse.model_validate(decision))
 
 
@@ -477,10 +473,7 @@ async def upload_binary(
     # A file lands among the patient's documents; with them off there is
     # nowhere to put it.
     if not running("media"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Documents are not available — the file cannot be filed",
-        )
+        raise migration_error("migration_import.binary.documents_unavailable")
     await ensure_room(db, tenant, ctx.clinic_id, _request_size(request), "guardar este documento")
     result = await ingest_binary(db, job=job, file=file, claimed_sha256=sha256)
     return ApiResponse(data=result)
@@ -525,7 +518,7 @@ async def upload_sheet(
     await ensure_room(db, tenant, ctx.clinic_id, _request_size(request), "subir esta hoja")
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SHEET_SUFFIXES:
-        raise HTTPException(status_code=422, detail="Solo se aceptan archivos .xlsx y .csv.")
+        raise migration_error("migration_import.sheet.unsupported_format")
     job_id = uuid.uuid4()
     staging_dir = _staging_root() / str(ctx.clinic_id)
     staging_dir.mkdir(parents=True, exist_ok=True)
@@ -537,16 +530,13 @@ async def upload_sheet(
             if written > SHEET_MAX_BYTES:
                 await out.close()
                 staged_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail="El archivo pesa más de 20 MB.",
-                )
+                raise migration_error("migration_import.sheet.too_large")
             await out.write(chunk)
     try:
         sheet = read_sheet(staged_path)
     except SheetError as exc:
         staged_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise migration_error("migration_import.sheet.invalid_content", detail=str(exc)) from exc
 
     job = await ImportJobService.create_job(
         db,
@@ -621,36 +611,35 @@ async def convert_sheet(
     """Turn the sheet into a ``.dpm``; the job then goes on as any other."""
     job = await _get_job_or_404(db, ctx.clinic_id, job_id)
     if job.status != "mapping":
-        raise HTTPException(
-            status_code=409,
-            detail="Esta hoja ya se convirtió; súbela de nuevo para cambiar las columnas.",
-        )
+        raise migration_error("migration_import.sheet.already_converted")
     kind = (job.execute_options or {}).get("sheet_kind", "patients")
     spec = KINDS[kind]
     chosen = set(body.mapping.values())
     unknown = sorted(chosen - set(spec.fields))
     if unknown:
-        raise HTTPException(status_code=422, detail=f"Campos desconocidos: {', '.join(unknown)}.")
-    if len(chosen) != len(body.mapping):
-        raise HTTPException(
-            status_code=422, detail="Un mismo dato está asignado a más de una columna."
+        raise migration_error(
+            "migration_import.sheet.mapping_unknown_field",
+            detail=f"Campos desconocidos: {', '.join(unknown)}.",
         )
+    if len(chosen) != len(body.mapping):
+        raise migration_error("migration_import.sheet.mapping_duplicate_field")
     missing = missing_required(kind, chosen)
     if missing:
         needed = ", ".join(sorted(spec.fields[field][0] for field in missing[0]))
-        raise HTTPException(
-            status_code=422, detail=f"Falta asignar una columna a alguno de estos datos: {needed}."
+        raise migration_error(
+            "migration_import.sheet.mapping_required_field_missing",
+            detail=f"Falta asignar una columna a alguno de estos datos: {needed}.",
         )
     # Patients are what appointments and balances attach to.
     if kind != "patients" and not running("patients"):
-        raise HTTPException(status_code=409, detail="La app Pacientes no está habilitada.")
+        raise migration_error("migration_import.sheet.patients_unavailable")
 
     sheet_path = Path(job.file_path)
     sheet = read_sheet(sheet_path)
     problems: list[tuple[str | None, str]] = []
     mapping = {int(index): field for index, field in body.mapping.items()}
     if any(index < 0 or index >= len(sheet.headers) for index in mapping):
-        raise HTTPException(status_code=422, detail="Una de las columnas no existe en la hoja.")
+        raise migration_error("migration_import.sheet.column_not_found")
     clinic = await db.get(Clinic, ctx.clinic_id)
     destination = sheet_path.with_suffix(".dpm")
     destination.unlink(missing_ok=True)
@@ -713,7 +702,7 @@ async def download_sheet_problems(
     job = await _get_job_or_404(db, ctx.clinic_id, job_id)
     path = _problems_report_path(Path(job.file_path), job.id)
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Esta hoja no tiene filas con problemas.")
+        raise migration_error("migration_import.sheet.problems_not_found")
     return FileResponse(
         path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -791,14 +780,9 @@ async def download_export(
     job = await _get_export_or_404(db, ctx.clinic_id, export_id)
     ends = export_expires_at(job)
     if ends is not None and ends <= datetime.now(UTC):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El archivo de esta exportación caducó y se borró del servidor; genera otra.",
-        )
+        raise migration_error("migration_import.export.expired")
     if job.status != "completed" or not job.file_path or not Path(job.file_path).exists():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="export file not available"
-        )
+        raise migration_error("migration_import.export.file_unavailable")
     stamp = (job.completed_at or job.created_at).strftime("%Y%m%d-%H%M")
     return FileResponse(
         job.file_path,
@@ -817,7 +801,7 @@ async def delete_export_file(
     """Remove the file from the server. The record that it was made stays."""
     job = await _get_export_or_404(db, ctx.clinic_id, export_id)
     if job.status in {"pending", "running"}:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="export still running")
+        raise migration_error("migration_import.export.in_progress")
     job = await ExportJobService.delete_file(db, job)
     return ApiResponse(data=_export_view(job))
 
@@ -831,7 +815,7 @@ def _export_view(job) -> ExportJobResponse:
 async def _get_export_or_404(db: AsyncSession, clinic_id: UUID, export_id: UUID):
     job = await ExportJobService.get(db, clinic_id, export_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="export not found")
+        raise migration_error("migration_import.export.not_found")
     return job
 
 
@@ -860,12 +844,15 @@ async def undo_job(
     try:
         plan = await ImportUndoService.check(db, job)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise migration_error("migration_import.undo.invalid_state", detail=str(exc)) from exc
     if plan.blockers:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=describe_blockers(plan))
+        raise migration_error(
+            "migration_import.undo.blocked", detail=describe_blockers(plan)
+        )
     job.execute_options = {**(job.execute_options or {}), "status_before_undo": job.status}
     job.status = "undoing"
     job.undo_error = None
+    job.undo_error_code = None
     await db.flush()
     background_tasks.add_task(ImportUndoService.undo_in_background, job.id, ctx.user_id)
     return ApiResponse(data=ImportJobResponse.model_validate(job))
@@ -884,5 +871,5 @@ def _request_size(request: Request) -> int:
 async def _get_job_or_404(db: AsyncSession, clinic_id: UUID, job_id: UUID):
     job = await ImportJobService.get_job(db, clinic_id, job_id)
     if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+        raise migration_error("migration_import.job.not_found")
     return job

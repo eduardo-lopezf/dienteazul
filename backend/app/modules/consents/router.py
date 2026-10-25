@@ -3,13 +3,15 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.errors import AppError
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
+from .errors import consent_domain_error, consents_error
 from .pdf import render_pdf
 from .providers import REQUIRE_FOR_PLAN, SETTINGS_KEY, requires_informed_for_plan
 from .schemas import (
@@ -35,9 +37,10 @@ CanWrite = Annotated[None, Depends(require_permission("consents.write"))]
 CanEditTemplates = Annotated[None, Depends(require_permission("consents.templates.write"))]
 
 
-def _refuse(error: ConsentError) -> HTTPException:
-    code = status.HTTP_409_CONFLICT if isinstance(error, ConsentStateError) else 400
-    return HTTPException(status_code=code, detail=str(error))
+def _refuse(error: ConsentError) -> AppError:
+    return consent_domain_error(
+        str(error), state_error=isinstance(error, ConsentStateError)
+    )
 
 
 # --- Templates ---------------------------------------------------------------
@@ -98,7 +101,7 @@ async def update_template(
 ) -> ApiResponse[TemplateResponse]:
     template = await TemplateService.get(db, ctx.clinic_id, template_id)
     if template is None:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise consents_error("consents.template.not_found")
     template = await TemplateService.update(db, template, data.model_dump(exclude_unset=True))
     return ApiResponse(data=TemplateResponse.model_validate(template))
 
@@ -109,7 +112,7 @@ async def update_template(
 async def _consent(db: AsyncSession, ctx: ClinicContext, consent_id: UUID):
     consent = await ConsentService.get(db, ctx.clinic_id, consent_id)
     if consent is None:
-        raise HTTPException(status_code=404, detail="Consent not found")
+        raise consents_error("consents.consent.not_found")
     return consent
 
 

@@ -1270,6 +1270,8 @@ class ExportJobService:
         """Write the file for ``job``. Failures are kept on the row."""
         destination = ExportJobService.file_for(job.id, job.clinic_id)
         job.status = "running"
+        job.error = None
+        job.error_code = None
         await db.commit()
         try:
             counts = await write_clinic_export(
@@ -1284,6 +1286,7 @@ class ExportJobService:
             destination.unlink(missing_ok=True)
             job.status = "failed"
             job.error = str(exc)
+            job.error_code = "migration_import.export.failed"
         else:
             job.status = "completed"
             job.file_path = str(destination)
