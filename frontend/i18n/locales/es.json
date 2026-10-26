@@ -496,6 +496,15 @@
     },
     "administrative": {
       "title": "Administración"
+    },
+    "validation": {
+      "required": "Este campo es obligatorio",
+      "tooLong": "Máximo {max} caracteres",
+      "nameInvalid": "Solo puede contener letras, espacios, apóstrofos, guiones y puntos",
+      "phoneInvalid": "Introduce un teléfono válido (7 a 15 dígitos, opcionalmente con prefijo +)",
+      "emailInvalid": "Introduce un email válido",
+      "dateOfBirthFuture": "La fecha de nacimiento no puede ser futura",
+      "dateOfBirthTooOld": "La fecha de nacimiento no puede ser de hace más de {years} años"
     }
   },
   "patientDetail": {
@@ -617,6 +626,12 @@
       "lockedHint": "Viene de un tratamiento del catálogo o de un plan: se quita desde la lista de tratamientos",
       "eruption": "Erupción…",
       "accept": "Aceptar",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "clear": "Limpiar",
+      "undoHint": "Deshacer el último cambio (Ctrl+Z)",
+      "redoHint": "Rehacer el cambio deshecho (Ctrl+Shift+Z)",
+      "clearHint": "Quitar todos los cambios sin guardar: la ficha como al abrirla",
       "pending": "1 cambio sin guardar | {count} cambios sin guardar",
       "saved": "Diagnóstico guardado",
       "saveFailed": "No se pudo guardar la condición del diente"

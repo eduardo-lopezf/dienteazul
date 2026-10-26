@@ -9,7 +9,9 @@ import { API_BASE, expect, test, tokenFor } from './_fixtures'
  * Accept and Cancel in reach, its controls (outside the dense chart) are
  * finger-sized, and a tap on another tooth picks it too.
  *
- * Nothing is saved: the test presses a finding and cancels, and checks
+ * Undo, Redo and Clear step through what is pending.
+ *
+ * Nothing is saved: the test presses findings and cancels, and checks
  * through the API that the patient's chart did not change.
  */
 test.describe('tooth diagnosis card on a tablet', () => {
@@ -75,9 +77,22 @@ test.describe('tooth diagnosis card on a tablet', () => {
     await expect(page.getByTestId('tooth-diagnosis-picked')).toContainText('2')
     await expect(page.getByTestId('tooth-diagnosis-title')).toContainText(',')
 
-    // A finding pressed stays pending; Cancel drops it.
+    // A finding pressed stays pending; Undo, Redo and Clear step through
+    // what is pending; Cancel drops it.
+    const pending = page.getByTestId('tooth-diagnosis-pending')
+    await expect(page.getByTestId('tooth-diagnosis-undo')).toBeDisabled()
     await page.getByTestId('tooth-finding-diastema').tap()
-    await expect(page.getByTestId('tooth-diagnosis-pending')).toBeVisible()
+    await expect(pending).toBeVisible()
+    await page.getByTestId('tooth-diagnosis-undo').tap()
+    await expect(pending).toBeHidden()
+    await page.getByTestId('tooth-diagnosis-redo').tap()
+    await expect(pending).toBeVisible()
+    await page.getByTestId('tooth-finding-crowding').tap()
+    await page.getByTestId('tooth-diagnosis-clear').tap()
+    await expect(pending).toBeHidden()
+    await expect(page.getByTestId('tooth-diagnosis-redo')).toBeDisabled()
+    await page.getByTestId('tooth-diagnosis-undo').tap()
+    await expect(pending).toBeVisible()
     await page.getByTestId('tooth-diagnosis-cancel').tap()
     await expect(card).toBeHidden()
     expect(await countTreatments(), 'cancel saved something').toBe(before)

@@ -46,6 +46,12 @@ services:
       # Lets the control plane (control/) read usage per clinic. Empty
       # keeps /api/v1/ops switched off.
       CONTROL_PLANE_SECRET: ${CONTROL_PLANE_SECRET:-}
+      # Logging (see .env.example). In development the application log
+      # also goes to a file on the `error_logs` volume, so the control
+      # panel's Logs can read it (GET /api/v1/ops/logs). Set LOG_DIR to
+      # an empty value in .env to keep stdout only.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_DIR: ${LOG_DIR-/var/log/dienteazul}
     ports:
       # Loopback only, like the database. These are development servers:
       # uvicorn with --reload and Nuxt's dev server, which says so itself
@@ -67,6 +73,10 @@ services:
     volumes:
       - ./backend:/app
       - storage_data:/app/storage
+      # The server-error log the control panel reads (ADR 0060). A named
+      # volume so the occurrences outlive the container — without it a
+      # restart is also the panel forgetting every failure.
+      - error_logs:/var/log/dienteazul
       # Mount the frontend root read-write so the backend can regenerate
       # modules.json when a module with a Nuxt layer is installed.
       - ./frontend:/host_frontend
@@ -108,3 +118,4 @@ services:
 volumes:
   pgdata:
   storage_data:
+  error_logs:

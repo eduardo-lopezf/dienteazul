@@ -25,6 +25,10 @@ services:
       SERVICE_FQDN_BACKEND_8000: ${BACKEND_FQDN}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dental_clinic}
       SECRET_KEY: ${SECRET_KEY}
+      # Signs the public-budget links (ADR 0006). Mandatory in production
+      # and different from SECRET_KEY, or the backend refuses to start:
+      # openssl rand -hex 32.
+      BUDGET_PUBLIC_SECRET_KEY: ${BUDGET_PUBLIC_SECRET_KEY}
       ENVIRONMENT: production
       ALLOWED_ORIGINS: ${FRONTEND_URL}
       STORAGE_BACKEND: local
@@ -36,8 +40,24 @@ services:
       # leave it unset so seed never runs.
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-0}
       SEED_LANG: ${SEED_LANG:-es}
+      # The secret the control panel shares with this backend to reach
+      # /api/v1/ops (ADR 0049 rule 4): its Logs, usage and clinics. Unset,
+      # that endpoint does not exist. Set it in Coolify's Environment tab
+      # (at least 32 characters) and the same value in the panel's
+      # Ambientes page.
+      CONTROL_PLANE_SECRET: ${CONTROL_PLANE_SECRET:-}
+      # Logging (see .env.example). The application log is also written to
+      # <LOG_DIR>/dienteazul.log so the control panel's Logs → Aplicación
+      # can read it (GET /api/v1/ops/logs); the server errors go to the
+      # same directory (ERROR_LOG_DIR's default, ADR 0060).
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_DIR: ${LOG_DIR:-/var/log/dienteazul}
     volumes:
       - storage_data:/app/storage
+      # Both logs outlive a redeploy: without a volume each new container
+      # starts with the panel's Logs empty. The image gives the directory
+      # to the app's user, and a new named volume takes that ownership.
+      - error_logs:/var/log/dienteazul
     depends_on:
       db:
         condition: service_healthy
@@ -71,3 +91,4 @@ services:
 volumes:
   pgdata:
   storage_data:
+  error_logs:

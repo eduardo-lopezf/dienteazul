@@ -12,7 +12,10 @@
  *
  * Presses are pending (`FindingDraft`): the card's chart and switches show
  * them, *Aceptar* hands them to the chart to save, *Cancelar* (or closing
- * the card) drops them. Caries and *Erupción…* save what is pending first,
+ * the card) drops them. *Deshacer* / *Rehacer* (Ctrl+Z, Ctrl+Shift+Z or
+ * Ctrl+Y) step through the presses; *Limpiar* drops every pending press at
+ * once — the card as it opened — and can itself be undone. Caries and
+ * *Erupción…* save what is pending first,
  * since they leave the card. The chart charts, so its own state (undo,
  * toasts, history) stays the one source.
  */
@@ -69,10 +72,58 @@ const { t } = useI18n()
 const picked = ref<number[]>([])
 /** Presses not saved yet. */
 const draft = ref<FindingDraft>(new Map())
+/** Earlier drafts, for *Deshacer*; undone ones, for *Rehacer*. */
+const past = ref<FindingDraft[]>([])
+const future = ref<FindingDraft[]>([])
 watch(() => props.toothNumber, (tooth) => {
   picked.value = tooth === null ? [] : [tooth]
   draft.value = new Map()
+  past.value = []
+  future.value = []
 }, { immediate: true })
+
+/** A new draft: the old one can be gone back to, nothing is redone. */
+function commitDraft(next: FindingDraft) {
+  past.value = [...past.value, draft.value]
+  future.value = []
+  draft.value = next
+}
+
+function undo() {
+  const previous = past.value.at(-1)
+  if (!previous || props.saving) return
+  past.value = past.value.slice(0, -1)
+  future.value = [...future.value, draft.value]
+  draft.value = previous
+}
+
+function redo() {
+  const next = future.value.at(-1)
+  if (!next || props.saving) return
+  future.value = future.value.slice(0, -1)
+  past.value = [...past.value, draft.value]
+  draft.value = next
+}
+
+/** Back to the card as it opened: nothing pending. */
+function clear() {
+  if (!draft.value.size || props.saving) return
+  commitDraft(new Map())
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (props.toothNumber === null || !(e.ctrlKey || e.metaKey)) return
+  const key = e.key.toLowerCase()
+  if (key === 'z' && !e.shiftKey) {
+    e.preventDefault()
+    undo()
+  } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+    e.preventDefault()
+    redo()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 function togglePick(tooth: number) {
   picked.value = picked.value.includes(tooth)
@@ -104,7 +155,12 @@ function press(finding: ToothFinding) {
     if (single.value !== null) emit('surface', finding, single.value, draftChanges(draft.value))
     return
   }
-  draft.value = toggleDraft(finding, picked.value, facts.value, draft.value)
+  const next = toggleDraft(finding, picked.value, facts.value, draft.value)
+  // A press that changes nothing (a locked finding) is not a step to undo.
+  const same = next.size === draft.value.size
+    && [...next].every(([key, on]) => draft.value.get(key) === on)
+  if (same) return
+  commitDraft(next)
 }
 
 function accept() {
@@ -175,9 +231,23 @@ const groups = computed(() => [
           >
             {{ title }}
           </h2>
-          <p class="text-caption text-subtle mt-1">
-            {{ t('odontogram.findings.help') }}
-          </p>
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-caption text-subtle mt-1">
+              {{ t('odontogram.findings.help') }}
+            </p>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-sprout"
+              class="shrink-0"
+              :disabled="single === null || saving"
+              :title="single === null ? t('odontogram.findings.oneToothHint') : undefined"
+              data-testid="tooth-diagnosis-eruption"
+              @click="single !== null && emit('eruption', single, draftChanges(draft))"
+            >
+              {{ t('odontogram.findings.eruption') }}
+            </UButton>
+          </div>
         </template>
 
         <div class="space-y-4">
@@ -287,19 +357,43 @@ const groups = computed(() => [
         </div>
 
         <template #footer>
-          <div class="flex justify-between gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-sprout"
-              :disabled="single === null || saving"
-              :title="single === null ? t('odontogram.findings.oneToothHint') : undefined"
-              data-testid="tooth-diagnosis-eruption"
-              @click="single !== null && emit('eruption', single, draftChanges(draft))"
-            >
-              {{ t('odontogram.findings.eruption') }}
-            </UButton>
-            <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1">
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-undo-2"
+                :disabled="!past.length || saving"
+                :title="t('odontogram.findings.undoHint')"
+                data-testid="tooth-diagnosis-undo"
+                @click="undo"
+              >
+                {{ t('odontogram.findings.undo') }}
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-redo-2"
+                :disabled="!future.length || saving"
+                :title="t('odontogram.findings.redoHint')"
+                data-testid="tooth-diagnosis-redo"
+                @click="redo"
+              >
+                {{ t('odontogram.findings.redo') }}
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-eraser"
+                :disabled="!draft.size || saving"
+                :title="t('odontogram.findings.clearHint')"
+                data-testid="tooth-diagnosis-clear"
+                @click="clear"
+              >
+                {{ t('odontogram.findings.clear') }}
+              </UButton>
+            </div>
+            <div class="flex items-center gap-2 ms-auto">
               <span
                 v-if="pendingCount"
                 class="text-caption text-muted"

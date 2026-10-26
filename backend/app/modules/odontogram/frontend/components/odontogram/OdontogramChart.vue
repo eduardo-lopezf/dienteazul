@@ -573,6 +573,9 @@ const lowerMidlineBridgeStatus = computed<'existing' | 'planned' | null>(() => {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  // A tooth card is open: the keys are its own. Ctrl+Z here would delete
+  // the last saved treatment behind it, and a letter would arm one.
+  if (tooltipsBlocked.value) return
 
   if (e.key === 'Escape') {
     if (isMultiToothMode.value && multiToothSelection.value.teeth.length > 0) {

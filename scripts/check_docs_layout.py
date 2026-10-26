@@ -37,6 +37,7 @@ ROOT_FILES_ALLOWED: frozenset[str] = frozenset(
         "modules-catalog.md",
         "subprocessors-catalog.md",
         "apps-catalog.md",
+        "errors-catalog.md",
     }
 )
 

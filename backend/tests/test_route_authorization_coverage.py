@@ -75,6 +75,9 @@ UNAUTHENTICATED: dict[str, str] = {
         "control plane only, by signed token; where requests failed, values scrubbed"
     ),
     "DELETE /api/v1/ops/errors": "control plane only, by signed token; forgets them",
+    "GET /api/v1/ops/logs": (
+        "control plane only, by signed token; the application log, values scrubbed"
+    ),
     "GET /api/v1/ops/announcements": "control plane only, by signed token; the notices",
     "POST /api/v1/ops/announcements": "control plane only, by signed token; publishes a notice",
     "PUT /api/v1/ops/announcements/{announcement_id}": (

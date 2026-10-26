@@ -66,6 +66,14 @@ test.describe('clinical history', () => {
       const row = page.getByTestId('questionnaire-row').filter({ hasText: complaint })
       await expect(row).toBeVisible({ timeout: 30_000 })
       await expect(row.getByTestId('questionnaire-signed')).toBeVisible()
+      // "Ver" opens the same form, read-only, with what was answered.
+      await row.getByTestId('questionnaire-view-open').click()
+      const view = page.getByTestId('questionnaire-view')
+      await expect(view.getByTestId('questionnaire-chief-complaint')).toHaveValue(complaint)
+      await expect(view.getByTestId('questionnaire-signature-shown')).toContainText(offered)
+      await expect(page.getByTestId('questionnaire-save')).toHaveCount(0)
+      await page.getByTestId('questionnaire-view-close').click()
+      await expect(view).toBeHidden()
       const saved = ((await (await page.request.get(questionnaires, { headers: auth })).json()) as {
         data: { chief_complaint: string | null, signed_by_name: string | null, signature_data: { png?: string } | null }[]
       }).data.find(q => q.chief_complaint === complaint)!

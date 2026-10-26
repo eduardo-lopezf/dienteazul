@@ -9,9 +9,12 @@
  * — on the tablet, or on the printed sheet whose foot carries their consent.
  * The pediatric form is offered first under 18; the clinician may pick the
  * other one.
+ *
+ * Given a saved `questionnaire`, the same form opens read-only with what
+ * was answered and who signed it.
  */
 import { PERMISSIONS } from '~~/app/config/permissions'
-import type { FormKind, QuestionAnswer, SignerCapacity } from '../../composables/useHealthQuestionnaires'
+import type { FormKind, HealthQuestionnaire, QuestionAnswer, SignerCapacity } from '../../composables/useHealthQuestionnaires'
 import {
   CONDITION_GROUPS,
   FORM_KINDS,
@@ -31,6 +34,8 @@ const props = defineProps<{
   patientName?: string
   /** Decides which form is offered first. */
   patientBirthDate?: string | null
+  /** A saved questionnaire to show read-only instead of a blank form. */
+  questionnaire?: HealthQuestionnaire | null
 }>()
 const emit = defineEmits<{ 'update:open': [value: boolean], 'saved': [] }>()
 
@@ -46,6 +51,7 @@ type Mode = 'screen' | 'paper'
 const mode = ref<Mode>('screen')
 const formKind = ref<FormKind>('adult')
 const isPediatric = computed(() => formKind.value === 'pediatric')
+const viewing = computed(() => Boolean(props.questionnaire))
 const canFileScan = computed(() => isActive('media') && can(PERMISSIONS.documents.write))
 const modeOptions = computed(() => (['screen', 'paper'] as const).map(value => ({
   label: t(value === 'screen' ? 'healthQuestionnaire.onScreen' : 'healthQuestionnaire.paper'), value
@@ -107,9 +113,34 @@ async function startForm(kind: FormKind) {
   }
 }
 
+/** Fill the form with what a saved questionnaire answered. */
+function showSaved(q: HealthQuestionnaire) {
+  formKind.value = q.form_kind
+  chiefComplaint.value = q.chief_complaint ?? ''
+  bloodType.value = q.blood_type ?? ''
+  allergies.value = q.declared_allergies ?? ''
+  answers.value = Object.fromEntries(
+    Object.entries(q.answers).map(([key, value]) => [key, value.answer ? 'yes' : 'no'])
+  )
+  details.value = Object.fromEntries(
+    Object.entries(q.answers).map(([key, value]) => [key, value.detail ?? ''])
+  )
+  ticked.value = Object.fromEntries(q.conditions.map(key => [key, true]))
+  formData.value = { ...q.form_data }
+  drugsDetail.value = q.drugs_detail ?? ''
+  other.value = q.other_conditions ?? ''
+  signature.value = q.signature_data?.png ?? null
+  signerName.value = q.signed_by_name ?? ''
+  signerCapacity.value = q.signer_capacity ?? 'patient'
+}
+
 watch(() => props.open, (opened) => {
   if (!opened) return
   mode.value = 'screen'
+  if (props.questionnaire) {
+    showSaved(props.questionnaire)
+    return
+  }
   chiefComplaint.value = ''
   bloodType.value = ''
   allergies.value = ''
@@ -121,6 +152,14 @@ watch(() => props.open, (opened) => {
 function chooseForm(kind: FormKind) {
   if (kind !== formKind.value) void startForm(kind)
 }
+
+// A saved one shows the regulation it was signed under, not today's.
+const shownRegulation = computed(() => props.questionnaire
+  ? props.questionnaire.regulation
+  : regulation.value?.text)
+const takenAt = computed(() => props.questionnaire
+  ? new Date(props.questionnaire.taken_at).toLocaleString(locale.value, { dateStyle: 'medium', timeStyle: 'short' })
+  : '')
 
 const conditions = computed(() => Object.keys(ticked.value).filter(key => ticked.value[key]))
 const filledData = computed(() => Object.fromEntries(
@@ -207,12 +246,22 @@ async function save() {
             {{ isPediatric ? t('healthQuestionnaire.pediatric.title') : t('healthQuestionnaire.title') }}
           </h2>
           <p class="text-caption text-muted">
+            <template v-if="questionnaire">
+              {{ t('healthQuestionnaire.takenAt') }}: {{ takenAt }} ·
+            </template>
             {{ t('healthQuestionnaire.confidential') }}
           </p>
         </template>
 
-        <div class="space-y-5">
+        <!-- Read-only when showing a saved one: `inert` keeps every field
+             as it was answered without greying it out. -->
+        <div
+          class="space-y-5"
+          :inert="viewing"
+          :data-testid="viewing ? 'questionnaire-view' : undefined"
+        >
           <UFormField
+            v-if="!viewing"
             :label="t('healthQuestionnaire.form')"
             :description="t('healthQuestionnaire.formHint')"
           >
@@ -227,7 +276,7 @@ async function save() {
           </UFormField>
 
           <UFormField
-            v-if="canFileScan"
+            v-if="canFileScan && !viewing"
             :label="t('healthQuestionnaire.howFilled')"
           >
             <URadioGroup
@@ -450,18 +499,38 @@ async function save() {
 
           <!-- What the questionnaire is kept under, said where it is declared. -->
           <p
-            v-if="regulation?.text"
+            v-if="shownRegulation"
             class="text-caption text-subtle"
             data-testid="questionnaire-regulation"
           >
-            {{ t('regulation.label') }}: {{ regulation.text }}
+            {{ t('regulation.label') }}: {{ shownRegulation }}
           </p>
+
+          <!-- Who signed a saved one. Rows from before signatures have none. -->
+          <div
+            v-if="viewing && questionnaire?.signed_at"
+            class="flex items-end gap-4 flex-wrap border-t border-default pt-4"
+            data-testid="questionnaire-signature-shown"
+          >
+            <img
+              v-if="signature"
+              :src="signature"
+              :alt="t('healthQuestionnaire.sign.title')"
+              class="h-20 rounded border border-default bg-white"
+            >
+            <p class="text-sm text-muted">
+              {{ t('healthQuestionnaire.sign.signedBy', {
+                name: signerName,
+                capacity: t(`healthQuestionnaire.sign.capacities.${signerCapacity}`)
+              }) }}
+            </p>
+          </div>
 
           <!-- Whoever answered signs it — for a child, a parent or guardian,
                under the consent the paper form carries. On paper the
                signature is on the sheet. -->
           <div
-            v-if="mode === 'screen'"
+            v-if="mode === 'screen' && !viewing"
             class="space-y-3 border-t border-default pt-4"
             data-testid="questionnaire-signature"
           >
@@ -514,7 +583,23 @@ async function save() {
         </div>
 
         <template #footer>
-          <div class="flex justify-end gap-2">
+          <div
+            v-if="viewing"
+            class="flex justify-end"
+          >
+            <UButton
+              color="neutral"
+              variant="soft"
+              data-testid="questionnaire-view-close"
+              @click="emit('update:open', false)"
+            >
+              {{ t('common.close') }}
+            </UButton>
+          </div>
+          <div
+            v-else
+            class="flex justify-end gap-2"
+          >
             <UButton
               color="neutral"
               variant="ghost"

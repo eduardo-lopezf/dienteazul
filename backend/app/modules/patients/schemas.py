@@ -5,6 +5,7 @@ billing. Medical history, emergency contact, legal guardian and alert
 shapes live in ``app.modules.patients_clinical.schemas``.
 """
 
+import re
 from datetime import date, datetime
 from uuid import UUID
 
@@ -49,18 +50,67 @@ class BillingAddress(BaseModel):
 # --- Patient CRUD --------------------------------------------------------
 
 
+PHONE_SEPARATORS_RE = re.compile(r"[\s\-().]")
+PHONE_DIGITS_RE = re.compile(r"^\+?\d{7,15}$")
+NAME_PUNCTUATION = frozenset(" '-.")
+MAX_PATIENT_AGE_YEARS = 130
+NOTES_MAX_LENGTH = 5000
+
+
 class PatientCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     phone: str | None = Field(default=None, max_length=20)
     email: EmailStr | None = None
     date_of_birth: date | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=NOTES_MAX_LENGTH)
     do_not_contact: bool = False
     billing_name: str | None = Field(default=None, max_length=200)
     billing_tax_id: str | None = Field(default=None, max_length=50)
     billing_address: BillingAddress | None = None
     billing_email: EmailStr | None = None
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def validate_name(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        if not all(ch.isalpha() or ch in NAME_PUNCTUATION for ch in value):
+            raise ValueError("may only contain letters, spaces, apostrophes, hyphens and dots")
+        return value
+
+    @field_validator("phone", "email", "notes", mode="before")
+    @classmethod
+    def blank_to_none(cls, value: object) -> object:
+        # Optional fields: an empty value means "not given", so it skips validation.
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not PHONE_DIGITS_RE.match(PHONE_SEPARATORS_RE.sub("", value)):
+            raise ValueError("phone must have 7 to 15 digits, optionally starting with '+'")
+        return value
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_date_of_birth(cls, value: date | None) -> date | None:
+        if value is None:
+            return None
+        today = date.today()
+        if value > today:
+            raise ValueError("date_of_birth cannot be in the future")
+        if value.year < today.year - MAX_PATIENT_AGE_YEARS:
+            raise ValueError(f"date_of_birth cannot be more than {MAX_PATIENT_AGE_YEARS} years ago")
+        return value
 
 
 class PatientUpdate(BaseModel):

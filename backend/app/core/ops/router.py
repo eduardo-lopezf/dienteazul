@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
 from app.config import settings
+from app.core import server_errors
 from app.core.announcements.models import Announcement
 from app.core.auth.models import Clinic, ClinicMembership, TierLimit, User
 from app.core.auth.schemas import _validate_iana_timezone
@@ -56,13 +57,12 @@ from app.core.privacy.tiers import (
     validate_tier_custody,
 )
 from app.core.schemas import ApiResponse
-from app.core.server_errors.models import ServerError
 from app.core.tenancy import TenantContext
 from app.core.tenancy.dependencies import get_tenant
 from app.core.tenancy.usage import BACKUPS_FOLDER
 from app.database import get_db
 
-from . import snapshot
+from . import app_log, snapshot
 from .purge import purge_clinic
 from .usage import ClinicState, cached_measure, clinic_log, clinic_profiles, clinic_states
 
@@ -1195,9 +1195,15 @@ async def delete_announcement(
 
 
 class ServerErrorResponse(BaseModel):
+    """One occurrence, as the panel shows it.
+
+    No ``id``: a line in a log is identified by when it happened and the
+    request it belonged to, and there is nothing to address it by —
+    nothing updates or deletes one on its own.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
     occurred_at: datetime
     method: str
     path: str
@@ -1212,19 +1218,70 @@ class ServerErrorResponse(BaseModel):
 
 @router.get("/errors", response_model=ApiResponse[list[ServerErrorResponse]])
 async def list_server_errors(
-    db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=200, ge=1, le=1000),
 ) -> ApiResponse[list[ServerErrorResponse]]:
     """The requests that ended in a server error, newest first: where each
     failed — route, exception, message without its values, the chain of
-    calls — and the request, clinic and user ids. Kept thirty days."""
-    rows = await db.scalars(
-        select(ServerError).order_by(ServerError.occurred_at.desc()).limit(limit)
+    calls — and the request, clinic and user ids.
+
+    Read from ``<ERROR_LOG_DIR>/errors.log`` and its rotated copies (ADR
+    0059), so how far back this reaches is how much the rotation keeps,
+    and it covers the process that answers — not the other replicas.
+    """
+    return ApiResponse(
+        data=[ServerErrorResponse.model_validate(entry) for entry in server_errors.read(limit)]
     )
-    return ApiResponse(data=[ServerErrorResponse.model_validate(row) for row in rows])
 
 
 @router.delete("/errors", status_code=status.HTTP_204_NO_CONTENT)
-async def clear_server_errors(db: Annotated[AsyncSession, Depends(get_db)]) -> None:
+async def clear_server_errors() -> None:
     """Forget every recorded error — once their causes are fixed."""
-    await db.execute(delete(ServerError))
+    server_errors.clear()
+
+
+class AppLogEntryResponse(BaseModel):
+    """One record of the application log, its message scrubbed."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    at: datetime
+    level: str
+    logger: str
+    request_id: str | None
+    clinic_id: str | None
+    #: With its traceback, when it carried one.
+    message: str
+
+
+class AppLogResponse(BaseModel):
+    #: ``False`` while ``LOG_DIR`` is empty: the process writes to stdout
+    #: alone and there is no file to read.
+    configured: bool
+    entries: list[AppLogEntryResponse]
+
+
+@router.get("/logs", response_model=ApiResponse[AppLogResponse])
+async def read_app_log(
+    limit: int = Query(default=500, ge=1, le=2000),
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] | None = None,
+    q: str | None = Query(default=None, max_length=200),
+) -> ApiResponse[AppLogResponse]:
+    """The application log, newest first: ``<LOG_DIR>/dienteazul.log`` and
+    its rotated copies, a traceback kept with the line that logged it.
+
+    ``level`` keeps that level and above; ``q`` keeps the records whose
+    logger, ids or message contain it. Every line is scrubbed of the
+    values it quoted (ADR 0049 rule 5). Like ``/errors``, it covers the
+    process that answers.
+    """
+    if not settings.LOG_DIR:
+        return ApiResponse(data=AppLogResponse(configured=False, entries=[]))
+    entries = await asyncio.to_thread(
+        app_log.read, Path(settings.LOG_DIR), limit, min_level=level, query=q
+    )
+    return ApiResponse(
+        data=AppLogResponse(
+            configured=True,
+            entries=[AppLogEntryResponse.model_validate(e) for e in entries],
+        )
+    )

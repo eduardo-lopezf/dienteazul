@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +18,9 @@ class InsecureSecretError(RuntimeError):
     example ``.env``.
     """
 
+
+# The levels ``LOG_LEVEL`` accepts, in the order a reader expects.
+_LOG_LEVELS: Final = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 # Minimum for HS256: the key is the whole security of every token.
 # ``openssl rand -hex 32`` yields 64 characters, comfortably over.
@@ -142,6 +145,44 @@ class Settings(BaseSettings):
     # this holds.
     CONTROL_PLANE_SECRET: str = ""
 
+    # Logging
+    #
+    # How much is written. One of DEBUG, INFO, WARNING, ERROR, CRITICAL;
+    # anything else refuses at boot rather than silently logging nothing,
+    # which is the failure mode of a misspelled level.
+    LOG_LEVEL: str = "INFO"
+    # Where a copy of the log is kept. Empty — the default — means the
+    # process only writes to stdout, which is what `docker-compose logs`
+    # and the platform's collector read. Set it to a directory and the
+    # same lines are also appended to ``<LOG_DIR>/dienteazul.log``; the
+    # directory is created if it is missing.
+    #
+    # **One writer per file.** The rotating handler lives in the process,
+    # so with several backends (ADR 0051) each rolls the file over on its
+    # own and they overwrite each other's rollovers. With replicas, give
+    # each one its own LOG_DIR, or leave this empty and let the platform
+    # collect stdout.
+    LOG_DIR: str = ""
+    # Where the requests that ended in a server error are kept, one JSON
+    # line each, for the control panel to read (ADR 0060). Unlike
+    # ``LOG_DIR`` this always writes: it is the panel's only source, so
+    # an empty value would mean an operator with nothing to look at.
+    # ``/var/log`` is the standard place for a service's logs; the image
+    # creates this directory and gives it to the app's user, and
+    # docker-compose mounts it so it outlives the container.
+    ERROR_LOG_DIR: str = "/var/log/dienteazul"
+    # Retention is the rotation: at most this many bytes per file, and
+    # this many rolled files kept beside the live one. It replaced the
+    # thirty-day purge the database table did.
+    ERROR_LOG_MAX_BYTES: int = 5 * 1024 * 1024
+    ERROR_LOG_BACKUP_COUNT: int = 3
+
+    # Rollover threshold for that file, in bytes. 10 MiB.
+    LOG_MAX_BYTES: int = 10 * 1024 * 1024
+    # How many rolled files to keep beside the live one, so the whole set
+    # is bounded at roughly ``LOG_MAX_BYTES * (LOG_BACKUP_COUNT + 1)``.
+    LOG_BACKUP_COUNT: int = 5
+
     # Rate limiting
     LOGIN_RATE_LIMIT: str = "5/minute"
     REGISTER_RATE_LIMIT: str = "3/hour"
@@ -227,6 +268,23 @@ class Settings(BaseSettings):
         if not self.ALLOWED_ORIGINS:
             return []
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def _known_log_level(cls, value: str) -> str:
+        """A level nobody recognises is silence, so say so at boot.
+
+        ``logging.getLevelName`` answers ``"Level WARN"`` for anything it
+        does not know instead of raising, and the root logger ends up at
+        a numeric level that drops everything — a deployment that looks
+        configured and logs nothing.
+        """
+        level = value.strip().upper()
+        if level not in _LOG_LEVELS:
+            raise ValueError(
+                f"LOG_LEVEL={value!r} is not a logging level. Use one of: {', '.join(_LOG_LEVELS)}."
+            )
+        return level
 
     @model_validator(mode="after")
     def _refuse_weak_production_secrets(self) -> "Settings":

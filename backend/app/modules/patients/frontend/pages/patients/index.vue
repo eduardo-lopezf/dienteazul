@@ -183,7 +183,69 @@ onMounted(() => {
   }
 })
 
+// Same rules as ``PatientCreate`` in the backend. Optional fields are
+// only validated when filled in.
+const NAME_RE = /^[\p{L} '.-]+$/u
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_SEPARATORS_RE = /[\s\-().]/g
+const PHONE_DIGITS_RE = /^\+?\d{7,15}$/
+const MAX_PATIENT_AGE_YEARS = 130
+const NOTES_MAX_LENGTH = 5000
+
+type PatientFormField = 'first_name' | 'last_name' | 'phone' | 'email' | 'date_of_birth' | 'notes'
+const formErrors = reactive<Record<PatientFormField, string>>({
+  first_name: '',
+  last_name: '',
+  phone: '',
+  email: '',
+  date_of_birth: '',
+  notes: ''
+})
+
+function validateName(value: string): string {
+  const name = value.trim()
+  if (!name) return t('patients.validation.required')
+  if (name.length > 100) return t('patients.validation.tooLong', { max: 100 })
+  if (!NAME_RE.test(name)) return t('patients.validation.nameInvalid')
+  return ''
+}
+
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function validateForm(): boolean {
+  formErrors.first_name = validateName(newPatient.first_name)
+  formErrors.last_name = validateName(newPatient.last_name)
+
+  const phone = (newPatient.phone || '').trim()
+  formErrors.phone = phone && (phone.length > 20 || !PHONE_DIGITS_RE.test(phone.replace(PHONE_SEPARATORS_RE, '')))
+    ? t('patients.validation.phoneInvalid')
+    : ''
+
+  const email = (newPatient.email || '').trim()
+  formErrors.email = email && !EMAIL_RE.test(email) ? t('patients.validation.emailInvalid') : ''
+
+  const dob = newPatient.date_of_birth || ''
+  const today = new Date()
+  formErrors.date_of_birth = ''
+  if (dob > toIsoDate(today)) {
+    formErrors.date_of_birth = t('patients.validation.dateOfBirthFuture')
+  } else if (dob && Number(dob.slice(0, 4)) < today.getFullYear() - MAX_PATIENT_AGE_YEARS) {
+    formErrors.date_of_birth = t('patients.validation.dateOfBirthTooOld', { years: MAX_PATIENT_AGE_YEARS })
+  }
+
+  formErrors.notes = (newPatient.notes || '').length > NOTES_MAX_LENGTH
+    ? t('patients.validation.tooLong', { max: NOTES_MAX_LENGTH })
+    : ''
+
+  return Object.values(formErrors).every(error => !error)
+}
+
 function resetForm() {
+  Object.keys(formErrors).forEach((key) => {
+    formErrors[key as PatientFormField] = ''
+  })
   Object.assign(newPatient, {
     first_name: '',
     last_name: '',
@@ -195,13 +257,14 @@ function resetForm() {
 }
 
 async function createPatient() {
+  if (!validateForm()) return
   isSubmitting.value = true
   try {
     const response = await api.post<ApiResponse<Patient>>('/api/v1/patients', {
-      first_name: newPatient.first_name,
-      last_name: newPatient.last_name,
-      phone: newPatient.phone || null,
-      email: newPatient.email || null,
+      first_name: newPatient.first_name.trim(),
+      last_name: newPatient.last_name.trim(),
+      phone: newPatient.phone?.trim() || null,
+      email: newPatient.email?.trim() || null,
       date_of_birth: newPatient.date_of_birth || null,
       notes: newPatient.notes || null
     })
@@ -428,6 +491,7 @@ function patientCity(p: Patient): string {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <UFormField
               :label="t('patients.firstName')"
+              :error="formErrors.first_name || undefined"
               required
             >
               <UInput
@@ -438,6 +502,7 @@ function patientCity(p: Patient): string {
             </UFormField>
             <UFormField
               :label="t('patients.lastName')"
+              :error="formErrors.last_name || undefined"
               required
             >
               <UInput
@@ -449,14 +514,20 @@ function patientCity(p: Patient): string {
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <UFormField :label="t('patients.phone')">
+            <UFormField
+              :label="t('patients.phone')"
+              :error="formErrors.phone || undefined"
+            >
               <UInput
                 v-model="newPatient.phone"
                 :placeholder="t('patients.phone')"
                 type="tel"
               />
             </UFormField>
-            <UFormField :label="t('patients.email')">
+            <UFormField
+              :label="t('patients.email')"
+              :error="formErrors.email || undefined"
+            >
               <UInput
                 v-model="newPatient.email"
                 :placeholder="t('patients.email')"
@@ -465,14 +536,20 @@ function patientCity(p: Patient): string {
             </UFormField>
           </div>
 
-          <UFormField :label="t('patients.dateOfBirth')">
+          <UFormField
+            :label="t('patients.dateOfBirth')"
+            :error="formErrors.date_of_birth || undefined"
+          >
             <UInput
               v-model="newPatient.date_of_birth"
               type="date"
             />
           </UFormField>
 
-          <UFormField :label="t('patients.notes')">
+          <UFormField
+            :label="t('patients.notes')"
+            :error="formErrors.notes || undefined"
+          >
             <UTextarea
               v-model="newPatient.notes"
               :placeholder="t('patients.notes')"

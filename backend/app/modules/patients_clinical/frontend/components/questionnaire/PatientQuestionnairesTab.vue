@@ -19,7 +19,14 @@ const canWrite = computed(() => can(PERMISSIONS.medicalHistory.write))
 const items = ref<HealthQuestionnaire[]>([])
 const loading = ref(true)
 const formOpen = ref(false)
-const expanded = ref<string | null>(null)
+/** The saved questionnaire open read-only, if any. */
+const viewed = ref<HealthQuestionnaire | null>(null)
+const viewOpen = ref(false)
+
+function view(item: HealthQuestionnaire) {
+  viewed.value = item
+  viewOpen.value = true
+}
 
 async function load() {
   loading.value = true
@@ -42,11 +49,6 @@ function when(item: HealthQuestionnaire): string {
 
 function positives(item: HealthQuestionnaire): string[] {
   return questionsOf(item.form_kind).filter(key => item.answers[key]?.answer)
-}
-
-/** The questions a questionnaire answered, in its own form's order. */
-function asked(item: HealthQuestionnaire): string[] {
-  return questionsOf(item.form_kind).filter(key => item.answers[key])
 }
 
 function summary(item: HealthQuestionnaire): string {
@@ -207,7 +209,8 @@ async function retract(item: HealthQuestionnaire) {
               variant="ghost"
               color="neutral"
               icon="i-lucide-eye"
-              @click="expanded = expanded === item.id ? null : item.id"
+              data-testid="questionnaire-view-open"
+              @click="view(item)"
             >
               {{ t('healthQuestionnaire.view') }}
             </UButton>
@@ -223,97 +226,6 @@ async function retract(item: HealthQuestionnaire) {
             </UButton>
           </div>
         </div>
-
-        <div
-          v-if="expanded === item.id"
-          class="mt-3 space-y-2 text-sm rounded-md border border-default p-3"
-        >
-          <!-- Who signed it, and under what. -->
-          <div
-            v-if="item.signed_at"
-            class="flex items-end gap-4 flex-wrap border-b border-default pb-2"
-            data-testid="questionnaire-signature-shown"
-          >
-            <img
-              v-if="item.signature_data?.png"
-              :src="item.signature_data.png"
-              :alt="t('healthQuestionnaire.sign.title')"
-              class="h-16 rounded border border-default bg-white"
-            >
-            <p class="text-muted">
-              {{ t('healthQuestionnaire.sign.signedBy', {
-                name: item.signed_by_name,
-                capacity: t(`healthQuestionnaire.sign.capacities.${item.signer_capacity ?? 'patient'}`)
-              }) }}
-            </p>
-          </div>
-          <p
-            v-if="item.regulation"
-            class="text-caption text-subtle"
-          >
-            {{ t('regulation.label') }}: {{ item.regulation }}
-          </p>
-          <p
-            v-if="item.blood_type || item.declared_allergies"
-            class="text-muted"
-          >
-            <span v-if="item.blood_type">{{ t('healthQuestionnaire.bloodType') }}: {{ item.blood_type }}</span>
-            <span v-if="item.declared_allergies"> · {{ t('healthQuestionnaire.allergies') }}: {{ item.declared_allergies }}</span>
-          </p>
-          <dl
-            v-if="Object.keys(item.form_data ?? {}).length"
-            class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5"
-            data-testid="questionnaire-form-data"
-          >
-            <div
-              v-for="(value, key) in item.form_data"
-              :key="key"
-              class="flex gap-1"
-            >
-              <dt class="text-muted">
-                {{ t(`healthQuestionnaire.pediatric.fields.${key}`) }}:
-              </dt>
-              <dd class="text-default">
-                {{ value }}
-              </dd>
-            </div>
-          </dl>
-          <ul class="space-y-1">
-            <li
-              v-for="key in asked(item)"
-              :key="key"
-              class="flex gap-2"
-            >
-              <UBadge
-                :color="item.answers[key]!.answer ? 'warning' : 'neutral'"
-                variant="subtle"
-                size="xs"
-              >
-                {{ item.answers[key]!.answer ? t('common.yes') : t('common.no') }}
-              </UBadge>
-              <span class="text-muted">
-                {{ t(`healthQuestionnaire.questions.${key}`) }}
-                <span
-                  v-if="item.answers[key]!.detail"
-                  class="text-default"
-                >— {{ item.answers[key]!.detail }}</span>
-              </span>
-            </li>
-          </ul>
-          <p
-            v-if="item.conditions.length"
-            class="text-default"
-          >
-            {{ item.conditions.map(key => t(`healthQuestionnaire.conditions.${key}`)).join(', ') }}
-            <span v-if="item.drugs_detail">({{ item.drugs_detail }})</span>
-          </p>
-          <p
-            v-if="item.other_conditions"
-            class="text-muted"
-          >
-            {{ item.other_conditions }}
-          </p>
-        </div>
       </li>
     </ul>
 
@@ -323,6 +235,11 @@ async function retract(item: HealthQuestionnaire) {
       :patient-name="`${ctx.patient.first_name} ${ctx.patient.last_name}`.trim()"
       :patient-birth-date="ctx.patient.date_of_birth"
       @saved="load"
+    />
+    <HealthQuestionnaireModal
+      v-model:open="viewOpen"
+      :patient-id="ctx.patient.id"
+      :questionnaire="viewed"
     />
   </UCard>
 </template>

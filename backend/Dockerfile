@@ -66,10 +66,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python -m pip uninstall -y pip setuptools wheel
 
-# Non-root user, owning /app and the storage directory a volume mounts on.
+# Non-root user, owning /app and the directories a volume mounts on:
+# storage for patient files, and /var/log/dienteazul for the server-error
+# log the control panel reads (ADR 0060). The app runs as appuser and
+# /var/log is root's, so the directory has to exist and be given away
+# here — created at runtime it would fail, and the panel would have
+# nothing to show.
 RUN useradd -m -u 1000 appuser \
-    && mkdir -p /app/storage \
-    && chown appuser:appuser /app /app/storage
+    && mkdir -p /app/storage /var/log/dienteazul \
+    && chown appuser:appuser /app /app/storage /var/log/dienteazul
 
 # ---------------------------------------------------------------------------
 # runtime — the same filesystem as one layer.

@@ -2,51 +2,18 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Final
 
 from fastapi import status
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.core.errors import AppError, ErrorCategory
+from app.core.errors import AppError, ErrorDefinition, error_raiser, load_error_catalog
 
-ERRORS_FILE: Final[Path] = Path(__file__).with_name("errors.json")
+ERROR_CATALOG: Final[dict[str, ErrorDefinition]] = load_error_catalog(__file__)
 
+_raise_for = error_raiser(ERROR_CATALOG)
 
-class ErrorDefinition(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    code: str = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
-    category: ErrorCategory
-    status_code: int = Field(ge=400, lt=600)
-    message: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-
-
-class ErrorCatalog(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: int = Field(ge=1)
-    errors: list[ErrorDefinition]
-
-    @model_validator(mode="after")
-    def _unique_codes(self) -> ErrorCatalog:
-        codes = [error.code for error in self.errors]
-        if len(codes) != len(set(codes)):
-            raise ValueError("error codes must be unique")
-        return self
-
-
-def _load_catalog() -> dict[str, ErrorDefinition]:
-    data = json.loads(ERRORS_FILE.read_text(encoding="utf-8"))
-    catalog = ErrorCatalog.model_validate(data)
-    return {error.code: error for error in catalog.errors}
-
-
-# Fail at startup if the module's error contract is malformed.
-ERROR_CATALOG: Final[dict[str, ErrorDefinition]] = _load_catalog()
-
+# Named codes, so a route reads ``not_found(DOCUMENT_NOT_FOUND, ...)``
+# rather than a dotted string. Media is the only module that does this.
 DOCUMENT_NOT_FOUND: Final[str] = "media.document.not_found"
 ATTACHMENT_NOT_FOUND: Final[str] = "media.attachment.not_found"
 PATIENT_NOT_FOUND: Final[str] = "media.patient.not_found"
@@ -61,15 +28,18 @@ ATTACHMENT_OWNER_TYPE_INVALID: Final[str] = "media.attachment.owner_type_invalid
 
 
 def media_error(code: str, *, status_code: int, detail: str) -> AppError:
+    """Raise a declared case, with the caller stating the status it expects.
+
+    Unlike every other module's raiser this one takes ``status_code``
+    and refuses when it disagrees with the catalogue. It is a guard
+    against the two drifting while ``not_found`` and ``invalid`` below
+    hard-code one: the helper's name would keep promising a 404 after
+    the catalogue had moved the case to a 409.
+    """
     definition = ERROR_CATALOG[code]
     if status_code != definition.status_code:
         raise ValueError(f"status mismatch for {code}: {status_code} != {definition.status_code}")
-    return AppError(
-        definition.code,
-        status_code=definition.status_code,
-        detail=detail,
-        category=definition.category,
-    )
+    return _raise_for(code, detail=detail)
 
 
 def not_found(code: str, detail: str) -> AppError:

@@ -24,6 +24,8 @@ import contextlib
 import logging
 from collections.abc import Iterator
 from contextvars import ContextVar, Token
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from uuid import UUID, uuid4
 
 _UNBOUND = "-"
@@ -105,9 +107,32 @@ _DEFAULT_FORMAT = (
 )
 
 
-def setup_logging(level: int | str = logging.INFO) -> None:
+#: The one file a ``log_dir`` holds. Fixed on purpose: the directory is
+#: the configurable part, and a second name would only mean a second
+#: place to look.
+LOG_FILE_NAME = "dienteazul.log"
+
+
+def setup_logging(
+    level: int | str = logging.INFO,
+    *,
+    log_dir: str | Path | None = None,
+    max_bytes: int = 10 * 1024 * 1024,
+    backup_count: int = 5,
+) -> None:
     """Attach the context filter to the root logger and set a format
     string that surfaces the bound fields. Idempotent.
+
+    With ``log_dir`` the same lines are also appended to a rotating file
+    inside it, created if missing. Without it — the default — the
+    process writes to stdout alone, which is what a container's
+    collector reads. The file never replaces stdout: losing
+    ``docker-compose logs`` to gain a file is not a trade anybody asked
+    for.
+
+    The rotating handler rolls the file over from *this* process, so a
+    directory shared by several backends (ADR 0051) has them rolling
+    over on top of each other. One writer per directory.
     """
     root = logging.getLogger()
     root.setLevel(level)
@@ -130,3 +155,45 @@ def setup_logging(level: int | str = logging.INFO) -> None:
         handler.setFormatter(formatter)
         handler.addFilter(filt)
         root.addHandler(handler)
+
+    if log_dir:
+        _attach_file_handler(root, Path(log_dir), formatter, filt, max_bytes, backup_count)
+
+
+def _attach_file_handler(
+    root: logging.Logger,
+    directory: Path,
+    formatter: logging.Formatter,
+    filt: LogContextFilter,
+    max_bytes: int,
+    backup_count: int,
+) -> None:
+    """Append to ``<directory>/dienteazul.log``, rolled by size.
+
+    A directory that cannot be created or written to logs the reason to
+    stdout and leaves the process running: the backend's job is seeing
+    patients, and refusing to boot over a log file would turn an
+    operator's typo into an outage.
+    """
+    target = directory / LOG_FILE_NAME
+    existing = [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
+    if any(Path(h.baseFilename) == target.resolve() for h in existing):
+        return  # Idempotent: a reload must not stack handlers on one file.
+
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        handler = RotatingFileHandler(
+            target,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        logging.getLogger(__name__).warning(
+            "LOG_DIR=%s is not writable (%s), logging to stdout only", directory, exc
+        )
+        return
+
+    handler.setFormatter(formatter)
+    handler.addFilter(filt)
+    root.addHandler(handler)

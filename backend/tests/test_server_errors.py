@@ -1,10 +1,15 @@
 """Server errors are kept for the operator (``app.core.server_errors``) and
 read by the control panel at ``/api/v1/ops/errors``: where each failed,
-never the values it was working on."""
+never the values it was working on.
+
+They are JSON lines in ``<ERROR_LOG_DIR>/errors.log`` since ADR 0060, so
+each test points that setting at a directory of its own — a file, unlike
+a transaction, does not roll back between tests."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Annotated
 
 import pytest
@@ -12,6 +17,7 @@ from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 
 from app.config import settings
+from app.core import server_errors
 from app.core.auth.dependencies import ClinicContext, get_clinic_context
 from app.core.auth.models import Clinic
 from app.core.server_errors import scrub
@@ -25,6 +31,15 @@ BROKEN = "/api/v1/__test__/broken/{item_id}"
 @pytest.fixture
 def ops_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "CONTROL_PLANE_SECRET", SECRET)
+
+
+@pytest.fixture(autouse=True)
+def error_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Point the recorder at this test's own directory."""
+    monkeypatch.setattr(settings, "ERROR_LOG_DIR", str(tmp_path))
+    server_errors.reset_writer()
+    yield tmp_path
+    server_errors.reset_writer()
 
 
 @pytest.fixture

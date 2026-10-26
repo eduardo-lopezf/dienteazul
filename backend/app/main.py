@@ -107,7 +107,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Logging: attach the context filter early so every line emitted
     # during startup / module install also carries the bound fields
     # (defaults to ``-`` outside a request).
-    setup_logging()
+    setup_logging(
+        settings.LOG_LEVEL,
+        log_dir=settings.LOG_DIR or None,
+        max_bytes=settings.LOG_MAX_BYTES,
+        backup_count=settings.LOG_BACKUP_COUNT,
+    )
 
     # Startup.
     #
@@ -433,7 +438,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     logger.exception("Unhandled exception", exc_info=exc)
     # Kept for the operator's panel: where it failed, never what with.
     route = request.scope.get("route")
-    await record_server_error(
+    record_server_error(
         exc,
         method=request.method,
         path=getattr(route, "path", None) or request.url.path,

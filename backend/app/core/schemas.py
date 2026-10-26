@@ -35,7 +35,7 @@ class ErrorResponse(BaseModel):
       Absent when nothing claimed the failure, e.g. a bare
       ``HTTPException``.
     - ``reference`` — this request's id. The same string prefixes every
-      log line it produced and keys its row in ``ServerError``, so a
+      log line it produced and names its line in the server-error log, so a
       person who reads it out leads the operator straight to the cause.
     """
 

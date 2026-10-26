@@ -496,6 +496,15 @@
       "remove": "Remove guardian",
       "required": "Required for patients under 18",
       "title": "Legal guardian"
+    },
+    "validation": {
+      "required": "This field is required",
+      "tooLong": "Maximum {max} characters",
+      "nameInvalid": "Only letters, spaces, apostrophes, hyphens and dots are allowed",
+      "phoneInvalid": "Enter a valid phone number (7 to 15 digits, optionally with a + prefix)",
+      "emailInvalid": "Enter a valid email",
+      "dateOfBirthFuture": "Date of birth cannot be in the future",
+      "dateOfBirthTooOld": "Date of birth cannot be more than {years} years ago"
     }
   },
   "patientDetail": {
@@ -617,6 +626,12 @@
       "lockedHint": "Charted from a catalog treatment or a plan: remove it from the treatment list",
       "eruption": "Eruption…",
       "accept": "Accept",
+      "undo": "Undo",
+      "redo": "Redo",
+      "clear": "Clear",
+      "undoHint": "Undo the last change (Ctrl+Z)",
+      "redoHint": "Redo the undone change (Ctrl+Shift+Z)",
+      "clearHint": "Drop every unsaved change: the card as it opened",
       "pending": "1 unsaved change | {count} unsaved changes",
       "saved": "Diagnosis saved",
       "saveFailed": "Could not save the tooth condition"
