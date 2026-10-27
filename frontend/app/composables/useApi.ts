@@ -92,6 +92,9 @@ export function useApi() {
         name?: string
         statusCode?: number
         data?: ErrorEnvelope
+        // What `ofetch` wraps: a request that ran out of patience arrives
+        // as a `FetchError` whose cause is the `TimeoutError`.
+        cause?: { name?: string }
         response?: { headers?: { get(name: string): string | null } }
       }
 
@@ -202,11 +205,22 @@ export function useApi() {
         throw error
       }
 
-      // Network error
+      // Nothing came back: either the request never got an answer, or it
+      // ran out of the patience set above. Those are different facts and
+      // the difference matters most on a write — a request that timed out
+      // may well have been delivered and applied, and "Error de conexión"
+      // tells the user the opposite. `ofetch` reports the timeout as a
+      // `FetchError` (never `AbortError`, so the cancellation branch above
+      // does not catch it) with no `statusCode`, which is how every slow
+      // write came to be reported as a connection failure.
       if (!fetchError.statusCode) {
+        const timedOut = fetchError.cause?.name === 'TimeoutError'
+        const writing = method !== undefined && method !== 'GET'
         toast.add({
           title: t('common.error'),
-          description: t('common.networkError'),
+          description: timedOut
+            ? t(writing ? 'common.timeoutWrite' : 'common.timeoutError')
+            : t('common.networkError'),
           color: 'error'
         })
       }

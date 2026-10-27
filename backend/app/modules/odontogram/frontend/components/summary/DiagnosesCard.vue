@@ -56,7 +56,10 @@ const href = computed(
 )
 
 function formatClinicalType(key: string): string {
-  return t(`odontogram.treatmentTypes.${key}`, key.replace(/_/g, ' '))
+  // `odontogram.treatments.types` is where the 63 clinical-type labels live.
+  // The old `odontogram.treatmentTypes` namespace does not exist, so every
+  // diagnosis fell through to the humanized key and warned about it.
+  return t(`odontogram.treatments.types.${key}`, key.replace(/_/g, ' '))
 }
 </script>
 

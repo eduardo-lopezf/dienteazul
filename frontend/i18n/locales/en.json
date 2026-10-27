@@ -2129,6 +2129,8 @@
     "required": "This field is required",
     "invalidEmail": "Invalid email",
     "networkError": "Connection error",
+    "timeoutError": "The server took too long to answer",
+    "timeoutWrite": "The server took too long to answer. The change may have been saved: reload the page before trying again",
     "serverError": "Server error. If it happens again, give this reference to support",
     "notFound": "Not found",
     "offline": "Offline — data may not be up to date",

@@ -2130,6 +2130,8 @@
     "required": "Este campo es requerido",
     "invalidEmail": "Email inválido",
     "networkError": "Error de conexión",
+    "timeoutError": "El servidor tardó demasiado en responder",
+    "timeoutWrite": "El servidor tardó demasiado en responder. El cambio puede haberse guardado: recarga la página antes de reintentar",
     "serverError": "Error del servidor. Si vuelve a ocurrir, pasa esta referencia a soporte",
     "notFound": "No encontrado",
     "offline": "Sin conexión — datos pueden no estar actualizados",

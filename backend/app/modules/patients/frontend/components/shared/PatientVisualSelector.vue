@@ -61,6 +61,59 @@ const canSubmit = computed(
   () => form.first_name.trim().length > 0 && form.last_name.trim().length > 0 && !isSubmitting.value
 )
 
+// Same rules as ``PatientCreate`` in the backend, so this form says what
+// is wrong where it can be fixed. The full patient form already does
+// (`patients/pages/patients/index.vue`); here every refusal used to come
+// out as one line reading "no se pudo crear el paciente", which is how a
+// last name with digits in it reached the user as a nameless failure.
+const NAME_RE = /^[\p{L} '.-]+$/u
+const PHONE_SEPARATORS_RE = /[\s\-().]/g
+const PHONE_DIGITS_RE = /^\+?\d{7,15}$/
+
+type CreateField = 'first_name' | 'last_name' | 'phone'
+const fieldErrors = reactive<Record<CreateField, string>>({
+  first_name: '',
+  last_name: '',
+  phone: ''
+})
+
+function nameError(value: string): string {
+  const name = value.trim()
+  if (!name) return t('patients.validation.required')
+  if (name.length > 100) return t('patients.validation.tooLong', { max: 100 })
+  if (!NAME_RE.test(name)) return t('patients.validation.nameInvalid')
+  return ''
+}
+
+function phoneError(value: string): string {
+  const phone = value.trim()
+  if (!phone) return ''
+  if (phone.length > 20 || !PHONE_DIGITS_RE.test(phone.replace(PHONE_SEPARATORS_RE, ''))) {
+    return t('patients.validation.phoneInvalid')
+  }
+  return ''
+}
+
+/** The rule for one field. Never empty: a 422 named it, so it is broken. */
+function ruleFor(field: CreateField): string {
+  if (field === 'phone') return phoneError(form.phone) || t('patients.validation.phoneInvalid')
+  return nameError(form[field]) || t('patients.validation.nameInvalid')
+}
+
+function clearFieldErrors() {
+  fieldErrors.first_name = ''
+  fieldErrors.last_name = ''
+  fieldErrors.phone = ''
+}
+
+/** Fill `fieldErrors`; true when there is nothing left to fix. */
+function validateForm(): boolean {
+  fieldErrors.first_name = nameError(form.first_name)
+  fieldErrors.last_name = nameError(form.last_name)
+  fieldErrors.phone = phoneError(form.phone)
+  return Object.values(fieldErrors).every(error => !error)
+}
+
 const duplicateName = computed(() => {
   const p = duplicateMatch.value
   if (!p) return ''
@@ -135,6 +188,7 @@ function enterCreateMode(query: string) {
   form.phone = ''
   createError.value = null
   duplicateMatch.value = null
+  clearFieldErrors()
   // The create form is `v-else` of the search branch, so switching mode
   // mounts it — and `autofocus` on the first field puts the cursor there.
   // It used to be `nextTick(() => firstNameRef.value?.focus())`, with the
@@ -149,6 +203,7 @@ function cancelCreate() {
   mode.value = 'search'
   createError.value = null
   duplicateMatch.value = null
+  clearFieldErrors()
   if (dupLookupTimer) clearTimeout(dupLookupTimer)
   dupLookupCtrl?.abort()
 }
@@ -197,6 +252,7 @@ function useExisting() {
 
 async function submitCreate() {
   if (!canSubmit.value) return
+  if (!validateForm()) return
   isSubmitting.value = true
   createError.value = null
   createCtrl?.abort()
@@ -223,6 +279,17 @@ async function submitCreate() {
     mode.value = 'search'
   } catch (err) {
     if ((err as { name?: string })?.name === 'AbortError') return
+    // A refused payload names the fields it refused, in the error
+    // envelope's `fields` (`app/core/errors.py`). Its text is the
+    // backend's own English prose, so what goes under the field is this
+    // form's rule for it; the generic line is left for a failure that
+    // names nothing — a conflict, a 500, a network that never answered.
+    const refused = (err as { failure?: { fields?: Record<string, string> } }).failure?.fields ?? {}
+    const named = Object.keys(refused).filter((field): field is CreateField => field in fieldErrors)
+    if (named.length > 0) {
+      for (const field of named) fieldErrors[field] = ruleFor(field)
+      return
+    }
     createError.value = t('patientSelector.createForm.errorGeneric')
   } finally {
     if (createCtrl === ctrl) createCtrl = null
@@ -354,6 +421,7 @@ async function submitCreate() {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <UFormField
           :label="t('patientSelector.createForm.firstName')"
+          :error="fieldErrors.first_name || undefined"
           required
         >
           <UInput
@@ -366,6 +434,7 @@ async function submitCreate() {
         </UFormField>
         <UFormField
           :label="t('patientSelector.createForm.lastName')"
+          :error="fieldErrors.last_name || undefined"
           required
         >
           <UInput
@@ -380,6 +449,7 @@ async function submitCreate() {
       <UFormField
         :label="t('patientSelector.createForm.phone')"
         :description="t('patientSelector.createForm.phoneHint')"
+        :error="fieldErrors.phone || undefined"
       >
         <UInput
           v-model="form.phone"

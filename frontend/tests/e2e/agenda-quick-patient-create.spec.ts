@@ -46,7 +46,13 @@ test.describe('agenda — quick patient create', () => {
 
     // Type a name that is unique enough to not collide with seed data
     // even when this spec runs multiple times against the same DB.
-    const suffix = Date.now().toString().slice(-6)
+    //
+    // Letters, not digits: `PatientCreate.validate_name` accepts only
+    // letters, spaces, apostrophes, hyphens and dots, so a numeric suffix
+    // made the POST a 422 and the selected card never arrived. The phone
+    // keeps the digits — it needs them.
+    const digits = Date.now().toString().slice(-6)
+    const suffix = digits.replace(/\d/g, d => String.fromCharCode(97 + Number(d)))
     const firstName = 'Quickcreate'
     const lastName = `Test ${suffix}`
     const fullName = `${firstName} ${lastName}`
@@ -72,7 +78,7 @@ test.describe('agenda — quick patient create', () => {
     // Optional phone — exercise it so we cover the POST payload branch
     // that includes a phone number.
     const phoneField = createForm.getByLabel(/Teléfono|Phone/i)
-    await phoneField.fill(`+34 600 ${suffix}`)
+    await phoneField.fill(`+34 600 ${digits}`)
 
     // Submit — the button is disabled until both names are non-empty,
     // which is already the case (pre-filled).
@@ -97,6 +103,39 @@ test.describe('agenda — quick patient create', () => {
     const body = (await res.json()) as { data: Array<{ first_name: string, last_name: string }> }
     const match = body.data.find(p => p.first_name === firstName && p.last_name === lastName)
     expect(match, `expected patient ${fullName} to be persisted`).toBeDefined()
+  })
+
+  test('a refused name is reported under the field, not as a bare failure', async ({ loggedIn }) => {
+    // `PatientCreate` accepts letters, spaces, apostrophes, hyphens and
+    // dots. A refusal names its field in the error envelope, and the form
+    // has to put it there: the whole modal used to answer a 422 with one
+    // line reading "no se pudo crear el paciente", with nothing saying
+    // which field or why.
+    await loggedIn.goto('/appointments')
+    await loggedIn.waitForLoadState('networkidle')
+
+    await loggedIn.getByRole('button', { name: /Nueva cita|New appointment/i }).first().click()
+    const searchInput = loggedIn.locator('input[data-testid="visual-selector-input"]').first()
+    await expect(searchInput).toBeVisible({ timeout: 10_000 })
+    await searchInput.fill('Quickcreate Rejected')
+
+    const createRow = loggedIn.locator('[data-testid="patient-selector-create-row"]')
+    await expect(createRow).toBeVisible({ timeout: 5_000 })
+    await createRow.click()
+
+    const createForm = loggedIn.locator('[data-testid="patient-selector-create-form"]')
+    await expect(createForm).toBeVisible()
+    await createForm.getByLabel(/Apellidos|Last name/i).fill('Rejected 42')
+    await createForm.locator('[data-testid="patient-selector-create-submit"]').click()
+
+    // The rule for that field, where it can be fixed.
+    await expect(
+      createForm.getByText(/apóstrofos|apostrophes/i).first()
+    ).toBeVisible({ timeout: 5_000 })
+    // And not the one line that said nothing.
+    await expect(createForm.getByText(/No se pudo crear|Could not create/i)).toHaveCount(0)
+    // Nothing was created under a name the backend refuses.
+    await expect(loggedIn.getByText('Rejected 42, Quickcreate')).toHaveCount(0)
   })
 
   test('the "+ Crear" row is hidden for a role without patients.write', async ({ page }) => {

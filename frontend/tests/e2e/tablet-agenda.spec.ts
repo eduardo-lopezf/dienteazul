@@ -135,7 +135,11 @@ test.describe('agenda by touch', () => {
 
     const box = (await block.boundingBox())!
     const x = box.x + box.width / 2
-    const y = box.y + box.height / 2
+    // Near the top edge, not the centre: the bottom of a selected block is
+    // the resize handle, and on a thirty-minute block the centre sits 8 px
+    // above it. CI lost that margin to a reflow and the gesture resized
+    // instead — a write of `end_time` alone, which is what this asserted on.
+    const y = box.y + Math.min(8, box.height / 4)
     await page.mouse.move(x, y)
     await page.mouse.down()
     await page.mouse.move(x, y + 30, { steps: 5 })

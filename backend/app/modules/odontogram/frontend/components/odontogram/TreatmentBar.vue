@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { Arch, OdontogramTreatment, Treatment, TreatmentStatus, TreatmentPlan } from '~~/app/types'
 import { TREATMENT_ICONS, isSurfaceTreatment, resolveTreatmentIconKey } from './TreatmentIcons'
 import {
@@ -510,6 +511,27 @@ function selectPlan(planId: string | null) {
 function handleCreatePlan() {
   emit('createPlan')
 }
+
+// Nuxt UI v4 drives the menu from an `items` prop. The `<UDropdownMenuItem>`
+// children this used to be written with resolve to nothing: Vue warned once
+// per child on every render of the bar, and the menu opened empty — so
+// neither picking a plan nor"Crear plan nuevo" was reachable from here.
+// Same shape as `AppointmentModal`'s email menu: a list per group, and the
+// separator comes from the grouping.
+const planMenuItems = computed<DropdownMenuItem[][]>(() => [
+  planOptions.value.map(option => ({
+    label: option.label,
+    icon: option.icon,
+    class: option.isActive ? 'font-medium' : undefined,
+    trailingIcon: props.selectedPlanId === option.value ? 'i-lucide-check' : undefined,
+    onSelect: () => selectPlan(option.value)
+  })),
+  [{
+    label: t('odontogram.createNewPlan'),
+    icon: 'i-lucide-plus',
+    onSelect: () => handleCreatePlan()
+  }]
+])
 </script>
 
 <template>
@@ -579,7 +601,7 @@ function handleCreatePlan() {
           class="plan-selector"
         >
           <span class="plan-selector-label">{{ t('odontogram.addToPlan') }}:</span>
-          <UDropdownMenu>
+          <UDropdownMenu :items="planMenuItems">
             <UButton
               variant="soft"
               color="neutral"
@@ -594,42 +616,6 @@ function handleCreatePlan() {
               />
               <span class="truncate max-w-[120px]">{{ selectedPlanLabel }}</span>
             </UButton>
-            <template #content>
-              <UDropdownMenuGroup>
-                <UDropdownMenuItem
-                  v-for="option in planOptions"
-                  :key="option.value ?? 'no-plan'"
-                  @click="selectPlan(option.value)"
-                >
-                  <template #leading>
-                    <UIcon
-                      v-if="option.icon"
-                      :name="option.icon"
-                      class="w-4 h-4"
-                      :class="option.isActive ? 'text-warning-accent' : 'text-subtle'"
-                    />
-                  </template>
-                  <span :class="option.isActive ? 'font-medium' : ''">{{ option.label }}</span>
-                  <template #trailing>
-                    <UIcon
-                      v-if="selectedPlanId === option.value"
-                      name="i-lucide-check"
-                      class="w-4 h-4 text-primary-accent"
-                    />
-                  </template>
-                </UDropdownMenuItem>
-              </UDropdownMenuGroup>
-              <UDropdownMenuSeparator />
-              <UDropdownMenuItem @click="handleCreatePlan">
-                <template #leading>
-                  <UIcon
-                    name="i-lucide-plus"
-                    class="w-4 h-4 text-primary-accent"
-                  />
-                </template>
-                <span class="text-primary-accent">{{ t('odontogram.createNewPlan') }}</span>
-              </UDropdownMenuItem>
-            </template>
           </UDropdownMenu>
         </div>
       </Transition>
@@ -695,7 +681,7 @@ function handleCreatePlan() {
         </template>
         <template v-else>
           <UIcon
-            name="i-lucide-hand-pointer"
+            name="i-lucide-pointer"
             class="w-4 h-4"
           />
           <span>{{ t('odontogram.instructions.selectTreatment') }}</span>

@@ -724,12 +724,15 @@ const allAppointmentsWithDayIndex = computed(() => {
                        for a finger, so a selected block grows it to 20 px
                        and paints it — by then the block has been
                        deliberately picked, and the grab bar is the only
-                       affordance that needs to be reachable. -->
+                       affordance that needs to be reachable.
+                       Capped at 40 % of the block: 20 px of a 36 px block is
+                       nearly all of it, centre included, and a selected
+                       quarter-hour could then only be resized, never moved. -->
                   <div
                     class="absolute bottom-0 left-0 right-0 cursor-ns-resize transition-colors"
                     :class="selectedId === appointment.id
-                      ? 'h-5 bg-primary-500/20'
-                      : 'h-2 hover:bg-black/10 dark:hover:bg-white/10'"
+                      ? 'h-5 max-h-[40%] bg-primary-500/20'
+                      : 'h-2 max-h-[40%] hover:bg-black/10 dark:hover:bg-white/10'"
                     @pointerdown.stop="startAppointmentDrag('resize', appointment, $event)"
                   >
                     <div

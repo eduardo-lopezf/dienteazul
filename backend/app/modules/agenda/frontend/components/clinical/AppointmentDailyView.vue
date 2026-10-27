@@ -607,12 +607,14 @@ const appointmentsByProfIndex = computed(() => {
 
                   <!-- Resize handle. See AppointmentCalendar: 8 px works
                        for a mouse, so a selected block grows it to 20 px
-                       and paints it for the finger that picked it. -->
+                       and paints it for the finger that picked it, capped
+                       at 40 % of the block so a short one keeps a body to
+                       drag. -->
                   <div
                     class="absolute bottom-0 left-0 right-0 cursor-ns-resize transition-colors"
                     :class="selectedId === appointment.id
-                      ? 'h-5 bg-primary-500/20'
-                      : 'h-2 hover:bg-black/10 dark:hover:bg-white/10'"
+                      ? 'h-5 max-h-[40%] bg-primary-500/20'
+                      : 'h-2 max-h-[40%] hover:bg-black/10 dark:hover:bg-white/10'"
                     @pointerdown.stop="startAppointmentDrag('resize', appointment, $event)"
                   >
                     <div
