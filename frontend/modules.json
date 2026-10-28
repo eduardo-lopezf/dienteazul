@@ -22,6 +22,7 @@
     "/module_layers/reports/frontend",
     "/module_layers/schedules/frontend",
     "/module_layers/treatment_plan/frontend",
+    "/module_layers/calendar_feed/frontend",
     "/module_layers/clinical_notes/frontend",
     "/module_layers/periodontogram/frontend"
   ],
@@ -113,6 +114,10 @@
     {
       "name": "treatment_plan",
       "path": "/module_layers/treatment_plan/frontend"
+    },
+    {
+      "name": "calendar_feed",
+      "path": "/module_layers/calendar_feed/frontend"
     },
     {
       "name": "clinical_notes",

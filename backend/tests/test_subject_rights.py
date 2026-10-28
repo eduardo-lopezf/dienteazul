@@ -288,6 +288,12 @@ class TestCoverage:
     # `payments`, which contributes for both modules.
     SILENT_BY_DESIGN = {
         "accounting_export",
+        # One row per staff account that subscribed a calendar client:
+        # clinic, user, token, last access. No patient column and no
+        # appointment copy — the feed renders what the agenda holds at
+        # the moment it is polled, so an erasure there is immediately
+        # reflected in what the subscription serves.
+        "calendar_feed",
         "cashbox",
         "catalog",
         # Settlements with professionals. No patient column; `lines` is a

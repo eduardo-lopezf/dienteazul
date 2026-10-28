@@ -100,12 +100,14 @@ copilot = "app.modules.copilot:CopilotModule"
 cashbox = "app.modules.cashbox:CashboxModule"
 liquidations = "app.modules.liquidations:LiquidationsModule"
 record = "app.modules.record:RecordModule"
+calendar_feed = "app.modules.calendar_feed:CalendarFeedModule"
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [tool.setuptools.package-data]
 "app.modules.agenda" = ["errors.json"]
+"app.modules.calendar_feed" = ["errors.json"]
 "app.modules.accounting_export" = ["errors.json"]
 "app.modules.budget" = ["errors.json"]
 "app.modules.billing" = ["errors.json"]

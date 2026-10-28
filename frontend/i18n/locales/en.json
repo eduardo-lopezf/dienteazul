@@ -1918,6 +1918,10 @@
         "disabled": "Disabled"
       },
       "catalog": {
+        "ics_feed": {
+          "title": "Calendar subscription (.ics)",
+          "summary": "One URL per user that their calendar polls on its own. No Google Cloud, and one-way."
+        },
         "google_calendar": {
           "title": "Google Calendar",
           "summary": "Syncs the agenda's appointments with Google Calendar."
@@ -1984,6 +1988,10 @@
             "title": "Workspace",
             "summary": "The main app: the clinic, its users and permissions, the home page with its widgets, and settings. Every other app runs on it."
           },
+        "calendar_sync": {
+          "title": "External calendar",
+          "summary": "Publishes the agenda as a calendar subscription the user adds to Google Calendar, Apple Calendar or Outlook."
+        },
         "agenda": {
           "title": "Agenda",
           "summary": "Appointments, cabinets and working hours for the clinic and its professionals."
@@ -2269,6 +2277,32 @@
     "friday": "Friday",
     "saturday": "Saturday",
     "sunday": "Sunday"
+  },
+  "calendarFeed": {
+    "title": "Calendar subscription",
+    "intro": "Publishes your agenda at a URL your calendar polls on its own. No Google Cloud, and one-way: what you change in your calendar does not come back to Diente Azul.",
+    "urlLabel": "Subscription URL",
+    "scopeOwn": "Carries only your appointments.",
+    "scopeClinic": "Carries the clinic's whole agenda.",
+    "none": "You do not have a subscription URL yet.",
+    "create": "Create the URL",
+    "rotate": "Change the URL",
+    "rotateWarning": "The current URL will stop working and the calendars already using it will go empty. They will have to subscribe again with the new one.",
+    "rotateConfirm": "Change it",
+    "revoke": "Delete",
+    "reveal": "Show the URL",
+    "hide": "Hide the URL",
+    "copy": "Copy the URL",
+    "copied": "URL copied",
+    "lastAccess": "Your calendar last polled it on {at}.",
+    "neverAccessed": "No calendar has polled it yet.",
+    "localhost": "This address only exists on this computer. Google cannot reach it, so the subscription will not fill until the clinic is published at an address reachable from the internet.",
+    "howTo": {
+      "copy": "Copy the URL.",
+      "google": "In Google Calendar: Other calendars → Subscribe to calendar → From URL.",
+      "wait": "Google takes a few hours to pick up changes; it is not immediate."
+    },
+    "warning": "Anybody holding this URL can see your patients' names and their appointments. Treat it like a password: do not share it, and change it if it gets out."
   },
   "catalog": {
     "packs": {

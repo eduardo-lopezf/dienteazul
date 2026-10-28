@@ -394,7 +394,10 @@ class ScheduleInstalmentInput(BaseModel):
     label: str | None = Field(default=None, max_length=120)
     # Nullable on purpose: "before surgery" is a real milestone with no date.
     due_date: date | None = None
-    amount: Decimal = Field(gt=0)
+    # Not ``gt=0`` here: the service owns that rule so the refusal carries
+    # ``payments.schedule.instalment_amount_invalid`` instead of a generic
+    # payload error.
+    amount: Decimal
 
 
 class PaymentScheduleCreate(BaseModel):

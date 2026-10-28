@@ -167,6 +167,40 @@ def test_periodontogram_uninstall_roundtrip_is_branch_scoped() -> None:
     )
 
 
+def test_calendar_feed_uninstall_roundtrip_is_branch_scoped() -> None:
+    """install → uninstall → reinstall drops only the feed's own table.
+
+    The feed owns one table and no foreign key into another module's
+    (ADR 0061): its branch hangs off the core root, so a downgrade here
+    must not reach the agenda, whose appointments it only ever read
+    through a contract.
+    """
+    tables = _declared_tables("calendar_feed")
+
+    _alembic("upgrade", "heads")
+    before = _list_tables()
+    assert tables.issubset(before), (
+        f"expected calendar_feed tables at heads; missing: {tables - before}"
+    )
+    baseline_others = before - tables
+
+    _alembic("downgrade", f"calendar_feed@-{_count_owned_revisions('calendar_feed')}")
+
+    after_down = _list_tables()
+    assert tables.isdisjoint(after_down), (
+        f"calendar_feed tables survived downgrade: {tables & after_down}"
+    )
+    assert baseline_others <= after_down, (
+        f"downgrade leaked into other modules; missing tables: {baseline_others - after_down}"
+    )
+
+    _alembic("upgrade", "calendar_feed@head")
+    after_up = _list_tables()
+    assert before <= after_up, (
+        f"reinstall did not restore every table; missing: {before - after_up}"
+    )
+
+
 def test_migration_import_uninstall_roundtrip_is_branch_scoped() -> None:
     """install → uninstall → reinstall drops only migration_import's tables.
 

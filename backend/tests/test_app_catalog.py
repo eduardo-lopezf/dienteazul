@@ -224,11 +224,18 @@ def test_every_module_belongs_to_an_app() -> None:
     assert discovered - listed == set()
 
 
-def test_shipped_agenda_lists_google_calendar_as_planned() -> None:
-    """Listed, not switchable: there is no integration behind it yet."""
-    apis = {api.name: api.status for api in _app("agenda").apis}
+def test_shipped_calendar_sync_lists_its_two_apis() -> None:
+    """The feed ships and can be used; Google Calendar is listed and not
+    switchable, because there is no integration behind it yet. Both belong
+    to Calendar sync, not to the agenda: the agenda books appointments and
+    knows nothing about who subscribes to them."""
+    apis = {api.name: api.status for api in _app("calendar_sync").apis}
 
-    assert apis == {"google_calendar": ApiStatus.PLANNED}
+    assert apis == {
+        "ics_feed": ApiStatus.ENABLED,
+        "google_calendar": ApiStatus.PLANNED,
+    }
+    assert _app("agenda").apis == ()
 
 
 # --- A disabled App -------------------------------------------------------
@@ -440,7 +447,13 @@ async def test_apps_endpoint_lists_the_catalog(
     assert agenda["modules"] == ["agenda", "schedules"]
     assert agenda["requires"] == []
     assert "patients" in agenda["integrates"]
-    assert agenda["apis"] == [{"name": "google_calendar", "status": "planned"}]
+    assert agenda["apis"] == []
+
+    sync = next(app for app in response.json()["data"] if app["name"] == "calendar_sync")
+    assert sync["apis"] == [
+        {"name": "ics_feed", "status": "enabled"},
+        {"name": "google_calendar", "status": "planned"},
+    ]
 
 
 @pytest.mark.asyncio

@@ -93,3 +93,6 @@ backend/app/core/plugins/README.md
 
 # Jenkins local
 /jenkins-local/
+
+# CodeGraph local index (regenerable with `codegraph init`)
+/.codegraph/

@@ -9,10 +9,12 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.core.contracts import ProfessionalActivity, VisitNote
+from app.core.contracts import AppointmentEntry, ProfessionalActivity, VisitNote
 
 from .models import Appointment, AppointmentTreatment
+from .presenter import present
 
 
 class AgendaAppointmentBook:
@@ -37,6 +39,69 @@ class AgendaAppointmentBook:
             )
         )
         return list(result.scalars().all())
+
+    async def window(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        *,
+        since: datetime,
+        until: datetime,
+        professional_id: UUID | None = None,
+    ) -> list[AppointmentEntry]:
+        """Flatten a window of the agenda for whoever renders it elsewhere.
+
+        Built on :func:`presenter.present`, so a consumer sees exactly
+        what the API shows — a patient whose App is off is missing from
+        the brief here too (ADR 0037) — and no name is resolved twice.
+        """
+        query = (
+            select(Appointment)
+            .options(selectinload(Appointment.treatments))
+            .where(
+                Appointment.clinic_id == clinic_id,
+                Appointment.start_time >= since,
+                Appointment.start_time <= until,
+                Appointment.status != "cancelled",
+            )
+            .order_by(Appointment.start_time)
+        )
+        if professional_id is not None:
+            query = query.where(Appointment.professional_id == professional_id)
+        rows = list((await db.execute(query)).scalars().all())
+
+        entries = []
+        for appointment in await present(db, clinic_id, rows):
+            patient = appointment.patient
+            professional = appointment.professional
+            entries.append(
+                AppointmentEntry(
+                    id=appointment.id,
+                    start_time=appointment.start_time,
+                    end_time=appointment.end_time,
+                    status=appointment.status,
+                    updated_at=appointment.updated_at or appointment.created_at,
+                    title=appointment.title,
+                    treatment_type=appointment.treatment_type,
+                    cabinet=appointment.cabinet,
+                    patient_name=(
+                        f"{patient.first_name} {patient.last_name}".strip() if patient else None
+                    ),
+                    professional_name=(
+                        f"{professional.first_name} {professional.last_name}".strip()
+                        if professional
+                        else None
+                    ),
+                    treatment_names=tuple(
+                        name
+                        for link in appointment.treatments
+                        # ``names`` is per locale; the clinic's UI is Spanish,
+                        # and any other locale beats showing nothing.
+                        if (name := link.names.get("es") or next(iter(link.names.values()), None))
+                    ),
+                )
+            )
+        return entries
 
     async def visit_notes(
         self, db: AsyncSession, clinic_id: UUID, planned_item_ids: Collection[UUID]

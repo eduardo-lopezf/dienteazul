@@ -1918,6 +1918,10 @@
         "disabled": "Deshabilitada"
       },
       "catalog": {
+        "ics_feed": {
+          "title": "Suscripción de calendario (.ics)",
+          "summary": "Una URL por usuario que su calendario consulta solo. Sin Google Cloud y en un solo sentido."
+        },
         "google_calendar": {
           "title": "Google Calendar",
           "summary": "Sincroniza las citas de la agenda con Google Calendar."
@@ -1984,6 +1988,10 @@
             "title": "Espacio de trabajo",
             "summary": "La app principal: la clínica, sus usuarios y permisos, el inicio con sus widgets y la configuración. Las demás apps se montan sobre ella."
           },
+        "calendar_sync": {
+          "title": "Calendario externo",
+          "summary": "Publica la agenda como una suscripción de calendario que el usuario añade a Google Calendar, Apple Calendar u Outlook."
+        },
         "agenda": {
           "title": "Agenda",
           "summary": "Citas, gabinetes y horarios de la clínica y de los profesionales."
@@ -2269,6 +2277,32 @@
     "friday": "Viernes",
     "saturday": "Sábado",
     "sunday": "Domingo"
+  },
+  "calendarFeed": {
+    "title": "Suscripción de calendario",
+    "intro": "Publica tu agenda en una URL que tu calendario consulta solo. Sin Google Cloud y en un solo sentido: lo que cambies en tu calendario no vuelve a Diente Azul.",
+    "urlLabel": "URL de suscripción",
+    "scopeOwn": "Lleva solo tus citas.",
+    "scopeClinic": "Lleva la agenda completa de la clínica.",
+    "none": "Todavía no tienes una URL de suscripción.",
+    "create": "Crear la URL",
+    "rotate": "Cambiar la URL",
+    "rotateWarning": "La URL actual dejará de funcionar y los calendarios que ya la usan se quedarán vacíos. Habrá que volver a suscribirlos con la nueva.",
+    "rotateConfirm": "Cambiarla",
+    "revoke": "Eliminar",
+    "reveal": "Mostrar la URL",
+    "hide": "Ocultar la URL",
+    "copy": "Copiar la URL",
+    "copied": "URL copiada",
+    "lastAccess": "Tu calendario la consultó por última vez el {at}.",
+    "neverAccessed": "Ningún calendario la ha consultado todavía.",
+    "localhost": "Esta dirección solo existe en este ordenador. Google no puede consultarla, así que la suscripción no se llenará hasta que la clínica esté publicada en una dirección accesible desde internet.",
+    "howTo": {
+      "copy": "Copia la URL.",
+      "google": "En Google Calendar: Otros calendarios → Suscribirse a un calendario → Desde URL.",
+      "wait": "Google tarda unas horas en traer los cambios; no es inmediato."
+    },
+    "warning": "Quien tenga esta URL ve los nombres de tus pacientes y sus citas. Trátala como una contraseña: no la compartas y cámbiala si se te escapa."
   },
   "catalog": {
     "packs": {

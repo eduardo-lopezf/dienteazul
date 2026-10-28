@@ -86,6 +86,35 @@ class VisitNote:
 
 
 @dataclass(frozen=True, slots=True)
+class AppointmentEntry:
+    """One appointment, flattened to what a calendar shows of it.
+
+    No row and no id of another module's: a consumer that renders the
+    agenda somewhere else — an iCalendar feed, a printed day sheet —
+    needs the hands of the clock and the words on the card, nothing more.
+    Plain data all the way down, so the owner can one day answer this
+    from another container (see ``core-apps-separable-containers``).
+
+    ``start_time`` / ``end_time`` are the clinic's wall clock, and the
+    offset they carry is a storage artifact: read the hands, then
+    localize them to the clinic's zone. ``patient_name`` is absent when
+    the Patients App is off, exactly as it is absent from the API.
+    """
+
+    id: UUID
+    start_time: datetime
+    end_time: datetime
+    status: str
+    updated_at: datetime
+    title: str | None = None
+    treatment_type: str | None = None
+    cabinet: str | None = None
+    patient_name: str | None = None
+    professional_name: str | None = None
+    treatment_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ReferenceSpecialty:
     """A discipline with a reference catalogue a clinic can start with."""
 
@@ -206,6 +235,23 @@ class AppointmentBook(Protocol):
         self, db: AsyncSession, clinic_id: UUID, planned_item_ids: Collection[UUID]
     ) -> list[VisitNote]:
         """The non-empty notes left on these planned treatments in visits."""
+
+    async def window(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        *,
+        since: datetime,
+        until: datetime,
+        professional_id: UUID | None = None,
+    ) -> list[AppointmentEntry]:
+        """The appointments starting in ``[since, until]``, oldest first.
+
+        Cancelled ones are left out: they are not on anybody's calendar.
+        ``professional_id`` narrows it to one professional's day; ``None``
+        is the whole clinic. Not paginated — a caller rendering a
+        document has no second page to ask for.
+        """
 
 
 class PlanBudgets(Protocol):

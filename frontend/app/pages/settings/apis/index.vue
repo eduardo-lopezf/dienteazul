@@ -74,6 +74,17 @@ watch(canRead, (ok) => {
     </div>
 
     <template v-else>
+      <!--
+        What an App puts on this page itself. The declared list below says
+        which outside services exist; a module that already has something
+        to configure registers it here (ADR 0041), and it disappears with
+        its App.
+      -->
+      <ModuleSlot
+        name="settings.apis.sections"
+        :ctx="{}"
+      />
+
       <div
         v-if="!loaded && !admin.error.value"
         class="space-y-3"

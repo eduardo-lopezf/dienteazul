@@ -27,6 +27,9 @@ export const PERMISSIONS = {
     read: 'agenda.appointments.read',
     write: 'agenda.appointments.write'
   },
+  calendarFeed: {
+    manage: 'calendar_feed.subscription.manage'
+  },
   users: {
     read: 'admin.users.read',
     write: 'admin.users.write'

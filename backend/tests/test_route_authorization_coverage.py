@@ -47,6 +47,11 @@ UNAUTHENTICATED: dict[str, str] = {
     "GET /api/v1/budget/public/budgets/{token}/pdf/signed": "ADR 0006 public budget link",
     "POST /api/v1/budget/public/budgets/{token}/accept": "ADR 0006 patient decision",
     "POST /api/v1/budget/public/budgets/{token}/reject": "ADR 0006 patient decision",
+    # ADR 0061: the unguessable token in the path *is* the credential, and
+    # it cannot carry ADR 0006's second factor — a calendar client fills in
+    # no form. Rate-limited, revocable, and it answers with one person's
+    # agenda or nothing.
+    "GET /api/v1/calendar_feed/calendar/{token}.ics": "ADR 0061 subscription link",
     # Authorized, just not by a role: the payload is rejected unless it
     # carries a valid per-clinic HMAC signature.
     "POST /api/v1/whatsapp_kapso/webhook": "inbound webhook, verified by HMAC signature",

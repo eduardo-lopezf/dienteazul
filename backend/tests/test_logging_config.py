@@ -24,11 +24,29 @@ from app.config import Settings
 from app.core.log_context import setup_logging
 
 
+def _file_handlers(root: logging.Logger) -> list[logging.Handler]:
+    return [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
+
+
 @pytest.fixture
 def isolated_root() -> Iterator[logging.Logger]:
-    """Hand back the root logger as it was: these tests mutate it."""
+    """Hand back the root logger as it was: these tests mutate it.
+
+    The file handlers already on it are detached for the duration, and
+    put back untouched afterwards. Without that, these tests only pass
+    when they run first: the app's own lifespan calls ``setup_logging``
+    with the deployment's ``LOG_DIR`` — set in the dev container — so
+    any earlier test that started the app through the ``client`` fixture
+    leaves a handler on ``/var/log/dienteazul/dienteazul.log`` behind it.
+    What these tests assert is what *this* call attaches, so they have
+    to count from zero.
+    """
     root = logging.getLogger()
     handlers, level = list(root.handlers), root.level
+    for handler in _file_handlers(root):
+        # Removed, never closed: it belongs to whoever attached it and
+        # goes back on the logger below, still open.
+        root.removeHandler(handler)
     yield root
     for handler in list(root.handlers):
         if handler not in handlers:
@@ -36,10 +54,6 @@ def isolated_root() -> Iterator[logging.Logger]:
             root.removeHandler(handler)
     root.handlers = handlers
     root.setLevel(level)
-
-
-def _file_handlers(root: logging.Logger) -> list[logging.Handler]:
-    return [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
 
 
 def test_without_a_directory_nothing_is_written_to_disk(

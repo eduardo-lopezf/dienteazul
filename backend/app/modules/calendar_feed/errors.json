@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "calendar_feed.not_found", "category": "not_found", "status_code": 404, "message": "Calendar subscription not found", "description": "The user has no calendar subscription in the active clinic."},
+    {"code": "calendar_feed.agenda.unavailable", "category": "dependency", "status_code": 400, "message": "The calendar feed needs the Agenda app", "description": "A subscription cannot be issued while the Agenda app is disabled: there would be nothing to publish."}
+  ]
+}

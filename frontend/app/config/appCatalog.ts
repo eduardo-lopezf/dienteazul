@@ -29,6 +29,7 @@ export interface AppPresentation {
 export const APP_CATALOG: Record<string, AppPresentation> = {
   workspace: { icon: 'i-lucide-layout-dashboard', settingsPath: '/settings/apps/workspace' },
   agenda: { icon: 'i-lucide-calendar-days' },
+  calendar_sync: { icon: 'i-lucide-calendar-sync' },
   patients: { icon: 'i-lucide-users' },
   recalls: { icon: 'i-lucide-bell-ring' },
   treatments: { icon: 'i-lucide-clipboard-list', settingsPath: '/settings/apps/treatments' },
