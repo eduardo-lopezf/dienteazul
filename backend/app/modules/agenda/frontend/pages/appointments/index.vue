@@ -647,7 +647,7 @@ watch(isPhone, async (mobile) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col w-full min-w-0 overflow-hidden">
+  <div class="relative h-full flex flex-col w-full min-w-0 overflow-hidden">
     <PageHeader :title="t('appointments.title')">
       <!--
         The date navigator lives here rather than inside each view: all
@@ -830,6 +830,26 @@ watch(isPhone, async (mobile) => {
       @saved="handleSaved"
       @cancelled="handleCancelled"
     />
+
+    <!--
+      Bottom-right corner: what other Apps offer to do with this agenda
+      (ADR 0041). The page places the corner and knows nothing about what
+      lands in it; `calendar_feed` puts the calendar-subscription
+      shortcuts there.
+
+      `pointer-events-none` on the wrapper and `auto` on its children:
+      the corner sits over the last hours of the day grid, which drags on
+      Pointer Events, and a transparent box there would silently eat the
+      drag.
+    -->
+    <div
+      class="absolute bottom-3 right-3 z-20 flex gap-2 pointer-events-none [&>*]:pointer-events-auto"
+    >
+      <ModuleSlot
+        name="agenda.calendar.subscribe"
+        :ctx="{}"
+      />
+    </div>
 
     <!-- Renders the post-completion follow-up modal once for the
          whole agenda page. Triggered by `useCompletionFollowup()`

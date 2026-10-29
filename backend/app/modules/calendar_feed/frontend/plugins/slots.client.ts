@@ -12,4 +12,17 @@ export default defineNuxtPlugin(() => {
     order: 10,
     permission: 'calendar_feed.subscription.manage'
   })
+
+  // The two shortcuts in the agenda's bottom-right corner. Same slot
+  // contract: the agenda owns the corner, this module owns what sits in
+  // it and knows nothing of the page around it.
+  registerSlot('agenda.calendar.subscribe', {
+    id: 'calendar_feed.agenda.subscribe',
+    labelKey: 'calendarFeed.subscribe.google.button',
+    component: defineAsyncComponent(
+      () => import('../components/agenda/CalendarSubscribeButtons.vue')
+    ),
+    order: 10,
+    permission: 'calendar_feed.subscription.manage'
+  })
 })

@@ -80,11 +80,11 @@ def test_shipped_catalog_names_only_real_modules() -> None:
             assert module_registry.is_discovered(module), module
 
 
-def test_shipped_agenda_groups_agenda_and_schedules_and_is_enabled() -> None:
+def test_shipped_agenda_groups_the_agenda_modules_and_is_enabled() -> None:
     agenda = _app("agenda")
 
-    assert agenda.version == "0.1"
-    assert agenda.modules == ("agenda", "schedules")
+    assert agenda.version == "0.2"
+    assert agenda.modules == ("agenda", "schedules", "calendar_feed")
     assert agenda.enabled is True
 
 
@@ -224,18 +224,16 @@ def test_every_module_belongs_to_an_app() -> None:
     assert discovered - listed == set()
 
 
-def test_shipped_calendar_sync_lists_its_two_apis() -> None:
-    """The feed ships and can be used; Google Calendar is listed and not
-    switchable, because there is no integration behind it yet. Both belong
-    to Calendar sync, not to the agenda: the agenda books appointments and
-    knows nothing about who subscribes to them."""
-    apis = {api.name: api.status for api in _app("calendar_sync").apis}
+def test_shipped_agenda_lists_its_two_calendar_apis() -> None:
+    """Both ways out of the agenda live on the agenda's own App: the feed
+    ships and can be used, and Google Calendar is listed and nothing more,
+    because there is no integration behind it yet."""
+    apis = {api.name: api.status for api in _app("agenda").apis}
 
     assert apis == {
         "ics_feed": ApiStatus.ENABLED,
         "google_calendar": ApiStatus.PLANNED,
     }
-    assert _app("agenda").apis == ()
 
 
 # --- A disabled App -------------------------------------------------------
@@ -441,16 +439,13 @@ async def test_apps_endpoint_lists_the_catalog(
 
     assert response.status_code == 200
     agenda = next(app for app in response.json()["data"] if app["name"] == "agenda")
-    assert agenda["version"] == "0.1"
+    assert agenda["version"] == "0.2"
     assert agenda["enabled"] is True
     assert agenda["tier"] == "core"
-    assert agenda["modules"] == ["agenda", "schedules"]
+    assert agenda["modules"] == ["agenda", "schedules", "calendar_feed"]
     assert agenda["requires"] == []
     assert "patients" in agenda["integrates"]
-    assert agenda["apis"] == []
-
-    sync = next(app for app in response.json()["data"] if app["name"] == "calendar_sync")
-    assert sync["apis"] == [
+    assert agenda["apis"] == [
         {"name": "ics_feed", "status": "enabled"},
         {"name": "google_calendar", "status": "planned"},
     ]

@@ -9,17 +9,10 @@
     },
     {
       "name": "agenda",
-      "version": "0.1",
+      "version": "0.2",
       "tier": "core",
       "status": "enabled",
-      "modules": ["agenda", "schedules"]
-    },
-    {
-      "name": "calendar_sync",
-      "version": "0.1",
-      "tier": "optional",
-      "status": "enabled",
-      "modules": ["calendar_feed"],
+      "modules": ["agenda", "schedules", "calendar_feed"],
       "apis": [
         { "name": "ics_feed", "status": "enabled" },
         { "name": "google_calendar", "status": "planned" }

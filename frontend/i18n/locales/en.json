@@ -1988,10 +1988,6 @@
             "title": "Workspace",
             "summary": "The main app: the clinic, its users and permissions, the home page with its widgets, and settings. Every other app runs on it."
           },
-        "calendar_sync": {
-          "title": "External calendar",
-          "summary": "Publishes the agenda as a calendar subscription the user adds to Google Calendar, Apple Calendar or Outlook."
-        },
         "agenda": {
           "title": "Agenda",
           "summary": "Appointments, cabinets and working hours for the clinic and its professionals."
@@ -2296,7 +2292,35 @@
     "copied": "URL copied",
     "lastAccess": "Your calendar last polled it on {at}.",
     "neverAccessed": "No calendar has polled it yet.",
-    "localhost": "This address only exists on this computer. Google cannot reach it, so the subscription will not fill until the clinic is published at an address reachable from the internet.",
+    "oneWay": "For now the sync runs one way: your appointments show up in the calendar, but what you change there does not come back to Diente Azul.",
+    "copyFailed": "Could not copy. Select the address and copy it by hand.",
+    "subscribe": {
+      "noUrl": "You do not have an address yet. Create it in Settings → APIs, on the “Calendar subscription” card, then come back here.",
+      "goToSettings": "Go to Settings → APIs",
+      "google": {
+        "button": "Google Calendar",
+        "title": "See your agenda in Google Calendar",
+        "intro": "Google only lets you subscribe to an address from a computer. Once added, it reaches an Android phone by itself.",
+        "steps": {
+          "copy": "Copy your agenda's address. If you do not have one yet, create it in Settings → APIs.",
+          "web": "On a computer, open calendar.google.com. In the left column, press the “+” next to “Other calendars” and choose to subscribe with a URL.",
+          "android": "Paste the address and press “Add calendar”. Google takes a few minutes to read it the first time.",
+          "show": "On your Android phone, open the Google Calendar app: the new calendar arrives on its own. If you cannot see it, go to Menu → Settings and switch it on in the list."
+        },
+        "caveat": "Google decides when to poll the address: usually every few hours, so a new appointment can take a while to appear. There is no way to force it."
+      },
+      "apple": {
+        "button": "Apple Calendar",
+        "title": "See your agenda in Apple's calendar",
+        "intro": "iPhone and iPad subscribe to the address directly, with no service in between.",
+        "steps": {
+          "copy": "Copy your agenda's address. If you do not have one yet, create it in Settings → APIs.",
+          "iphone": "On iPhone or iPad: Settings → Apps → Calendar → Calendar Accounts → Add Account → Other → Add Subscribed Calendar. Paste the address, press “Next”, then “Save”. On older iOS the path is Settings → Calendar → Accounts.",
+          "mac": "On the Mac: open Calendar and go to File → New Calendar Subscription. Paste the address, press “Subscribe” and choose how often it refreshes."
+        },
+        "caveat": "Each device decides how often it re-reads the address. On the Mac you can choose the interval; on iPhone the system manages it."
+      }
+    },
     "howTo": {
       "copy": "Copy the URL.",
       "google": "In Google Calendar: Other calendars → Subscribe to calendar → From URL.",

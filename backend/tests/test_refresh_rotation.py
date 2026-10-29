@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import sessions
+from app.core.auth import refusals, sessions
 from app.core.auth.models import AuthSession, Clinic, ClinicMembership, User
 from app.core.auth.service import create_refresh_token, decode_token, hash_password
 
@@ -258,13 +259,73 @@ async def test_idle_policy_rejects_refresh_and_access(
     )
     await db_session.commit()
 
-    assert (await _refresh(client, refresh)).status_code == 401
+    refused = await _refresh(client, refresh)
+    assert refused.status_code == 401
+    # The case, not just the status: the login screen says "inactividad"
+    # off this code and an operator finds the line by the reference
+    # (ADR 0062).
+    assert refused.json()["code"] == refusals.REFRESH_FAMILY_INACTIVE
+    assert refused.json()["reference"]
     access_response = await client.get(
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"}
     )
     assert access_response.status_code == 401
+    assert access_response.json()["code"] == refusals.SESSION_FAMILY_INACTIVE
     await db_session.refresh(session)
     assert session.revoked_reason is None
+
+
+@pytest.mark.asyncio
+async def test_every_way_a_session_is_refused_names_its_case(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """One 401 per cause, each saying which cause it was.
+
+    They were one indistinguishable answer, and only reuse left a trace —
+    so somebody thrown out mid-shift could not be told, or found in the
+    log, which of seven things had happened (ADR 0062).
+    """
+    user = await _make_user(db_session, "refusal-codes@example.com")
+    access, refresh = await _login(client, user.email)
+
+    # Undecodable, and a well-formed token that names no session row.
+    assert (await _refresh(client, "not-a-token")).json()["code"] == refusals.REFRESH_UNDECODABLE
+    orphan = create_refresh_token(user.id, jti=uuid4())
+    assert (await _refresh(client, orphan)).json()["code"] == refusals.REFRESH_UNKNOWN
+
+    # An access token presented where a refresh one belongs.
+    assert (await _refresh(client, access)).json()["code"] == refusals.REFRESH_MALFORMED
+
+    # The account-wide switch: every token minted before it is refused.
+    user.token_version += 1
+    await db_session.commit()
+    assert (await _refresh(client, refresh)).json()["code"] == refusals.REFRESH_VERSION_REVOKED
+
+    # And a family that was revoked under a live access token.
+    other = await _make_user(db_session, "refusal-codes-revoked@example.com")
+    other_access, other_refresh = await _login(client, other.email)
+    payload = decode_token(other_refresh)
+    revoked = await db_session.get(AuthSession, payload["jti"])
+    assert revoked is not None
+    await sessions.revoke_family(db_session, revoked.family_id, "logout")
+    await db_session.commit()
+    response = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {other_access}"}
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == refusals.SESSION_FAMILY_UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_reuse_is_refused_by_name(client: AsyncClient, db_session: AsyncSession) -> None:
+    user = await _make_user(db_session, "reuse-code@example.com")
+    _, refresh = await _login(client, user.email)
+    assert (await _refresh(client, refresh)).status_code == 200
+
+    replayed = await _refresh(client, refresh)
+
+    assert replayed.status_code == 401
+    assert replayed.json()["code"] == refusals.REFRESH_REUSED
 
 
 @pytest.mark.asyncio

@@ -7,8 +7,10 @@ are what a two-way Google Calendar integration would need, and they are
 not available yet (ADR 0061).
 
 Read-only and one-way by nature — a calendar client subscribed to a feed
-never writes back. Its own App, so a clinic that does not want patient
-names leaving the building switches it off and the agenda is untouched.
+never writes back. Part of the Agenda App (ADR 0044): without an agenda
+there is nothing to publish, so it goes off when the agenda does and
+needs no `requires_apps` entry of its own. Nothing leaves the clinic
+until a user creates a subscription.
 """
 
 from fastapi import APIRouter

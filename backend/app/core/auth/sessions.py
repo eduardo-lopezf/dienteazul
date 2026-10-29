@@ -46,8 +46,45 @@ class RefreshReuseError(Exception):
     """
 
 
+class RevokedFamilyError(Exception):
+    """The family this token belongs to was already revoked.
+
+    Told apart from :class:`RefreshReuseError` because the two mean
+    opposite things to whoever reads the log. A token presented after its
+    family was ended — the ordinary case being a refresh in flight when
+    somebody signed out, or a second tab catching up — used to be
+    answered as reuse: it re-revoked a family that was already dead and
+    logged "reuse detected", which reads as theft. Reuse is a token that
+    was *spent* and came back; that is still what this file treats as
+    theft (ADR 0062).
+    """
+
+    def __init__(self, family_id: UUID, reason: str | None) -> None:
+        super().__init__(f"session family {family_id} was revoked ({reason or 'unknown'})")
+        self.family_id = family_id
+        #: Why it was revoked, as ``revoke_family`` recorded it.
+        self.reason = reason
+
+
 class InactiveFamilyError(Exception):
-    """The session family exceeded its absolute or idle lifetime."""
+    """The session family exceeded its absolute or idle lifetime.
+
+    Carries which of the two it was and how long the family had gone
+    unextended: the caller turns both into the log line that explains an
+    incident, and "idle for 61 minutes" and "idle for nine hours" are
+    the same 401 with very different causes (ADR 0062).
+    """
+
+    def __init__(self, family_id: UUID, *, idle_minutes: int, absolute: bool) -> None:
+        super().__init__(
+            f"session family {family_id} is inactive "
+            f"(idle {idle_minutes} min, absolute deadline passed: {absolute})"
+        )
+        self.family_id = family_id
+        #: Whole minutes since ``last_activity_at``.
+        self.idle_minutes = idle_minutes
+        #: ``True`` when it was the 30-day family deadline, not the idle window.
+        self.absolute = absolute
 
 
 async def start_session(db: AsyncSession, user_id: UUID) -> AuthSession:
@@ -103,12 +140,20 @@ async def rotate(db: AsyncSession, jti: UUID) -> AuthSession:
         raise LookupError(f"no session for jti {jti}")
 
     now = datetime.now(UTC)
-    if (
-        session.family_expires_at <= now
-        or session.last_activity_at + timedelta(minutes=settings.AUTH_SESSION_IDLE_TIMEOUT_MINUTES)
+    absolute = session.family_expires_at <= now
+    idle = (
+        session.last_activity_at + timedelta(minutes=settings.AUTH_SESSION_IDLE_TIMEOUT_MINUTES)
         <= now
-    ):
-        raise InactiveFamilyError(f"session family {session.family_id} is inactive")
+    )
+    if absolute or idle:
+        raise InactiveFamilyError(
+            session.family_id,
+            idle_minutes=int((now - session.last_activity_at).total_seconds() // 60),
+            absolute=absolute,
+        )
+
+    if session.revoked_at is not None:
+        raise RevokedFamilyError(session.family_id, session.revoked_reason)
 
     if not session.is_usable:
         await revoke_family(db, session.family_id, "reuse")

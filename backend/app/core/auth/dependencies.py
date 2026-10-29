@@ -16,6 +16,7 @@ from app.config import settings
 from app.core.log_context import set_request_context
 from app.database import get_db
 
+from . import refusals
 from .models import AuthSession, Clinic, ClinicMembership, User
 from .permissions import has_permission
 from .service import decode_token
@@ -111,14 +112,31 @@ async def get_current_user(
         )
         session = result.scalar_one_or_none()
         now = datetime.now(UTC)
-        if (
-            session is None
-            or session.family_expires_at <= now
-            or session.last_activity_at
-            + timedelta(minutes=settings.AUTH_SESSION_IDLE_TIMEOUT_MINUTES)
+        if session is None:
+            # Every row of the family is revoked, or there never was one:
+            # a logout elsewhere, or reuse detection. Named apart from
+            # the idle case because the two want different words on the
+            # login screen and different reactions from an operator.
+            raise refusals.refuse(
+                refusals.SESSION_FAMILY_UNKNOWN,
+                "Could not validate credentials",
+                user=user.id,
+                family=family_id,
+            )
+        absolute = session.family_expires_at <= now
+        idle = (
+            session.last_activity_at + timedelta(minutes=settings.AUTH_SESSION_IDLE_TIMEOUT_MINUTES)
             <= now
-        ):
-            raise credentials_exception
+        )
+        if absolute or idle:
+            raise refusals.refuse(
+                refusals.SESSION_FAMILY_INACTIVE,
+                "Could not validate credentials",
+                user=user.id,
+                family=family_id,
+                idle_minutes=int((now - session.last_activity_at).total_seconds() // 60),
+                absolute=absolute,
+            )
 
     request.state.auth_family_id = family_id
 

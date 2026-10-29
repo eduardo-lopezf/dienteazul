@@ -1988,10 +1988,6 @@
             "title": "Espacio de trabajo",
             "summary": "La app principal: la clínica, sus usuarios y permisos, el inicio con sus widgets y la configuración. Las demás apps se montan sobre ella."
           },
-        "calendar_sync": {
-          "title": "Calendario externo",
-          "summary": "Publica la agenda como una suscripción de calendario que el usuario añade a Google Calendar, Apple Calendar u Outlook."
-        },
         "agenda": {
           "title": "Agenda",
           "summary": "Citas, gabinetes y horarios de la clínica y de los profesionales."
@@ -2296,7 +2292,35 @@
     "copied": "URL copiada",
     "lastAccess": "Tu calendario la consultó por última vez el {at}.",
     "neverAccessed": "Ningún calendario la ha consultado todavía.",
-    "localhost": "Esta dirección solo existe en este ordenador. Google no puede consultarla, así que la suscripción no se llenará hasta que la clínica esté publicada en una dirección accesible desde internet.",
+    "oneWay": "Por el momento la sincronización va en un solo sentido: tus citas se ven en el calendario, pero lo que cambies allí no vuelve a Diente Azul.",
+    "copyFailed": "No se pudo copiar. Selecciona la dirección y cópiala a mano.",
+    "subscribe": {
+      "noUrl": "Todavía no tienes una dirección. Créala en Configuración → APIs, en la tarjeta «Suscripción de calendario», y vuelve aquí.",
+      "goToSettings": "Ir a Configuración → APIs",
+      "google": {
+        "button": "Google Calendar",
+        "title": "Ver tu agenda en Google Calendar",
+        "intro": "Google solo permite suscribirse a una dirección desde un equipo de cómputo. Una vez añadida, aparece sola en el teléfono Android.",
+        "steps": {
+          "copy": "Copia la dirección de tu agenda. Si aún no tienes ninguna, créala en Configuración → APIs.",
+          "web": "En un equipo de cómputo, abre calendar.google.com. En la columna izquierda, pulsa el «+» junto a «Otros calendarios» y elige «Suscribirse mediante URL».",
+          "android": "Pega la dirección y pulsa «Añadir calendario». Google tarda unos minutos en leerla por primera vez.",
+          "show": "En tu teléfono Android, abre la app Google Calendar: el calendario nuevo baja solo. Si no lo ves, entra en Menú → Ajustes y actívalo en la lista."
+        },
+        "caveat": "Google decide cuándo consultar la dirección: suele ser cada varias horas, así que una cita nueva puede tardar en aparecer. No se puede forzar."
+      },
+      "apple": {
+        "button": "Apple Calendar",
+        "title": "Ver tu agenda en el calendario de Apple",
+        "intro": "El iPhone y el iPad se suscriben directamente a la dirección, sin pasar por ningún servicio intermedio.",
+        "steps": {
+          "copy": "Copia la dirección de tu agenda. Si aún no tienes ninguna, créala en Configuración → APIs.",
+          "iphone": "En el iPhone o el iPad: Ajustes → Aplicaciones → Calendario → Cuentas de calendario → Añadir cuenta → Otra → Añadir calendario suscrito. Pega la dirección, pulsa «Siguiente» y luego «Guardar». En versiones anteriores de iOS la ruta es Ajustes → Calendario → Cuentas.",
+          "mac": "En el Mac: abre Calendario y ve a Archivo → Nueva suscripción de calendario. Pega la dirección, pulsa «Suscribirse» y elige cada cuánto se actualiza."
+        },
+        "caveat": "Cada dispositivo decide cada cuánto vuelve a leer la dirección. En el Mac puedes elegir la frecuencia; en el iPhone la gestiona el sistema."
+      }
+    },
     "howTo": {
       "copy": "Copia la URL.",
       "google": "En Google Calendar: Otros calendarios → Suscribirse a un calendario → Desde URL.",

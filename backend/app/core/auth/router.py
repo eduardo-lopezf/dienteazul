@@ -25,7 +25,7 @@ from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.core.tenancy import TenantContext, get_tenant
 from app.database import get_db
 
-from . import sessions
+from . import refusals, sessions
 from .dependencies import (
     ClinicContext,
     declares_permissions,
@@ -114,6 +114,50 @@ async def _refresh_rate_key(request: Request) -> str:
             sub = payload.get("sub")
             if sub:
                 return f"refresh:{sub}"
+    except Exception:
+        pass
+    return get_remote_address(request)
+
+
+def _bearer_rate_key(request: Request) -> str:
+    """Key a limiter by the access token's subject, not the socket peer.
+
+    Same reasoning as :func:`_refresh_rate_key`, which only ever covered
+    ``/auth/refresh``. Every browser request arrives through the BFF
+    (ADR 0052), so on these endpoints ``get_remote_address`` is one
+    bucket for the whole deployment: ``/auth/activity`` capped at 30 a
+    minute between *all* users is a cap that silently stops extending
+    session families — which is the one thing that keeps a session alive
+    (ADR 0062). Keyed per user, a tab's two signals a minute cannot
+    crowd anybody else out.
+    """
+    header = request.headers.get("authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            sub = decode_token(token).get("sub")
+            if sub:
+                return f"user:{sub}"
+        except PyJWTError:
+            pass
+    return get_remote_address(request)
+
+
+async def _login_rate_key(request: Request) -> str:
+    """Key the login limiter by the account being tried, then by IP.
+
+    ``5/minute`` on the socket peer means five sign-ins a minute for an
+    entire clinic — a morning shift arriving together is enough to lock
+    the door. What the limit is actually for is guessing one account's
+    password, so the address being tried is the bucket; a request with
+    no readable form still falls back to the caller's IP, so an attacker
+    who omits it is capped as before.
+    """
+    try:
+        form = await request.form()
+        username = form.get("username")
+        if isinstance(username, str) and username:
+            return f"login:{username.strip().lower()}"
     except Exception:
         pass
     return get_remote_address(request)
@@ -238,7 +282,13 @@ async def setup(
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
+# Two buckets, because they answer two different abuses: five attempts a
+# minute on *one account* (guessing a password) and sixty from one host
+# (trying many accounts). The single IP-keyed limit this replaces did
+# neither behind the BFF — it was five sign-ins a minute for the whole
+# deployment, every user sharing one socket peer (ADR 0052, ADR 0062).
+@limiter.limit("5/minute", key_func=_login_rate_key)
+@limiter.limit("60/minute")
 async def login(
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -326,16 +376,20 @@ async def refresh_token(
         # row, so nothing could ever revoke it. Rejecting it logs those
         # holders out once, which is the point of the change.
         if user_id is None or token_type != "refresh" or raw_jti is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token",
+            raise refusals.refuse(
+                refusals.REFRESH_MALFORMED,
+                "Invalid refresh token",
+                user=user_id,
+                token_type=token_type,
+                has_jti=raw_jti is not None,
             )
 
-    except PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-        )
+    except PyJWTError as error:
+        raise refusals.refuse(
+            refusals.REFRESH_UNDECODABLE,
+            "Invalid or expired refresh token",
+            cause=type(error).__name__,
+        ) from None
 
     # Fetch user with memberships and clinics
     result = await db.execute(
@@ -344,16 +398,21 @@ async def refresh_token(
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
+        raise refusals.refuse(
+            refusals.REFRESH_USER_INACTIVE,
+            "User not found or inactive",
+            user=user_id,
+            found=user is not None,
         )
 
     # Check token version for revocation
     if user.token_version != token_version:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
+        raise refusals.refuse(
+            refusals.REFRESH_VERSION_REVOKED,
+            "Token has been revoked",
+            user=user.id,
+            presented_version=token_version,
+            current_version=user.token_version,
         )
 
     # Fetch memberships with clinics for response
@@ -390,20 +449,45 @@ async def refresh_token(
         successor = await sessions.rotate(db, UUID(raw_jti))
     except sessions.RefreshReuseError:
         await db.commit()
-        logger.warning("Refresh token reuse for user %s — session family revoked", user.id)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
+        raise refusals.refuse(
+            refusals.REFRESH_REUSED,
+            "Token has been revoked",
+            user=user.id,
+            jti=raw_jti,
         ) from None
-    except sessions.InactiveFamilyError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session family has expired or is inactive",
+    except sessions.RevokedFamilyError as error:
+        # Not reuse: the family was already ended, so there is nothing to
+        # revoke and nothing to raise the alarm about. ``reason`` says
+        # which — a logout elsewhere, or an earlier reuse that did.
+        raise refusals.refuse(
+            refusals.REFRESH_FAMILY_REVOKED,
+            "Token has been revoked",
+            user=user.id,
+            jti=raw_jti,
+            family=error.family_id,
+            revoked_reason=error.reason,
+        ) from None
+    except sessions.InactiveFamilyError as error:
+        # The cause an actively-used session dies of: nothing extended
+        # the family's idle window for an hour (ADR 0062). The idle
+        # minutes go in the line because the gap is the diagnosis — a
+        # little over sixty is the rule working, hours is a client that
+        # stopped signalling.
+        raise refusals.refuse(
+            refusals.REFRESH_FAMILY_INACTIVE,
+            "Session family has expired or is inactive",
+            user=user.id,
+            jti=raw_jti,
+            family=error.family_id,
+            idle_minutes=error.idle_minutes,
+            absolute=error.absolute,
         ) from None
     except LookupError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
+        raise refusals.refuse(
+            refusals.REFRESH_UNKNOWN,
+            "Invalid or expired refresh token",
+            user=user.id,
+            jti=raw_jti,
         ) from None
 
     await db.commit()
@@ -431,28 +515,39 @@ async def refresh_token(
 
 
 @router.post("/activity", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", key_func=_bearer_rate_key)
 async def record_activity(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
-    """Extend the idle timeout for the authenticated session family."""
+    """Extend the idle timeout for the authenticated session family.
+
+    This is the **only** thing that moves a family's clock forward —
+    rotation deliberately inherits the old stamp — so a refusal here is
+    the first sign that a session is on its way to dying under somebody
+    who is still working. It says which of the two it was, and the
+    client is expected to act on the answer rather than drop it
+    (ADR 0062).
+    """
     family_id = getattr(request.state, "auth_family_id", None)
     if family_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="A session-bound access token is required",
+        raise refusals.refuse(
+            refusals.ACTIVITY_NO_FAMILY,
+            "A session-bound access token is required",
+            user=current_user.id,
         )
     if not await sessions.record_activity(db, family_id, current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session family has expired or is inactive",
+        raise refusals.refuse(
+            refusals.ACTIVITY_FAMILY_INACTIVE,
+            "Session family has expired or is inactive",
+            user=current_user.id,
+            family=family_id,
         )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", key_func=_refresh_rate_key)
 async def logout(
     request: Request,
     data: TokenRefresh,
@@ -490,7 +585,7 @@ async def logout(
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=_bearer_rate_key)
 async def change_password(
     request: Request,
     data: PasswordChange,

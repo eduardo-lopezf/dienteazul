@@ -149,6 +149,7 @@ testpaths = ["tests"]
 # an explicit step. Unmarked runs exclude them to keep local TDD fast.
 markers = [
     "alembic_roundtrip: full base → head → base migration cycle (slow, needs DB)",
+    "contract: a rule checked against the source tree (fast, no DB) — CI runs these first",
 ]
 addopts = "-m 'not alembic_roundtrip'"
 filterwarnings = [

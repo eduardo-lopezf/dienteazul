@@ -33,13 +33,6 @@ const url = computed(() => {
   return `${window.location.origin}${feed.value.path}`
 })
 
-// A feed on localhost resolves for this browser and for nothing else.
-// Google polls from its own network, so the subscription would simply
-// never fill — worth saying before the user pastes it and waits.
-const unreachable = computed(
-  () => import.meta.client && ['localhost', '127.0.0.1'].includes(window.location.hostname)
-)
-
 const lastAccess = computed(() => {
   const at = feed.value?.last_access_at
   if (!at) return null
@@ -59,7 +52,7 @@ async function load() {
   loading.value = true
   try {
     const response = await api.get<ApiResponse<CalendarFeed | null>>(
-      '/calendar_feed/subscription'
+      '/api/v1/calendar_feed/subscription'
     )
     feed.value = response.data
   } catch (err: unknown) {
@@ -72,7 +65,7 @@ async function load() {
 async function issue() {
   loading.value = true
   try {
-    const response = await api.post<ApiResponse<CalendarFeed>>('/calendar_feed/subscription')
+    const response = await api.post<ApiResponse<CalendarFeed>>('/api/v1/calendar_feed/subscription')
     feed.value = response.data
     revealed.value = true
     confirmingRotate.value = false
@@ -86,7 +79,7 @@ async function issue() {
 async function revoke() {
   loading.value = true
   try {
-    await api.del('/calendar_feed/subscription')
+    await api.del('/api/v1/calendar_feed/subscription')
     feed.value = null
     revealed.value = false
   } catch (err: unknown) {
@@ -130,11 +123,11 @@ onMounted(load)
 
     <div class="space-y-4">
       <UAlert
-        v-if="feed && unreachable"
-        color="warning"
+        v-if="feed"
+        color="neutral"
         variant="subtle"
-        icon="i-lucide-triangle-alert"
-        :description="t('calendarFeed.localhost')"
+        icon="i-lucide-arrow-right"
+        :description="t('calendarFeed.oneWay')"
       />
 
       <template v-if="feed">

@@ -1,6 +1,6 @@
 import { appendResponseHeader, getRequestURL } from 'h3'
 import type { User, LoginCredentials, MeResponse, ApiResponse } from '~/types'
-import { loginLocation, type SessionEndReason } from '~/utils/session'
+import { loginLocation, reasonForCode, type SessionEndReason } from '~/utils/session'
 
 interface RefreshSlot {
   inFlight?: Promise<boolean>
@@ -14,12 +14,22 @@ interface RefreshContext {
 export interface SessionEnd {
   returnTo?: string
   reason?: SessionEndReason
+  /** The `request_id` of the refusal that ended it, for the login screen. */
+  reference?: string
 }
 
 const LOGOUT_TIMEOUT_MS = 5_000
 const clientRefreshSlot: RefreshSlot = {}
 const CHANNEL_NAME = 'dienteazul:auth-session'
 type SessionSignal = 'logout' | 'expired' | 'refreshed'
+/** What a tab tells the others about a session that ended, beyond "it did". */
+interface SessionEndSignal {
+  signal?: SessionSignal
+  sender?: string
+  id?: string
+  reason?: SessionEndReason
+  reference?: string
+}
 const CLIENT_TAB_ID = import.meta.client ? crypto.randomUUID() : ''
 let clientChannel: BroadcastChannel | null = null
 let clientSignalListenerInstalled = false
@@ -27,6 +37,28 @@ let lastHandledSessionSignal = ''
 
 function isAuthFailure(error: unknown): boolean {
   return (error as { statusCode?: number } | null)?.statusCode === 401
+}
+
+/**
+ * What the backend said when it refused: the case, and the reference
+ * that finds the line it logged (`app/core/auth/refusals.py`).
+ *
+ * The envelope travels through the BFF untouched, so both fields are on
+ * the error's `data`; `x-request-id` is the fallback for a refusal that
+ * never reached the app and so has no body — a gateway's, say.
+ */
+function refusalOf(error: unknown): { reason: SessionEndReason | null, reference?: string } {
+  const failed = error as {
+    data?: { code?: string, reference?: string }
+    response?: { headers?: { get(name: string): string | null } }
+  } | null
+  return {
+    reason: reasonForCode(failed?.data?.code),
+    reference:
+      failed?.data?.reference
+      ?? failed?.response?.headers?.get('x-request-id')
+      ?? undefined
+  }
 }
 
 function cookieValue(name: string): string | null {
@@ -57,12 +89,18 @@ export function useAuth() {
    * The backend refuses an idle family on refresh (ADR 0030, ADR 0052),
    * and whichever call notices first ends up here — a background poll as
    * readily as the inactivity watch. Saying "expired" then puts the wrong
-   * notice on the login screen, and which of the two wins is a race. The
-   * stamp the middleware reads decides it here too, so both paths agree;
-   * it is a cookie, so every tab agrees as well.
+   * notice on the login screen, and which of the two wins is a race.
+   *
+   * So the refusal itself decides: it carries the case it was refused
+   * for (ADR 0062). The local stamp is only the fallback, for a refusal
+   * with no code — an older backend, or a failure that never reached
+   * the app. Guessing from the stamp was how an hour of unsignalled
+   * activity came out as "expired": the cookie was fresh precisely
+   * because the browser had been writing it without the server's
+   * agreement.
    */
-  function endedReason(): SessionEndReason {
-    return activity.isExpired() ? 'idle' : 'expired'
+  function endedReason(code?: SessionEndReason | null): SessionEndReason {
+    return code ?? (activity.isExpired() ? 'idle' : 'expired')
   }
 
   const user = useState<User | null>('auth:user', () => null)
@@ -74,6 +112,17 @@ export function useAuth() {
   const clinicDeactivated = useState<boolean>('auth:clinic-deactivated', () => false)
   const privacyRenewal = useState<boolean>('auth:privacy-renewal', () => false)
   const session = useState<boolean>('auth:session', () => import.meta.server && hasIncomingSessionCookie(requestEvent ?? undefined))
+  /**
+   * How the last session ended, for whoever shows the login screen.
+   *
+   * Needed because the two know different halves. Only the refusal
+   * knows the case and the reference; only the route middleware
+   * actually performs the redirect when the session is refused during a
+   * server render — `goToLogin` is client-only, so without this the
+   * middleware fell back to a flat "expired" and dropped the reference
+   * on exactly the renders that have no other way to report one.
+   */
+  const sessionEnd = useState<SessionEnd | null>('auth:session-end', () => null)
   const lastSessionSignal = useState<string>('auth:last-session-signal', () => '')
   const isAuthenticated = computed(() => !!user.value && session.value)
   const hasStoredSession = computed(() => session.value)
@@ -156,13 +205,14 @@ export function useAuth() {
     privacyRenewal.value = false
   }
 
-  function broadcast(signal: SessionSignal): void {
+  function broadcast(signal: SessionSignal, end: Pick<SessionEnd, 'reason' | 'reference'> = {}): void {
     if (!import.meta.client) return
+    const message: SessionEndSignal = { signal, sender: CLIENT_TAB_ID, id: crypto.randomUUID(), ...end }
     try {
       clientChannel ??= new BroadcastChannel(CHANNEL_NAME)
-      clientChannel.postMessage({ signal, sender: CLIENT_TAB_ID, id: crypto.randomUUID() })
+      clientChannel.postMessage(message)
     } catch {
-      localStorage.setItem(CHANNEL_NAME, JSON.stringify({ signal, sender: CLIENT_TAB_ID, id: crypto.randomUUID() }))
+      localStorage.setItem(CHANNEL_NAME, JSON.stringify(message))
       localStorage.removeItem(CHANNEL_NAME)
     }
   }
@@ -193,12 +243,16 @@ export function useAuth() {
     // in landed on the dashboard instead of the page the session ended
     // on. It would also relabel an explicit logout as an expiry.
     if (router.currentRoute.value.path === '/login') return
-    await router.push(loginLocation(end.returnTo, end.reason))
+    await router.push(loginLocation(end.returnTo, end.reason, end.reference))
   }
 
   async function endSession(end: SessionEnd = {}): Promise<void> {
     clearSession()
-    broadcast('expired')
+    sessionEnd.value = { reason: end.reason, reference: end.reference }
+    // The other tabs are about to show the same screen; send them the
+    // case and the reference too, so all of them say the same thing and
+    // quote the same line of the log instead of each guessing.
+    broadcast('expired', { reason: end.reason, reference: end.reference })
     await goToLogin(end)
   }
 
@@ -215,7 +269,12 @@ export function useAuth() {
       await bffFetch('/api/v1/auth/refresh', { method: 'POST', body: {} })
     } catch (error) {
       if (!isAuthFailure(error)) throw error
-      await endSession({ returnTo: router.currentRoute.value.fullPath, reason: endedReason() })
+      const refusal = refusalOf(error)
+      await endSession({
+        returnTo: router.currentRoute.value.fullPath,
+        reason: endedReason(refusal.reason),
+        reference: refusal.reference
+      })
       return false
     }
 
@@ -254,6 +313,7 @@ export function useAuth() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })
     session.value = true
+    sessionEnd.value = null
     activity.touch()
     await fetchUserDirect()
     broadcast('refreshed')
@@ -311,7 +371,7 @@ export function useAuth() {
 
   if (import.meta.client && !clientSignalListenerInstalled) {
     clientSignalListenerInstalled = true
-    const receiveSignal = (data: { signal?: SessionSignal, sender?: string, id?: string }) => {
+    const receiveSignal = (data: SessionEndSignal) => {
       if (data?.sender === CLIENT_TAB_ID || (data?.id && (lastSessionSignal.value === data.id || lastHandledSessionSignal === data.id))) return
       if (data?.id) {
         lastSessionSignal.value = data.id
@@ -319,8 +379,15 @@ export function useAuth() {
       }
       if (data?.signal === 'logout' || data?.signal === 'expired') {
         clearSession()
+        sessionEnd.value = data.signal === 'expired'
+          ? { reason: endedReason(data.reason), reference: data.reference }
+          : null
         void goToLogin(data.signal === 'expired'
-          ? { returnTo: router.currentRoute.value.fullPath, reason: endedReason() }
+          ? {
+              returnTo: router.currentRoute.value.fullPath,
+              reason: endedReason(data.reason),
+              reference: data.reference
+            }
           : {})
       }
       if (data?.signal === 'refreshed') {
@@ -330,17 +397,18 @@ export function useAuth() {
     }
     if (typeof BroadcastChannel !== 'undefined') {
       clientChannel ??= new BroadcastChannel(CHANNEL_NAME)
-      clientChannel.onmessage = ({ data }: MessageEvent<{ signal?: SessionSignal, sender?: string, id?: string }>) => receiveSignal(data)
+      clientChannel.onmessage = ({ data }: MessageEvent<SessionEndSignal>) => receiveSignal(data)
     } else {
       window.addEventListener('storage', (event) => {
         if (event.key !== CHANNEL_NAME || !event.newValue) return
-        receiveSignal(JSON.parse(event.newValue) as { signal?: SessionSignal, sender?: string, id?: string })
+        receiveSignal(JSON.parse(event.newValue) as SessionEndSignal)
       })
     }
   }
 
   return {
     user: readonly(user),
+    sessionEnd: readonly(sessionEnd),
     permissions: readonly(permissions),
     clinicTimezone: readonly(clinicTimezone),
     onboardingPending: readonly(onboardingPending),

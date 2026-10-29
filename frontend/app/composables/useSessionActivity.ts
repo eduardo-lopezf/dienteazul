@@ -12,6 +12,13 @@
  * alive; and the server reads it too, so a tab reopened the next morning
  * is redirected to login before a single patient is rendered.
  *
+ * The cookie is written **after** the signal is accepted (ADR 0062).
+ * `last_activity_at` on the session family is the clock that decides,
+ * and this signal is the only thing that moves it — so stamping first
+ * and dropping the failures let the browser believe a session was
+ * younger than the server did, for good, and an hour later the user was
+ * thrown out mid-task over a signal nobody had noticed going missing.
+ *
  * The stamp is written in **server time**. The server compares it with its
  * own clock, and a browser whose clock runs an hour slow would otherwise be
  * logged out on every page load. The offset comes from the server's clock
@@ -36,7 +43,9 @@ const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touc
 // Client-only module state: one watch per page, one clock offset per load.
 let clockOffset: number | null = null
 let lastHandled = 0
-let watching = false
+// The teardown of whatever is watching right now, so a second `start`
+// replaces it instead of being turned away. See `start`.
+let stopCurrent: (() => void) | null = null
 
 export function useSessionActivity() {
   const config = useRuntimeConfig()
@@ -83,8 +92,15 @@ export function useSessionActivity() {
    * Returns the function that stops watching.
    */
   function start(onExpire: () => unknown): () => void {
-    if (import.meta.server || watching) return () => {}
-    watching = true
+    if (import.meta.server) return () => {}
+    // Replace whatever is watching rather than stand down. The guard
+    // this had — bail out if a watch exists — assumed the old layout
+    // always unmounts before the new one mounts. When the order went the
+    // other way the new instance got an inert stopper and the old
+    // instance's `onBeforeUnmount` took the real watch down with it:
+    // from then on that tab neither stamped nor signalled activity, and
+    // the session family died under somebody still working (ADR 0062).
+    stopCurrent?.()
     let expired = false
     const sessionAuthenticated = useState<boolean>('auth:session', () => false)
     const api = useApi()
@@ -100,6 +116,34 @@ export function useSessionActivity() {
       void onExpire()
     }
 
+    /**
+     * Signal the interaction, and stamp the cookie once it landed.
+     *
+     * The stamp used to go first, unconditionally, with the signal fired
+     * and forgotten after it. `last_activity_at` on the family is the
+     * only clock the backend honours and `/auth/activity` is the only
+     * thing that moves it, so every dropped signal pushed the browser's
+     * idea of the session ahead of the server's — and an hour after the
+     * drift began the user was thrown out mid-task, told the session had
+     * *expired* (the cookie was fresh, so the inactivity wording was
+     * ruled out) with nothing logged anywhere. Confirming first keeps
+     * the two clocks within one round-trip of each other, and the
+     * retry is the next interaction, 30 s away at most.
+     */
+    async function signal(): Promise<void> {
+      if (!sessionAuthenticated.value) return
+      try {
+        await api.post('/api/v1/auth/activity', null)
+        touch()
+      } catch {
+        // Left unstamped on purpose: if the backend did not take the
+        // signal, this tab must not believe the session is younger than
+        // the server does. A refusal that means the session is over has
+        // already been turned into a logout by `useApi`'s refresh path,
+        // which knows the code it was refused with.
+      }
+    }
+
     function onActivity(): void {
       const t = now()
       if (t - lastHandled < HANDLE_EVERY_MS) return
@@ -109,13 +153,10 @@ export function useSessionActivity() {
       // movement — and stamping it would quietly renew a session that had
       // already ended.
       if (isExpired()) return check()
-      touch()
-      if (sessionAuthenticated.value) {
-        void api.post('/api/v1/auth/activity', null).catch(() => {
-          // Activity transport failures do not end a session; the backend
-          // enforces idle expiry on the next authenticated request.
-        })
-      }
+      // No session to extend: nothing to confirm against, so the stamp
+      // is this tab's own (the login screen, a public budget page).
+      if (!sessionAuthenticated.value) return touch()
+      void signal()
     }
 
     function onVisible(): void {
@@ -136,9 +177,13 @@ export function useSessionActivity() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', check)
       window.clearInterval(timer)
-      watching = false
+      // Only if this watch is still the live one: a layout instance that
+      // unmounts after its replacement started must take its own
+      // listeners away and leave the replacement alone.
+      if (stopCurrent === stop) stopCurrent = null
     }
 
+    stopCurrent = stop
     return stop
   }
 

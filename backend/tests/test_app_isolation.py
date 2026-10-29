@@ -30,11 +30,11 @@ MODULES_ROOT = Path(__file__).resolve().parents[1] / "app" / "modules"
 IMPORTS: dict[str, set[str]] = {
     "workspace": set(),
     # Core Apps.
+    # `calendar_feed` is in here too and imports nothing either: the
+    # agenda's appointments reach it as plain data through
+    # `AppointmentBook.window` (ADR 0039).
     "agenda": set(),
     "patients": set(),
-    # The calendar feed imports nothing: the agenda's appointments reach
-    # it as plain data through `AppointmentBook.window` (ADR 0039).
-    "calendar_sync": set(),
     "recalls": {"patients", "agenda"},
     "treatments": {"patients"},
     # Optional Apps, as they stand.
@@ -80,10 +80,6 @@ REQUIRES: dict[str, set[str]] = {
     "cash": set(),
     "communications": set(),
     "reports": set(),
-    # The calendar feed integrates Agenda and Professionals and requires
-    # neither: with the Agenda App off it issues no subscription and the
-    # documents it already serves are empty (ADR 0037).
-    "calendar_sync": set(),
 }
 
 _IMPORT = re.compile(r"\s*(?:from|import)\s+app\.modules\.([a-z_]+)")

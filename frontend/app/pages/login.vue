@@ -12,13 +12,26 @@ const route = useRoute()
 
 // Why the user is here, when it was not their choice. Without it an
 // expired session reads as a crash: one moment a patient, the next a
-// login form.
+// login form. The reason is the backend's own (ADR 0062) — `revoked`
+// means the session was ended somewhere else, which waiting will not
+// undo, so it must not read as "it timed out".
 const sessionNotice = computed(() => {
   switch (route.query.reason) {
     case 'idle': return t('auth.sessionIdle')
     case 'expired': return t('auth.sessionExpired')
+    case 'revoked': return t('auth.sessionRevoked')
     default: return ''
   }
+})
+
+// The reference of the refusal that ended the session: one string that
+// finds its line in the operator's log (ADR 0059, ADR 0060). Shown only
+// alongside a notice, and only if it looks like a request id — it
+// arrives in a URL anybody can write.
+const sessionReference = computed(() => {
+  const ref = route.query.ref
+  const value = Array.isArray(ref) ? ref[0] : ref
+  return typeof value === 'string' && /^[\w-]{1,64}$/.test(value) ? value : ''
 })
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -177,6 +190,10 @@ watch(() => formState.password, () => {
           />
           <span class="text-body">
             {{ sessionNotice }}
+            <span
+              v-if="sessionReference"
+              class="text-caption block opacity-70"
+            >{{ t('auth.sessionReference', { reference: sessionReference }) }}</span>
           </span>
         </div>
 

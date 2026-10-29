@@ -81,6 +81,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Carry the destination, so a bookmark or a link opened without a session
   // lands there after login instead of on the dashboard.
   if (!isPublicRoute) {
-    return navigateTo(loginLocation(to.fullPath, hadSession ? 'expired' : undefined))
+    // What ended it, when something said so. A refusal during a server
+    // render cannot redirect on its own (`goToLogin` is client-only), so
+    // this is where its case and its reference reach the login screen —
+    // and where a flat "expired" used to overwrite them.
+    const ended = auth.sessionEnd.value
+    return navigateTo(
+      loginLocation(
+        to.fullPath,
+        ended?.reason ?? (hadSession ? 'expired' : undefined),
+        ended?.reference
+      )
+    )
   }
 })
