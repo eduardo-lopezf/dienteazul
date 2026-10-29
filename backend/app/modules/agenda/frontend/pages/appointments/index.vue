@@ -843,6 +843,7 @@ watch(isPhone, async (mobile) => {
       drag.
     -->
     <div
+      data-agenda-corner
       class="absolute bottom-3 right-3 z-20 flex gap-2 pointer-events-none [&>*]:pointer-events-auto"
     >
       <ModuleSlot

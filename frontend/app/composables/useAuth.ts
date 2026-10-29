@@ -98,9 +98,20 @@ export function useAuth() {
    * activity came out as "expired": the cookie was fresh precisely
    * because the browser had been writing it without the server's
    * agreement.
+   *
+   * `expired` is the one case the stamp still overrides. It is what
+   * every refusal that names nothing in particular comes out as — a
+   * request sent without the cookies, say — and it is also what the
+   * refused call reports while the inactivity watch is logging the same
+   * session out for being idle. Whoever lands second rewrote the login
+   * URL, so the notice depended on which of the two was quicker. A
+   * stamp past the idle window is the stronger statement of the two:
+   * the user was away. `idle` and `revoked` are named cases and always
+   * win.
    */
   function endedReason(code?: SessionEndReason | null): SessionEndReason {
-    return code ?? (activity.isExpired() ? 'idle' : 'expired')
+    if (code && code !== 'expired') return code
+    return activity.isExpired() ? 'idle' : 'expired'
   }
 
   const user = useState<User | null>('auth:user', () => null)

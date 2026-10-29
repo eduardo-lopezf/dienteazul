@@ -76,10 +76,10 @@ test.describe('admin sees the apps screen', () => {
       ).toHaveText(label!)
     }
 
-    // The catalog (`backend/apps.json`): Agenda v0.1, enabled.
+    // The catalog (`backend/apps.json`): Agenda v0.2, enabled.
     const agenda = loggedIn.getByTestId('app-card-agenda')
     await expect(agenda.getByRole('heading', { level: 3, name: /^Agenda$/ })).toBeVisible()
-    await expect(agenda).toContainText('v0.1')
+    await expect(agenda).toContainText('v0.2')
     // Case matters: "Deshabilitada" contains "habilitada".
     await expect(agenda).toContainText(/(^|\s)(Habilitada|Enabled)(\s|$)/)
 

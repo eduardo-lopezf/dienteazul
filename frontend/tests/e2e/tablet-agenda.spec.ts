@@ -216,7 +216,29 @@ test.describe('agenda by touch', () => {
     await expect(cells.first()).toBeVisible({ timeout: 30_000 })
     expect(await cells.count(), 'the day grid should have slots to tap').toBeGreaterThan(20)
 
-    const cell = cells.last()
+    // ...but not one sitting under the corner other Apps put their
+    // agenda shortcuts in (`agenda.calendar.subscribe`): those buttons
+    // sit over the last hours of the last column and take the tap, so
+    // the slot underneath never hears it. The slot entries arrive
+    // asynchronously, so the corner is measured after the grid has been
+    // scrolled to where the tap is going, not before.
+    await cells.last().scrollIntoViewIfNeeded()
+    const corner = page.locator('[data-agenda-corner] > *').first()
+    const obstruction = await corner.count() ? await corner.boundingBox() : null
+    const cell = await (async () => {
+      for (let i = await cells.count() - 1; i >= 0; i--) {
+        const candidate = cells.nth(i)
+        const box = await candidate.boundingBox()
+        if (!box) continue
+        const covered = obstruction
+          && box.x < obstruction.x + obstruction.width
+          && box.x + box.width > obstruction.x
+          && box.y < obstruction.y + obstruction.height
+          && box.y + box.height > obstruction.y
+        if (!covered) return candidate
+      }
+      throw new Error('every slot of the day grid is covered')
+    })()
     await cell.scrollIntoViewIfNeeded()
     await cell.click()
 
