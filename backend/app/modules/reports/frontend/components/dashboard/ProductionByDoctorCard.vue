@@ -64,6 +64,7 @@ const isEmpty = computed(() =>
     :title="t('reports.dashboard.charts.productionByDoctor')"
     icon="i-lucide-stethoscope"
     severity="info"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
   >

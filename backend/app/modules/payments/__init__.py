@@ -107,11 +107,11 @@ class PaymentsModule(BaseModule):
         return ["record.read", "record.write", "record.refund", "reports.read"]
 
     def get_providers(self) -> dict[type, object]:
-        from app.core.contracts import Collections
+        from app.core.contracts import CollectionReport, Collections
 
-        from .providers import collections
+        from .providers import collection_report, collections
 
-        return {Collections: collections}
+        return {Collections: collections, CollectionReport: collection_report}
 
     def get_tools(self) -> list:
         from . import tools

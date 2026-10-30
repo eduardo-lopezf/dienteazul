@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.core.plugins import BaseModule
+from app.core.scheduling import ScheduledJob
 
 from .router import router
 
@@ -19,7 +20,9 @@ class ReportsModule(BaseModule):
 
     manifest = {
         "name": "reports",
-        "version": "0.1.0",
+        # 0.2.0 added the module's first table (the scheduled-summary
+        # standing order); 0.3.0 adds the monthly targets.
+        "version": "0.4.0",
         "summary": "Cross-module reporting: billing, budgets, scheduling.",
         "author": "Diente Azul Core Team",
         "license": "BSL-1.1",
@@ -35,6 +38,25 @@ class ReportsModule(BaseModule):
             "billing",
             "payments",
             "professionals",
+        ],
+        "egress": [
+            {
+                "target": "smtp",
+                "subprocessor": (
+                    "El servidor SMTP que configure cada clínica — el "
+                    "destinatario real depende de esa configuración y no de "
+                    "este código, así que el contrato lo firma la clínica."
+                ),
+                "residency": "unspecified",
+                "data_classes": ["identifier", "operational", "financial"],
+                "purpose": (
+                    "Enviar a la propia clínica su resumen de una página "
+                    "cuando lo programa. Salen las direcciones del personal "
+                    "que lo recibe y las cifras agregadas del periodo; nunca "
+                    "datos de un paciente identificable."
+                ),
+                "required": False,
+            }
         ],
         "installable": True,
         "auto_install": True,
@@ -61,8 +83,12 @@ class ReportsModule(BaseModule):
     }
 
     def get_models(self) -> list:
-        # Reports module has no models - it queries other modules' data
-        return []
+        # Every figure is computed on demand from other modules' tables.
+        # The one row this module owns is the standing order for the
+        # scheduled summary.
+        from .models import MonthlyTarget, SummarySchedule
+
+        return [SummarySchedule, MonthlyTarget]
 
     def get_router(self) -> APIRouter:
         return router
@@ -72,6 +98,25 @@ class ReportsModule(BaseModule):
             "billing.read",  # View billing reports
             "budgets.read",  # View budget reports
             "scheduling.read",  # View scheduling reports
+            "summary.read",  # Print the clinic's one-page summary
+            "summary.write",  # Decide when the summary goes out, and to whom
+            "actionable.read",  # Work the lists of patients to contact
+        ]
+
+    def get_scheduled_jobs(self) -> list[ScheduledJob]:
+        from .tasks import send_scheduled_summaries
+
+        return [
+            ScheduledJob(
+                id="send_scheduled_summaries",
+                func=send_scheduled_summaries,
+                trigger="cron",
+                trigger_args={"hour": 7, "minute": 30},
+                name=(
+                    "Mail each clinic its one-page summary when a period closes "
+                    "(daily 07:30; weekly on Monday, monthly on the 1st)"
+                ),
+            )
         ]
 
     def get_tools(self) -> list:

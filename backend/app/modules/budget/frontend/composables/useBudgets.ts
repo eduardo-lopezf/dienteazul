@@ -44,17 +44,6 @@ export interface BudgetListParams {
   search?: string
 }
 
-// Status colors for badges
-const STATUS_COLORS: Record<BudgetStatus, string> = {
-  draft: 'gray',
-  sent: 'blue',
-  accepted: 'green',
-  completed: 'emerald',
-  rejected: 'red',
-  expired: 'orange',
-  cancelled: 'neutral'
-}
-
 export function useBudgets() {
   const api = useApi()
 
@@ -396,10 +385,6 @@ export function useBudgets() {
   // Helpers
   // ============================================================================
 
-  function getStatusColor(status: BudgetStatus): string {
-    return STATUS_COLORS[status] || 'gray'
-  }
-
   function canEdit(budget: Budget | BudgetDetail | BudgetListItem): boolean {
     return budget.status === 'draft'
   }
@@ -475,7 +460,6 @@ export function useBudgets() {
     fetchSignature,
 
     // Helpers
-    getStatusColor,
     canEdit,
     canSend,
     canAccept,

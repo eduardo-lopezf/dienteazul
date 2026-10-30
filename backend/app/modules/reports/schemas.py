@@ -2,9 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 # ============================================================================
 # Common
@@ -286,3 +287,92 @@ class DayOfWeekStats(BaseModel):
     completed_count: int
     cancelled_count: int
     no_show_count: int
+
+
+# ============================================================================
+# Scheduled summary
+# ============================================================================
+
+
+class SummaryScheduleResponse(BaseModel):
+    """A clinic's standing order for its one-page summary."""
+
+    is_active: bool
+    cadence: Literal["weekly", "monthly"]
+    recipients: list[EmailStr]
+    last_sent_for: date | None
+
+
+class SummaryScheduleUpdate(BaseModel):
+    """What the settings screen sends back.
+
+    ``recipients`` is capped: this is the clinic telling itself how it is
+    doing, not a mailing list, and an unbounded list is an unbounded send
+    on a cron.
+    """
+
+    is_active: bool = False
+    cadence: Literal["weekly", "monthly"] = "monthly"
+    recipients: list[EmailStr] = Field(default_factory=list, max_length=10)
+
+
+# ============================================================================
+# Monthly targets
+# ============================================================================
+
+
+class AttainmentOut(BaseModel):
+    """One goal: asked, arrived, and how far that is.
+
+    ``ratio`` is null when no goal was set — different from a goal of
+    zero, and a screen must not draw them alike.
+    """
+
+    target: Decimal | None
+    actual: Decimal
+    ratio: float | None
+
+
+class MonthlyTargetResponse(BaseModel):
+    month: date
+    collected: AttainmentOut
+    production: AttainmentOut
+    new_patients: AttainmentOut
+
+
+class MonthlyTargetUpdate(BaseModel):
+    """Every goal optional: a clinic sets the ones it actually steers by."""
+
+    collected_target: Decimal | None = Field(default=None, ge=0)
+    production_target: Decimal | None = Field(default=None, ge=0)
+    new_patients_target: int | None = Field(default=None, ge=0)
+
+
+# ============================================================================
+# Actionable lists
+# ============================================================================
+
+
+class ActionableRowOut(BaseModel):
+    """One person to contact, and why.
+
+    The PII fields keep the owning columns' names (`phone`, `email`,
+    `patient_name`) so the classification on those columns still
+    tokenizes them wherever this is serialized (ADR 0025).
+    """
+
+    patient_id: UUID
+    patient_name: str
+    phone: str | None
+    email: str | None
+    amount: Decimal | None
+    days: int | None
+    detail: str | None
+
+
+class ActionableListOut(BaseModel):
+    """A list, plus what it was asked for, so a screen can say so."""
+
+    key: Literal["owes_not_booked", "accepted_not_booked", "no_visit"]
+    rows: list[ActionableRowOut]
+    truncated: bool

@@ -10,6 +10,9 @@ import type {
   SchedulingSummary,
   WaitingTimeStats
 } from '../../composables/useReports'
+import FilterDateRange from '~~/app/components/shared/FilterDateRange.vue'
+import EmptyPeriodNotice from '../../components/EmptyPeriodNotice.vue'
+import ReportExportButton from '~~/app/components/shared/ReportExportButton.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -55,66 +58,10 @@ const durationVariance = ref<DurationVarianceStats | null>(null)
 const funnel = ref<AppointmentFunnel | null>(null)
 
 // ─── Date range ──────────────────────────────────────────────────────
-const today = new Date()
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-const dateFrom = ref(firstDayOfMonth.toISOString().split('T')[0] as string)
-const dateTo = ref(today.toISOString().split('T')[0] as string)
-
-const dateRangeOptions = computed(() => [
-  { label: t('reports.billing.thisMonth'), value: 'month' },
-  { label: t('reports.billing.thisQuarter'), value: 'quarter' },
-  { label: t('reports.billing.thisYear'), value: 'year' },
-  { label: t('reports.billing.lastMonth'), value: 'last_month' },
-  { label: t('reports.billing.lastQuarter'), value: 'last_quarter' },
-  { label: t('reports.billing.lastYear'), value: 'last_year' },
-  { label: t('reports.scheduling.filters.custom'), value: 'custom' }
-])
-const selectedRange = ref('month')
-
-watch(selectedRange, (range) => {
-  if (range === 'custom') return
-  const now = new Date()
-  let from: Date
-  let to: Date
-
-  switch (range) {
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1)
-      to = now
-      break
-    case 'quarter': {
-      const quarter = Math.floor(now.getMonth() / 3)
-      from = new Date(now.getFullYear(), quarter * 3, 1)
-      to = now
-      break
-    }
-    case 'year':
-      from = new Date(now.getFullYear(), 0, 1)
-      to = now
-      break
-    case 'last_month':
-      from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      to = new Date(now.getFullYear(), now.getMonth(), 0)
-      break
-    case 'last_quarter': {
-      const lastQuarter = Math.floor(now.getMonth() / 3) - 1
-      const year = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear()
-      const q = lastQuarter < 0 ? 3 : lastQuarter
-      from = new Date(year, q * 3, 1)
-      to = new Date(year, q * 3 + 3, 0)
-      break
-    }
-    case 'last_year':
-      from = new Date(now.getFullYear() - 1, 0, 1)
-      to = new Date(now.getFullYear() - 1, 11, 31)
-      break
-    default:
-      return
-  }
-
-  dateFrom.value = from.toISOString().split('T')[0] as string
-  dateTo.value = to.toISOString().split('T')[0] as string
-})
+// One range for the whole Productividad section (``useReportPeriod``),
+// mirrored into the URL so the period survives the drill-down.
+const { period, model: dateRangeModel, syncQuery } = useReportPeriod()
+syncQuery()
 
 // ─── Filters ─────────────────────────────────────────────────────────
 const selectedCabinetId = ref<string | null>(null)
@@ -134,6 +81,12 @@ const tabOptions = computed(() => [
   { value: 'quality', label: t('reports.scheduling.tabs.quality'), icon: 'i-lucide-gauge' }
 ])
 
+// No appointment at all in the range: every panel below reduces to the
+// same "Sin datos" card, so say why once and offer the way out.
+const periodIsEmpty = computed(() =>
+  !isLoading.value && !!summary.value && summary.value.total_appointments === 0
+)
+
 // ─── Data load ───────────────────────────────────────────────────────
 async function loadReports() {
   isLoading.value = true
@@ -150,15 +103,15 @@ async function loadReports() {
       durationData,
       funnelData
     ] = await Promise.all([
-      fetchSchedulingSummary(dateFrom.value, dateTo.value),
-      fetchFirstVisits(dateFrom.value, dateTo.value),
-      fetchHoursByProfessional(dateFrom.value, dateTo.value),
-      fetchCabinetUtilization(dateFrom.value, dateTo.value),
-      fetchByDayOfWeek(dateFrom.value, dateTo.value),
-      fetchWaitingTimes(dateFrom.value, dateTo.value, analyticsFilters.value),
-      fetchPunctuality(dateFrom.value, dateTo.value, analyticsFilters.value),
-      fetchDurationVariance(dateFrom.value, dateTo.value, analyticsFilters.value),
-      fetchFunnel(dateFrom.value, dateTo.value, analyticsFilters.value)
+      fetchSchedulingSummary(period.value.from, period.value.to),
+      fetchFirstVisits(period.value.from, period.value.to),
+      fetchHoursByProfessional(period.value.from, period.value.to),
+      fetchCabinetUtilization(period.value.from, period.value.to),
+      fetchByDayOfWeek(period.value.from, period.value.to),
+      fetchWaitingTimes(period.value.from, period.value.to, analyticsFilters.value),
+      fetchPunctuality(period.value.from, period.value.to, analyticsFilters.value),
+      fetchDurationVariance(period.value.from, period.value.to, analyticsFilters.value),
+      fetchFunnel(period.value.from, period.value.to, analyticsFilters.value)
     ])
 
     summary.value = summaryData
@@ -177,9 +130,9 @@ async function loadReports() {
   }
 }
 
-watch([dateFrom, dateTo, selectedCabinetId, selectedProfessionalId], () => {
+watch([period, selectedCabinetId, selectedProfessionalId], () => {
   loadReports()
-})
+}, { deep: true })
 
 onMounted(async () => {
   await fetchProfessionals()
@@ -285,10 +238,6 @@ function clearFilters() {
 const hasActiveAnalyticsFilter = computed(() =>
   selectedCabinetId.value !== null || selectedProfessionalId.value !== null
 )
-
-function goBack() {
-  router.push('/reports')
-}
 </script>
 
 <template>
@@ -297,69 +246,29 @@ function goBack() {
     <PageHeader
       :title="t('reports.scheduling.title')"
       :subtitle="t('reports.scheduling.description')"
+      back="/reports"
     >
       <template #actions>
+        <FilterDateRange
+          v-model="dateRangeModel"
+          :label="t('common.period')"
+        />
+        <ReportExportButton
+          endpoint="/api/v1/reports/scheduling/export"
+          stem="agenda"
+        />
         <UButton
-          variant="ghost"
-          color="neutral"
-          icon="i-lucide-arrow-left"
-          @click="goBack"
-        >
-          {{ t('common.back') }}
-        </UButton>
+          :loading="isLoading"
+          variant="soft"
+          icon="i-lucide-refresh-cw"
+          :aria-label="t('reports.billing.refresh')"
+          @click="loadReports"
+        />
       </template>
     </PageHeader>
 
     <!-- Filter bar -->
     <div class="space-y-3">
-      <div class="flex flex-wrap items-end gap-3">
-        <UFormField :label="t('reports.billing.period')">
-          <USelectMenu
-            v-model="selectedRange"
-            :aria-label="t('reports.billing.period')"
-            :items="dateRangeOptions"
-            value-key="value"
-            class="w-48"
-          />
-        </UFormField>
-
-        <template v-if="selectedRange === 'custom'">
-          <UFormField :label="t('reports.billing.from')">
-            <UInput
-              v-model="dateFrom"
-              type="date"
-            />
-          </UFormField>
-          <UFormField :label="t('reports.billing.to')">
-            <UInput
-              v-model="dateTo"
-              type="date"
-            />
-          </UFormField>
-        </template>
-
-        <div class="ml-auto flex items-center gap-2">
-          <UButton
-            v-if="hasActiveAnalyticsFilter"
-            variant="ghost"
-            color="neutral"
-            icon="i-lucide-x"
-            size="sm"
-            @click="clearFilters"
-          >
-            {{ t('reports.scheduling.filters.clear') }}
-          </UButton>
-          <UButton
-            :loading="isLoading"
-            variant="soft"
-            icon="i-lucide-refresh-cw"
-            @click="loadReports"
-          >
-            {{ t('reports.billing.refresh') }}
-          </UButton>
-        </div>
-      </div>
-
       <!-- Cabinet & professional chips -->
       <div
         v-if="cabinetChips.length > 0 || professionals.length > 0"
@@ -409,6 +318,18 @@ function goBack() {
             @toggle="toggleProfessional(p.id)"
           />
         </div>
+
+        <div v-if="hasActiveAnalyticsFilter">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-x"
+            size="sm"
+            @click="clearFilters"
+          >
+            {{ t('reports.scheduling.filters.clear') }}
+          </UButton>
+        </div>
       </div>
     </div>
 
@@ -432,6 +353,8 @@ function goBack() {
     </div>
 
     <template v-else>
+      <EmptyPeriodNotice v-if="periodIsEmpty" />
+
       <!-- Hero strip -->
       <div
         v-if="summary"

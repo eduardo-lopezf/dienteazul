@@ -74,7 +74,10 @@ export const PERMISSIONS = {
   reports: {
     billingRead: 'reports.billing.read',
     budgetsRead: 'reports.budgets.read',
-    schedulingRead: 'reports.scheduling.read'
+    schedulingRead: 'reports.scheduling.read',
+    summaryRead: 'reports.summary.read',
+    actionableRead: 'reports.actionable.read',
+    summaryWrite: 'reports.summary.write'
   },
   documents: {
     read: 'media.documents.read',

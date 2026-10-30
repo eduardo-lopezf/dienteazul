@@ -193,7 +193,7 @@ export interface PaymentsTrends {
 
 export function useReports() {
   const api = useApi()
-  const { t } = useI18n()
+  const { t, te } = useI18n()
 
   // ============================================================================
   // Billing Reports
@@ -608,28 +608,13 @@ export function useReports() {
     return format(num)
   }
 
+  // The status comes straight from the budget module, so the key is
+  // looked up rather than listed: the hand-written map had gone stale on
+  // `sent` and the report printed the raw value. `te` keeps an unknown
+  // status printing itself instead of a key path.
   function getBudgetStatusLabel(status: string): string {
-    const labels: Record<string, string> = {
-      draft: t('budget.status.draft'),
-      accepted: t('budget.status.accepted'),
-      rejected: t('budget.status.rejected'),
-      completed: t('budget.status.completed'),
-      expired: t('budget.status.expired'),
-      cancelled: t('budget.status.cancelled')
-    }
-    return labels[status] || status
-  }
-
-  function getBudgetStatusColor(status: string): string {
-    const colors: Record<string, string> = {
-      draft: 'neutral',
-      accepted: 'success',
-      rejected: 'error',
-      completed: 'info',
-      expired: 'warning',
-      cancelled: 'neutral'
-    }
-    return colors[status] || 'neutral'
+    const key = `budget.status.${status}`
+    return te(key) ? t(key) : status
   }
 
   function getDayOfWeekLabel(dayName: string): string {
@@ -689,7 +674,6 @@ export function useReports() {
     // Helpers
     formatCurrency,
     getBudgetStatusLabel,
-    getBudgetStatusColor,
     getDayOfWeekLabel,
     formatHours,
     getPaymentMethodLabel

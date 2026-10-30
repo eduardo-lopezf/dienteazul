@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Protocol, TypeVar
 from uuid import UUID
 
@@ -293,6 +294,81 @@ class Collections(Protocol):
         treatment_ids: Collection[UUID],
     ) -> bool:
         """Whether money the patient paid sits on these budgets or treatments."""
+
+
+@dataclass(frozen=True, slots=True)
+class CollectedPeriod:
+    """What a clinic took in over a period, and what it is owed today.
+
+    The collection axis and nothing else: no field here is, or can be
+    derived into, the difference between what was invoiced and what was
+    collected (ADR 0010). A consumer that wants the invoice axis reads
+    billing's own report.
+    """
+
+    currency: str
+    collected: Decimal
+    refunded: Decimal
+    net_collected: Decimal
+    payment_count: int
+    #: Point in time, not the period: what is owed as of now.
+    receivable_today: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class ProducedBy:
+    """Treatment executed in the period, attributed to one professional."""
+
+    professional_name: str | None
+    total: Decimal
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class PatientDebt:
+    """One patient's outstanding balance, and how old the worst of it is.
+
+    ``age_days`` is measured from the earliest charge the money has not
+    reached, not from the patient's oldest charge: a patient who is up to
+    date except for last week is not a 90-day debtor.
+    """
+
+    patient_id: UUID
+    amount: Decimal
+    age_days: int
+
+
+class CollectionReport(Protocol):
+    """The collection figures a clinic-wide summary puts on one page."""
+
+    async def collected_in_period(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        currency: str,
+        timezone: str,
+        date_from: date,
+        date_to: date,
+    ) -> CollectedPeriod:
+        """Collected, refunded and still owed, for this period."""
+
+    async def produced_by_professional(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        timezone: str,
+        date_from: date,
+        date_to: date,
+    ) -> list[ProducedBy]:
+        """Who executed the treatment the period earned."""
+
+    async def patients_owing(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        minimum: Decimal,
+    ) -> list[PatientDebt]:
+        """Who owes at least ``minimum``, oldest debt first."""
 
 
 class PlanConsents(Protocol):

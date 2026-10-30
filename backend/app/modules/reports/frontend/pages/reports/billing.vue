@@ -7,6 +7,11 @@ import type {
   ProfessionalBillingSummary,
   VatSummaryItem
 } from '~~/app/types'
+import FilterDateRange from '~~/app/components/shared/FilterDateRange.vue'
+import SnapshotBadge from '../../components/SnapshotBadge.vue'
+import EmptyPeriodNotice from '../../components/EmptyPeriodNotice.vue'
+import ReportExportButton from '~~/app/components/shared/ReportExportButton.vue'
+import BackButton from '~~/app/components/shared/BackButton.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -36,66 +41,20 @@ const professionals = ref<ProfessionalBillingSummary[]>([])
 const vatSummary = ref<VatSummaryItem[]>([])
 const numberingGaps = ref<NumberingGap[]>([])
 
-// Date range
-const today = new Date()
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-const dateFrom = ref(firstDayOfMonth.toISOString().split('T')[0])
-const dateTo = ref(today.toISOString().split('T')[0])
+// One range for the whole Productividad section (``useReportPeriod``),
+// mirrored into the URL so the period survives the drill-down.
+const { period, model: dateRangeModel, syncQuery } = useReportPeriod()
+syncQuery()
 
-// Quick date range options
-const dateRangeOptions = computed(() => [
-  { label: t('reports.billing.thisMonth'), value: 'month' },
-  { label: t('reports.billing.thisQuarter'), value: 'quarter' },
-  { label: t('reports.billing.thisYear'), value: 'year' },
-  { label: t('reports.billing.lastMonth'), value: 'last_month' },
-  { label: t('reports.billing.lastQuarter'), value: 'last_quarter' },
-  { label: t('reports.billing.lastYear'), value: 'last_year' }
-])
-const selectedRange = ref('month')
-
-watch(selectedRange, (range) => {
-  const now = new Date()
-  let from: Date
-  let to: Date
-
-  switch (range) {
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1)
-      to = now
-      break
-    case 'quarter': {
-      const quarter = Math.floor(now.getMonth() / 3)
-      from = new Date(now.getFullYear(), quarter * 3, 1)
-      to = now
-      break
-    }
-    case 'year':
-      from = new Date(now.getFullYear(), 0, 1)
-      to = now
-      break
-    case 'last_month':
-      from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      to = new Date(now.getFullYear(), now.getMonth(), 0)
-      break
-    case 'last_quarter': {
-      const lastQuarter = Math.floor(now.getMonth() / 3) - 1
-      const year = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear()
-      const q = lastQuarter < 0 ? 3 : lastQuarter
-      from = new Date(year, q * 3, 1)
-      to = new Date(year, q * 3 + 3, 0)
-      break
-    }
-    case 'last_year':
-      from = new Date(now.getFullYear() - 1, 0, 1)
-      to = new Date(now.getFullYear() - 1, 11, 31)
-      break
-    default:
-      return
-  }
-
-  dateFrom.value = from.toISOString().split('T')[0]
-  dateTo.value = to.toISOString().split('T')[0]
-})
+// Nothing issued and nothing collected: the range, not the clinic, is
+// usually what is wrong. The snapshot figures below still mean something,
+// so the notice goes above them rather than replacing the screen.
+const periodIsEmpty = computed(() =>
+  !isLoading.value
+  && !!summary.value
+  && summary.value.invoice_count === 0
+  && Number(summary.value.total_paid) === 0
+)
 
 // Load all report data
 async function loadReports() {
@@ -110,11 +69,11 @@ async function loadReports() {
       vatData,
       gapsData
     ] = await Promise.all([
-      fetchBillingSummary(dateFrom.value, dateTo.value),
+      fetchBillingSummary(period.value.from, period.value.to),
       fetchOverdueInvoices(),
-      fetchByPaymentMethod(dateFrom.value, dateTo.value),
-      fetchBillingByProfessional(dateFrom.value, dateTo.value),
-      fetchVatSummary(dateFrom.value, dateTo.value),
+      fetchByPaymentMethod(period.value.from, period.value.to),
+      fetchBillingByProfessional(period.value.from, period.value.to),
+      fetchVatSummary(period.value.from, period.value.to),
       fetchNumberingGaps()
     ])
 
@@ -131,10 +90,10 @@ async function loadReports() {
   }
 }
 
-// Reload when dates change
-watch([dateFrom, dateTo], () => {
+// Reload when the shared period changes
+watch(period, () => {
   loadReports()
-})
+}, { deep: true })
 
 onMounted(() => {
   loadReports()
@@ -165,69 +124,36 @@ function getPaymentMethodIcon(method: string): string {
 function goToInvoice(id: string) {
   router.push(`/invoices/${id}`)
 }
-
-function goBack() {
-  router.push('/reports')
-}
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <UButton
-          variant="ghost"
-          color="neutral"
-          icon="i-lucide-arrow-left"
-          @click="goBack"
-        />
-        <div>
-          <h1 class="text-display text-default">
+    <!-- Header: back, title and the one period control -->
+    <header
+      class="sticky top-0 z-10 -mx-4 px-4 py-3 bg-surface border-b border-default flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex items-center gap-4 min-w-0">
+        <BackButton to="/reports" />
+        <div class="min-w-0">
+          <h1 class="text-display text-default truncate">
             {{ t('reports.billing.title') }}
           </h1>
-          <p class="text-caption text-subtle">
+          <p class="text-caption text-subtle truncate">
             {{ t('reports.billing.description') }}
           </p>
         </div>
       </div>
-    </div>
-
-    <!-- Date Range Filters -->
-    <UCard>
-      <div class="flex flex-wrap items-end gap-4">
-        <UFormField :label="t('reports.billing.period')">
-          <USelectMenu
-            v-model="selectedRange"
-            :aria-label="t('reports.billing.period')"
-            :items="dateRangeOptions"
-            value-key="value"
-            class="w-48"
-          />
-        </UFormField>
-
-        <UFormField :label="t('reports.billing.from')">
-          <UInput
-            v-model="dateFrom"
-            type="date"
-          />
-        </UFormField>
-
-        <UFormField :label="t('reports.billing.to')">
-          <UInput
-            v-model="dateTo"
-            type="date"
-          />
-        </UFormField>
-
-        <UButton
-          :loading="isLoading"
-          @click="loadReports"
-        >
-          {{ t('reports.billing.refresh') }}
-        </UButton>
+      <div class="flex items-center gap-2">
+        <FilterDateRange
+          v-model="dateRangeModel"
+          :label="t('common.period')"
+        />
+        <ReportExportButton
+          endpoint="/api/v1/reports/billing/export"
+          stem="facturacion"
+        />
       </div>
-    </UCard>
+    </header>
 
     <!-- Loading state -->
     <div
@@ -241,6 +167,8 @@ function goBack() {
     </div>
 
     <template v-else>
+      <EmptyPeriodNotice v-if="periodIsEmpty" />
+
       <!-- Summary Cards -->
       <div
         v-if="summary"
@@ -282,6 +210,7 @@ function goBack() {
             <p class="text-display text-default text-warning-accent">
               {{ formatCurrency(summary.total_pending) }}
             </p>
+            <SnapshotBadge />
           </div>
         </UCard>
 
@@ -299,6 +228,7 @@ function goBack() {
             <p class="text-caption text-subtle">
               {{ t('reports.billing.invoices') }}
             </p>
+            <SnapshotBadge />
           </div>
         </UCard>
       </div>
@@ -308,8 +238,13 @@ function goBack() {
         v-if="numberingGaps.length > 0"
         color="warning"
         icon="i-lucide-alert-triangle"
-        :title="t('reports.billing.gapsDetected')"
       >
+        <template #title>
+          <span class="flex items-center gap-2">
+            {{ t('reports.billing.gapsDetected') }}
+            <SnapshotBadge />
+          </span>
+        </template>
         <template #description>
           <div class="space-y-1">
             <div
@@ -476,8 +411,9 @@ function goBack() {
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-default">
+              <h3 class="font-semibold text-default flex items-center gap-2">
                 {{ t('reports.billing.overdueInvoices') }}
+                <SnapshotBadge />
               </h3>
               <UBadge
                 v-if="overdueInvoices.length > 0"

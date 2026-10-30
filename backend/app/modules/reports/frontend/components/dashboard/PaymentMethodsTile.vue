@@ -42,8 +42,11 @@ const isEmpty = computed(() =>
   !props.state.loading && (!props.state.data || slices.value.every(s => s.value === 0))
 )
 
-function onSlice(key: string) {
-  navigateTo({ path: '/reports/billing', query: { method: key } })
+// The donut is the collection axis, so a slice opens the collections
+// report, not billing. The card itself stays unwrapped: a `to` would make
+// SummaryCard a link and a slice click would fire twice.
+function onSlice() {
+  navigateTo('/reports/payments')
 }
 </script>
 

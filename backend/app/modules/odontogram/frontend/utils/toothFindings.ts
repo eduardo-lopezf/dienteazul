@@ -184,6 +184,49 @@ export function toggleDraft(
   return next
 }
 
+export interface ClearResult {
+  next: Map<string, boolean>
+  /** Findings taken off, counting one per finding and tooth. */
+  cleared: number
+  /**
+   * Findings left on because they are not the card's to take off (a catalog
+   * treatment, a plan, several teeth at once). The card says so rather than
+   * promising a blank tooth it cannot deliver.
+   */
+  locked: number
+}
+
+/**
+ * *Limpiar*: every finding the card may take off the picked teeth comes off,
+ * as one pending step. A pending press that put a finding on simply goes
+ * away with it; what is charted from elsewhere stays and is counted.
+ */
+export function clearDraft(
+  teeth: number[],
+  facts: TeethFacts,
+  draft: FindingDraft
+): ClearResult {
+  const next = new Map(draft)
+  let cleared = 0
+  let locked = 0
+  for (const tooth of teeth) {
+    for (const finding of ALL_FINDINGS) {
+      if (!effectiveOn(finding, tooth, facts, draft)) continue
+      const real = stateOn(finding, tooth, facts)
+      if (real.active && real.locked) {
+        locked++
+        continue
+      }
+      // Already off on the chart: this was a pending press, so dropping the
+      // entry is the whole removal.
+      if (real.active) next.set(draftKey(finding, tooth), false)
+      else next.delete(draftKey(finding, tooth))
+      cleared++
+    }
+  }
+  return { next, cleared, locked }
+}
+
 export interface FindingChange {
   finding: ToothFinding
   tooth: number

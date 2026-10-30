@@ -37,6 +37,7 @@ const isEmpty = computed(() =>
     :title="t('reports.dashboard.kpi.avgCollectedTicket')"
     icon="i-lucide-receipt"
     severity="neutral"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
     :value="value"

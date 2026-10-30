@@ -13,8 +13,9 @@
  * Presses are pending (`FindingDraft`): the card's chart and switches show
  * them, *Aceptar* hands them to the chart to save, *Cancelar* (or closing
  * the card) drops them. *Deshacer* / *Rehacer* (Ctrl+Z, Ctrl+Shift+Z or
- * Ctrl+Y) step through the presses; *Limpiar* drops every pending press at
- * once — the card as it opened — and can itself be undone. Caries and
+ * Ctrl+Y) step through the presses; *Limpiar* takes every finding the card
+ * may remove off the picked teeth at once, as one pending step that can
+ * itself be undone, and says how many are not its to remove. Caries and
  * *Erupción…* save what is pending first,
  * since they leave the card. The chart charts, so its own state (undo,
  * toasts, history) stays the one source.
@@ -26,6 +27,7 @@ import { nomColor } from '../../utils/nomColors'
 import {
   MAIN_FINDINGS,
   OTHER_FINDINGS,
+  clearDraft,
   draftChanges,
   draftViews,
   selectionSummary,
@@ -105,10 +107,10 @@ function redo() {
   draft.value = next
 }
 
-/** Back to the card as it opened: nothing pending. */
+/** The picked teeth with nothing on them the card charts. */
 function clear() {
-  if (!draft.value.size || props.saving) return
-  commitDraft(new Map())
+  if (props.saving || !clearable.value.cleared) return
+  commitDraft(clearable.value.next)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -149,6 +151,9 @@ function previewTreatments(tooth: number) {
 }
 
 const pendingCount = computed(() => draft.value.size)
+
+/** What *Limpiar* would take off the picked teeth, and what it cannot. */
+const clearable = computed(() => clearDraft(picked.value, facts.value, draft.value))
 
 function press(finding: ToothFinding) {
   if (finding.kind === 'surface') {
@@ -385,7 +390,7 @@ const groups = computed(() => [
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-eraser"
-                :disabled="!draft.size || saving"
+                :disabled="!clearable.cleared || saving"
                 :title="t('odontogram.findings.clearHint')"
                 data-testid="tooth-diagnosis-clear"
                 @click="clear"
@@ -394,6 +399,16 @@ const groups = computed(() => [
               </UButton>
             </div>
             <div class="flex items-center gap-2 ms-auto">
+              <!-- A blank tooth is not always the card's to give: what came
+                   from a catalog item, a plan or several teeth at once stays,
+                   and saying so beats a button that silently leaves it. -->
+              <span
+                v-if="clearable.locked"
+                class="text-caption text-muted"
+                data-testid="tooth-diagnosis-locked"
+              >
+                {{ t('odontogram.findings.clearLocked', { count: clearable.locked }, clearable.locked) }}
+              </span>
               <span
                 v-if="pendingCount"
                 class="text-caption text-muted"

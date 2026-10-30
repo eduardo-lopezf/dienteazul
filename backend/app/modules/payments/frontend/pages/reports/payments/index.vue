@@ -21,12 +21,24 @@ import type {
   RefundsReport
 } from '~~/app/types'
 import { formatDateOnly } from '~~/app/utils/date'
+import ReportExportButton from '~~/app/components/shared/ReportExportButton.vue'
 
 definePageMeta({ middleware: 'auth' })
 
 const { t, locale } = useI18n()
 const { format: formatMoney } = useCurrency()
 const { summary, byMethod, byProfessional, aging, refunds, trends } = usePaymentReports()
+
+// This screen lives under /reports but belongs to payments, so it survives
+// the Productividad App being switched off (ADR 0038) — and then there is
+// nowhere to go back to. Until the module list arrives, assume it is there:
+// the route guard on /reports is the real gate.
+const { active: activeModules } = useModules()
+const backTo = computed(() =>
+  activeModules.value === null || activeModules.value.some(m => m.name === 'reports')
+    ? '/reports'
+    : undefined
+)
 
 type Granularity = 'day' | 'week' | 'month'
 
@@ -39,14 +51,13 @@ function toIso(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
-function defaultRange(): Range {
-  const to = new Date()
-  const from = new Date()
-  from.setDate(to.getDate() - 89)
-  return { from: toIso(from), to: toIso(to) }
-}
+// The period is the one the whole Productividad section shares
+// (`useReportPeriod`, host state): arriving from the panel keeps the
+// range the user picked there instead of resetting to this screen's own.
+const { period, model: dateRangeModel, syncQuery } = useReportPeriod()
+syncQuery()
 
-const range = ref<Range>(defaultRange())
+const range = computed<Range>(() => ({ from: period.value.from, to: period.value.to }))
 const granularity = ref<Granularity>('month')
 
 const summaryData = ref<PaymentsSummary | null>(null)
@@ -291,9 +302,18 @@ const allReportsEmpty = computed(() => {
     <PageHeader
       :title="t('payments.reports.title')"
       :subtitle="t('payments.reports.subtitle')"
+      :back="backTo"
     >
       <template #actions>
-        <FilterDateRange v-model="range" />
+        <FilterDateRange
+          v-model="dateRangeModel"
+          :label="t('common.period')"
+        />
+        <ReportExportButton
+          endpoint="/api/v1/payments/reports/export"
+          stem="cobros"
+          :query="{ granularity }"
+        />
         <UButton
           variant="ghost"
           color="neutral"

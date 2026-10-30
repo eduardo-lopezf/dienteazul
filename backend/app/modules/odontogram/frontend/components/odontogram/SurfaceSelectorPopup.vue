@@ -202,9 +202,19 @@ watch(() => props.open, (isOpen) => {
     </template>
 
     <template #body>
-      <div class="surface-selector">
-        <!-- Tooth visualization -->
-        <div class="tooth-views">
+      <div
+        class="surface-selector"
+        data-testid="surface-selector"
+      >
+        <!-- Tooth visualization. One tooth drawn at 160 px leaves every
+             surface over 44 px across (the narrow bands are 46 px), so this
+             is **not** a dense surface: it is tapped directly, and the
+             M/D/V/L/O buttons below are the second way, not a rescue.
+             `tablet-surface-picker.spec.ts` measures all five. -->
+        <div
+          data-testid="surface-tooth-views"
+          class="tooth-views"
+        >
           <!-- Occlusal View -->
           <div class="view-container">
             <div class="view-label">
@@ -272,6 +282,7 @@ watch(() => props.open, (isOpen) => {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   class="surface-path"
+                  :data-surface="surface"
                   @click="toggleSurface(surface as Surface)"
                 />
               </g>
@@ -362,6 +373,8 @@ watch(() => props.open, (isOpen) => {
             type="button"
             class="surface-btn"
             :class="{ selected: isSurfaceSelected(surface) }"
+            :data-testid="`surface-btn-${surface}`"
+            :data-active="isSurfaceSelected(surface)"
             :style="isSurfaceSelected(surface) ? { borderColor: treatmentColor, backgroundColor: treatmentColor + '15' } : {}"
             @click="toggleSurface(surface)"
           >
@@ -408,6 +421,7 @@ watch(() => props.open, (isOpen) => {
           <UButton
             color="neutral"
             variant="ghost"
+            data-testid="surface-cancel"
             @click="handleCancel"
           >
             {{ t('common.cancel') }}
@@ -415,6 +429,7 @@ watch(() => props.open, (isOpen) => {
           <UButton
             color="primary"
             :disabled="selectedSurfaces.length === 0"
+            data-testid="surface-confirm"
             @click="handleConfirm"
           >
             {{ t('common.confirm') }}
@@ -466,6 +481,9 @@ watch(() => props.open, (isOpen) => {
 .surface-path {
   cursor: pointer;
   transition: all 0.15s ease;
+  /* No double-tap-to-zoom delay on the drawing: `main.css` gives this to
+     buttons and links on a coarse pointer, and these are SVG paths. */
+  touch-action: manipulation;
 }
 
 .surface-path:hover {
@@ -474,6 +492,7 @@ watch(() => props.open, (isOpen) => {
 
 .surface-label,
 .surface-label-center {
+  touch-action: manipulation;
   font-size: 6px;
   font-weight: 600;
   fill: #6B7280;

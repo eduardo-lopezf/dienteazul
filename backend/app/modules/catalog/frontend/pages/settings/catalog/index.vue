@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TreatmentCatalogItem, TreatmentCatalogItemUpdate, TreatmentCatalogItemCreate, TreatmentCatalogCategory, VatTypeBrief, Specialty, SpecialtyCreate, SpecialtySuggestion, SpecialtyUpdate } from '~~/app/types'
+import type { TreatmentCatalogItem, TreatmentCatalogItemUpdate, TreatmentCatalogItemCreate, TreatmentCatalogCategory, Specialty, SpecialtyUpdate } from '~~/app/types'
 import { PERMISSIONS } from '~~/app/config/permissions'
 
 const { t, locale } = useI18n()
@@ -30,10 +30,14 @@ const displaySpecialties = computed(() =>
   showSpecialtiesInactive.value ? specialtiesApi.specialties.value : specialtiesApi.activeSpecialties.value
 )
 
-// Treatments shown in the specialty view. A full catalog snapshot kept
-// apart from `catalog.items`, which the list view narrows by search and
-// category — those filters must not hide treatments from this grouping.
-const specialtyItems = ref<TreatmentCatalogItem[]>([])
+// Both tabs read one snapshot, `catalog.items`, loaded once with
+// `include_deleted` (live, inactive and removed together). Each tab narrows
+// it in the browser. The specialty view used to keep a second full copy,
+// which every save re-downloaded on top of the first.
+//
+// The specialty view lists live and inactive treatments, never removed ones,
+// and ignores the list view's search and category on purpose.
+const specialtyItems = computed(() => catalog.items.value.filter(item => !item.deleted_at))
 const isLoadingSpecialtyView = ref(false)
 
 // Pseudo-group collecting treatments that have no specialty yet.
@@ -102,12 +106,10 @@ function toggleSpecialtyGroup(groupId: string) {
 async function loadSpecialtyView() {
   isLoadingSpecialtyView.value = true
   try {
-    const [items] = await Promise.all([
-      catalog.fetchAllItems(true),
-      specialtiesApi.fetchSpecialties(true)
-    ])
-    specialtyItems.value = items
-    expandedSpecialties.value = new Set(specialtyGroups.value.map(g => g.id))
+    // Groups start collapsed: drawing every discipline's treatments at once
+    // (several hundred rows, many shown under more than one) froze the
+    // browser for seconds on first open. A group draws its rows when opened.
+    await specialtiesApi.fetchSpecialties(true)
   } finally {
     isLoadingSpecialtyView.value = false
   }
@@ -161,68 +163,12 @@ async function handleAssignSave() {
     [...assignSelectedIds.value]
   )
   if (result) {
-    specialtyItems.value = await catalog.fetchAllItems(true)
+    await reloadItems()
     showAssignModal.value = false
     assignTarget.value = null
   }
   isAssigning.value = false
 }
-
-const showSpecialtyCreateModal = ref(false)
-const isCreatingSpecialty = ref(false)
-const newSpecialtyName = ref('')
-
-/**
- * Recognised disciplines the clinic has not added yet, offered as one-click
- * shortcuts above the text box.
- *
- * The box was free text and nothing else, under a placeholder reading
- * "Ej: Cirugía Oral y Maxilofacial" — the name of a specialty already in the
- * list below it. Typing a name that exists produced a second row, and the
- * cost is not an untidy list: a professional gets tagged with one row and the
- * treatments with the other, so "only what my team does" quietly matches
- * nothing.
- *
- * A picked suggestion carries its stable key, which the unique index enforces
- * and a later seed run matches instead of duplicating. Free text stays, for
- * everything a list cannot anticipate.
- */
-const suggestions = ref<SpecialtySuggestion[]>([])
-const pickedSuggestion = ref<SpecialtySuggestion | null>(null)
-
-function suggestionLabel(suggestion: SpecialtySuggestion): string {
-  return suggestion.names[locale.value] || suggestion.names.es || suggestion.names.en || ''
-}
-
-function pickSuggestion(suggestion: SpecialtySuggestion) {
-  pickedSuggestion.value = suggestion
-  newSpecialtyName.value = suggestionLabel(suggestion)
-}
-
-/** Fold accents and case, the way the API compares the two names. */
-function comparableName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-/**
- * The clinic's specialty that already answers to what is being typed, if any.
- *
- * Checked here as well as server-side because the two cases need different
- * answers and only one of them is a refusal the user can act on blind: an
- * existing *deactivated* specialty is invisible in this tab by default, so
- * "already exists" alone would send someone looking for a row no list shows.
- */
-const nameClash = computed(() => {
-  const typed = comparableName(newSpecialtyName.value)
-  if (!typed) return null
-  return specialtiesApi.specialties.value.find(s =>
-    Object.values(s.names).some(name => comparableName(name) === typed)
-  ) ?? null
-})
 
 const showSpecialtyEditModal = ref(false)
 const isEditingSpecialty = ref(false)
@@ -234,56 +180,13 @@ const showSpecialtyDeleteModal = ref(false)
 const isDeletingSpecialty = ref(false)
 const specialtyToDelete = ref<Specialty | null>(null)
 
-let specialtyViewLoaded = false
+const specialtyViewOpened = ref(false)
 watch(activeView, async (view) => {
-  if (view === 'specialty' && !specialtyViewLoaded) {
-    specialtyViewLoaded = true
+  if (view === 'specialty' && !specialtyViewOpened.value) {
+    specialtyViewOpened.value = true
     await loadSpecialtyView()
   }
 })
-
-async function openSpecialtyCreateModal() {
-  newSpecialtyName.value = ''
-  pickedSuggestion.value = null
-  showSpecialtyCreateModal.value = true
-  // Inactive ones included: they are what the clash check has to see.
-  await specialtiesApi.fetchSpecialties(true)
-  suggestions.value = await specialtiesApi.fetchSuggestions()
-}
-
-async function handleSpecialtyCreate() {
-  if (nameClash.value) return
-
-  isCreatingSpecialty.value = true
-  // A picked suggestion carries both languages and its key; typed text is
-  // only ever the language it was typed in.
-  const picked = pickedSuggestion.value
-  const matchesPick = picked && suggestionLabel(picked) === newSpecialtyName.value
-  const data: SpecialtyCreate = matchesPick
-    ? { names: { ...picked.names }, key: picked.key }
-    : { names: { [locale.value]: newSpecialtyName.value } }
-
-  const result = await specialtiesApi.createSpecialty(data)
-  isCreatingSpecialty.value = false
-  if (result) {
-    expandedSpecialties.value = new Set(expandedSpecialties.value).add(result.id)
-    showSpecialtyCreateModal.value = false
-    await loadSpecialtyView()
-  }
-}
-
-/** Switch a deactivated specialty back on, from the clash notice. */
-async function reactivateClash() {
-  const existing = nameClash.value
-  if (!existing) return
-  isCreatingSpecialty.value = true
-  const result = await specialtiesApi.updateSpecialty(existing.id, { is_active: true })
-  isCreatingSpecialty.value = false
-  if (result) {
-    showSpecialtyCreateModal.value = false
-    await loadSpecialtyView()
-  }
-}
 
 function openSpecialtyEditModal(specialty: Specialty) {
   editingSpecialty.value = specialty
@@ -343,13 +246,9 @@ async function toggleVisible(item: TreatmentCatalogItem) {
   try {
     const updated = await catalog.updateItem(item.id, { is_visible: next })
     if (!updated) return
-    // The two tabs read from different arrays (the list view shares
-    // `catalog.items`, the specialty view keeps its own snapshot), so patch
-    // both rather than refetching the whole catalog for one checkbox.
-    for (const list of [catalog.items.value, specialtyItems.value]) {
-      const found = list.find(i => i.id === item.id)
-      if (found) found.is_visible = next
-    }
+    // Patch the row rather than refetching the whole catalog for one checkbox.
+    const found = catalog.items.value.find(i => i.id === item.id)
+    if (found) found.is_visible = next
   } finally {
     const pending = new Set(togglingVisibility.value)
     pending.delete(item.id)
@@ -362,16 +261,14 @@ async function toggleVisible(item: TreatmentCatalogItem) {
  *
  * The row is patched rather than the catalog reloaded: setting a clinic's
  * prices means walking a column, and re-reading 136 rows between each one
- * would move the list under the cursor. Both snapshots hold the same object
- * for a given treatment, so the specialty tab follows along.
+ * would move the list under the cursor. Both tabs read the same snapshot, so
+ * the specialty tab follows along.
  */
 async function savePrice(item: TreatmentCatalogItem, price: number) {
   const updated = await catalog.updateItem(item.id, { default_price: price }, { silent: true })
   if (!updated) return
-  for (const list of [catalog.items.value, specialtyItems.value]) {
-    const found = list.find(i => i.id === item.id)
-    if (found) found.default_price = updated.default_price
-  }
+  const found = catalog.items.value.find(i => i.id === item.id)
+  if (found) found.default_price = updated.default_price
 }
 
 // Modal state
@@ -399,11 +296,10 @@ const selectedCategoryId = ref<string | undefined>(undefined)
  * internal code reserved, so it could neither be found nor recreated under the
  * same code.
  *
- * `include_deleted` drops the active filter along with the deleted one, so a
- * single flag covers both.
+ * The snapshot already holds both (it is loaded with `include_deleted`), so
+ * the switch only narrows in the browser.
  */
 const showRemoved = ref(false)
-watch(showRemoved, () => refreshItems())
 
 // Track which categories are expanded (all expanded by default)
 const expandedCategories = ref<Set<string>>(new Set())
@@ -412,7 +308,7 @@ const expandedCategories = ref<Set<string>>(new Set())
 onMounted(async () => {
   await Promise.all([
     catalog.fetchCategories(),
-    catalog.loadAllItems(false, showRemoved.value)
+    reloadItems()
   ])
   // Expand all categories by default
   expandedCategories.value = new Set(catalog.categories.value.map(c => c.id))
@@ -428,10 +324,16 @@ onMounted(async () => {
  * Same trade the clinical catalog already makes: a clinic's catalog is a
  * couple of hundred rows.
  */
+// What the list view offers before search and category: what the catalog
+// charges for, plus — with the switch on — what it no longer offers.
+const listViewItems = computed(() =>
+  showRemoved.value ? catalog.items.value : catalog.items.value.filter(item => item.is_active)
+)
+
 const filteredItems = computed(() => {
   const term = searchQuery.value.trim().toLowerCase()
 
-  return catalog.items.value.filter((item) => {
+  return listViewItems.value.filter((item) => {
     if (selectedCategoryId.value && item.category_id !== selectedCategoryId.value) return false
     if (!term) return true
     return (
@@ -450,7 +352,7 @@ const isFiltered = computed(() =>
 // list that held one page of it.
 const countLabel = computed(() =>
   isFiltered.value
-    ? t('catalog.count', { shown: filteredItems.value.length, total: catalog.items.value.length })
+    ? t('catalog.count', { shown: filteredItems.value.length, total: listViewItems.value.length })
     : String(filteredItems.value.length)
 )
 
@@ -516,17 +418,31 @@ function collapseAll() {
   expandedCategories.value = new Set()
 }
 
+/** Load the whole catalog: live, inactive and removed, in one pass. */
+async function reloadItems() {
+  await catalog.loadAllItems(false, true)
+}
+
 /**
- * Re-read the catalog after a write. Writing no longer reloads the list from
- * inside the composable, because that reload re-read page one and threw away
- * the search and the category the screen was showing.
+ * Put the row a write returned into the snapshot, in internal-code order.
  *
- * The specialty tab keeps its own snapshot and is refreshed only if it has
- * been opened; it reloads on first open anyway.
+ * Writes do not re-read the catalog. They used to: one save fetched every
+ * page of it twice in a row (once per tab) and re-rendered every row, which
+ * froze the browser for seconds. A request left waiting through that freeze
+ * is reported as timed out even when the server answered at once, so an
+ * admin editing several treatments in a row got a stack of "el servidor
+ * tardó" for saves that had worked. The API answers each write with the full
+ * item, which is all the screen needs.
  */
-async function refreshItems() {
-  await catalog.loadAllItems(false, showRemoved.value)
-  if (specialtyViewLoaded) specialtyItems.value = await catalog.fetchAllItems(true)
+function upsertItem(item: TreatmentCatalogItem) {
+  const list = catalog.items.value
+  const index = list.findIndex(i => i.id === item.id)
+  if (index !== -1) {
+    list.splice(index, 1, item)
+    return
+  }
+  const at = list.findIndex(i => i.internal_code.localeCompare(item.internal_code) > 0)
+  list.splice(at === -1 ? list.length : at, 0, item)
 }
 
 // Undoing a deletion is an ordinary update: the row never went away, and
@@ -542,7 +458,7 @@ async function restoreItem(item: TreatmentCatalogItem) {
   restoring.value = new Set(restoring.value).add(item.id)
   try {
     const restored = await catalog.updateItem(item.id, { is_active: true })
-    if (restored) await refreshItems()
+    if (restored) upsertItem(restored)
   } finally {
     const pending = new Set(restoring.value)
     pending.delete(item.id)
@@ -568,7 +484,7 @@ async function handleCreateItem(data: TreatmentCatalogItemCreate) {
 
   if (result) {
     showModal.value = false
-    await refreshItems()
+    upsertItem(result)
   }
 }
 
@@ -582,7 +498,7 @@ async function handleSaveItem(data: TreatmentCatalogItemUpdate) {
   if (result) {
     showModal.value = false
     editingItem.value = null
-    await refreshItems()
+    upsertItem(result)
   }
 }
 
@@ -596,13 +512,21 @@ async function handleDeleteItem() {
   if (!itemToDelete.value) return
 
   isDeleting.value = true
-  const result = await catalog.deleteItem(itemToDelete.value.id)
+  const deletedId = itemToDelete.value.id
+  const result = await catalog.deleteItem(deletedId)
   isDeleting.value = false
 
   if (result) {
+    // The delete answers 204, so mark the row the way the server just did
+    // (`CatalogService.delete_item`): removed and inactive. It stays in the
+    // snapshot, which is what lets "Mostrar inactivos y eliminados" show it.
+    const found = catalog.items.value.find(i => i.id === deletedId)
+    if (found) {
+      found.deleted_at = new Date().toISOString()
+      found.is_active = false
+    }
     showDeleteConfirm.value = false
     itemToDelete.value = null
-    await refreshItems()
   }
 }
 
@@ -614,19 +538,6 @@ function getItemName(item: TreatmentCatalogItem): string {
 function getCategoryName(categoryId: string): string {
   const category = catalog.categories.value.find(c => c.id === categoryId)
   return category ? catalog.getCategoryName(category) : '-'
-}
-
-function getVatTypeLabel(vatType: VatTypeBrief | undefined): string {
-  if (!vatType) return '-'
-  return vatType.names[locale.value] || vatType.names.es || vatType.names.en || '-'
-}
-
-function getVatTypeBadgeColor(vatType: VatTypeBrief | undefined): string {
-  if (!vatType) return 'neutral'
-  // Color based on rate: 0% = green, < 10% = yellow, >= 10% = red
-  if (vatType.rate === 0) return 'green'
-  if (Number(vatType.rate) < 10) return 'yellow'
-  return 'red'
 }
 
 // Category options for filter
@@ -659,13 +570,6 @@ const categoryOptions = computed(() => [
         >
           {{ t('catalog.newItem') }}
         </UButton>
-        <UButton
-          v-if="canManageTaxonomy && activeView === 'specialty'"
-          icon="i-lucide-plus"
-          @click="openSpecialtyCreateModal"
-        >
-          {{ t('specialties.new') }}
-        </UButton>
         <NuxtLink to="/settings">
           <UButton
             variant="ghost"
@@ -684,8 +588,14 @@ const categoryOptions = computed(() => [
       class="w-full sm:w-auto"
     />
 
-    <!-- By Specialty -->
-    <template v-if="activeView === 'specialty'">
+    <!-- By Specialty. Mounted on first open, then hidden rather than torn
+         down: each tab draws every treatment, and rebuilding several
+         hundred rows froze the browser for seconds on every switch. -->
+    <div
+      v-if="specialtyViewOpened"
+      v-show="activeView === 'specialty'"
+      class="space-y-6"
+    >
       <div class="flex items-center justify-between gap-4">
         <p class="text-caption text-subtle">
           {{ t('specialties.viewHint') }}
@@ -724,6 +634,7 @@ const categoryOptions = computed(() => [
           v-for="group in specialtyGroups"
           :key="group.id"
           class="overflow-hidden"
+          :ui="isSpecialtyExpanded(group.id) ? undefined : { body: 'hidden' }"
         >
           <template #header>
             <div class="flex items-center justify-between gap-3">
@@ -791,7 +702,8 @@ const categoryOptions = computed(() => [
             </div>
           </template>
 
-          <div v-show="isSpecialtyExpanded(group.id)">
+          <!-- `v-if`: a collapsed group's rows are not drawn at all. -->
+          <div v-if="isSpecialtyExpanded(group.id)">
             <p
               v-if="group.items.length === 0"
               class="py-4 text-sm text-muted dark:text-subtle"
@@ -824,48 +736,17 @@ const categoryOptions = computed(() => [
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[var(--color-border-subtle)]">
-                  <tr
+                  <CatalogItemRow
                     v-for="item in group.items"
                     :key="item.id"
-                    class="hover:bg-surface-muted"
-                  >
-                    <td class="py-2.5 px-4">
-                      <span class="font-mono text-sm text-muted dark:text-subtle">
-                        {{ item.internal_code }}
-                      </span>
-                    </td>
-                    <td class="py-2.5 px-4">
-                      <span class="font-medium text-default">
-                        {{ getItemName(item) }}
-                      </span>
-                      <UBadge
-                        v-if="!item.is_active"
-                        variant="subtle"
-                        color="error"
-                        class="ml-2"
-                        size="xs"
-                      >
-                        {{ t('common.inactive') }}
-                      </UBadge>
-                    </td>
-                    <td class="hidden sm:table-cell py-2.5 px-4 text-muted dark:text-subtle">
-                      {{ getCategoryName(item.category_id) }}
-                    </td>
-                    <td class="py-2.5 px-4 text-center">
-                      <UCheckbox
-                        :model-value="item.is_visible !== false"
-                        :disabled="!canEditItems || isTogglingVisibility(item.id)"
-                        @update:model-value="toggleVisible(item)"
-                      />
-                    </td>
-                    <td class="py-2.5 px-4 text-right font-medium">
-                      <CatalogPriceCell
-                        :item="item"
-                        :editable="canEditItems && !item.deleted_at"
-                        @save="price => savePrice(item, price)"
-                      />
-                    </td>
-                  </tr>
+                    :item="item"
+                    variant="specialty"
+                    :category-name="getCategoryName(item.category_id)"
+                    :can-edit="canEditItems"
+                    :toggling="isTogglingVisibility(item.id)"
+                    @save-price="savePrice"
+                    @toggle-visible="toggleVisible"
+                  />
                 </tbody>
               </table>
             </div>
@@ -956,104 +837,6 @@ const categoryOptions = computed(() => [
                 </div>
               </div>
             </div>
-          </UCard>
-        </template>
-      </UModal>
-
-      <!-- Create Specialty Modal -->
-      <UModal v-model:open="showSpecialtyCreateModal">
-        <template #content>
-          <UCard>
-            <template #header>
-              <div class="flex items-center gap-2">
-                <UIcon
-                  name="i-lucide-plus"
-                  class="w-5 h-5 text-primary-accent"
-                />
-                <h3 class="font-semibold text-default">
-                  {{ t('specialties.new') }}
-                </h3>
-              </div>
-            </template>
-
-            <form
-              class="space-y-4"
-              @submit.prevent="handleSpecialtyCreate"
-            >
-              <div v-if="suggestions.length">
-                <p class="text-caption text-subtle mb-2">
-                  {{ t('specialties.suggestionsHint') }}
-                </p>
-                <div class="flex flex-wrap gap-2">
-                  <UButton
-                    v-for="suggestion in suggestions"
-                    :key="suggestion.key"
-                    size="xs"
-                    variant="soft"
-                    :color="pickedSuggestion?.key === suggestion.key ? 'primary' : 'neutral'"
-                    @click="pickSuggestion(suggestion)"
-                  >
-                    {{ suggestionLabel(suggestion) }}
-                  </UButton>
-                </div>
-              </div>
-
-              <UFormField :label="t('specialties.name')">
-                <UInput
-                  v-model="newSpecialtyName"
-                  required
-                  :placeholder="t('specialties.namePlaceholder')"
-                  class="w-full"
-                />
-              </UFormField>
-
-              <!-- Said before anything is sent, because the two cases need
-                   different answers and a deactivated specialty is invisible
-                   in this tab by default. -->
-              <div
-                v-if="nameClash"
-                class="flex items-start gap-2 text-sm"
-                :class="nameClash.is_active ? 'text-warning' : 'text-muted'"
-              >
-                <UIcon
-                  name="i-lucide-info"
-                  class="size-4 shrink-0 mt-0.5"
-                />
-                <div class="space-y-1">
-                  <p>
-                    {{ nameClash.is_active
-                      ? t('specialties.clashActive', { name: specialtiesApi.getSpecialtyName(nameClash) })
-                      : t('specialties.clashInactive', { name: specialtiesApi.getSpecialtyName(nameClash) }) }}
-                  </p>
-                  <UButton
-                    v-if="!nameClash.is_active"
-                    size="xs"
-                    variant="soft"
-                    icon="i-lucide-undo-2"
-                    :loading="isCreatingSpecialty"
-                    @click="reactivateClash"
-                  >
-                    {{ t('specialties.reactivate') }}
-                  </UButton>
-                </div>
-              </div>
-
-              <div class="flex justify-end gap-2 pt-4">
-                <UButton
-                  variant="ghost"
-                  @click="showSpecialtyCreateModal = false"
-                >
-                  {{ t('common.cancel') }}
-                </UButton>
-                <UButton
-                  type="submit"
-                  :loading="isCreatingSpecialty"
-                  :disabled="!newSpecialtyName.trim() || Boolean(nameClash)"
-                >
-                  {{ t('common.save') }}
-                </UButton>
-              </div>
-            </form>
           </UCard>
         </template>
       </UModal>
@@ -1153,9 +936,12 @@ const categoryOptions = computed(() => [
           </div>
         </template>
       </UModal>
-    </template>
+    </div>
 
-    <template v-else>
+    <div
+      v-show="activeView === 'type'"
+      class="space-y-6"
+    >
       <!-- Filters -->
       <UCard>
         <div class="flex flex-col sm:flex-row gap-4">
@@ -1238,6 +1024,7 @@ const categoryOptions = computed(() => [
             v-for="group in groupedItems"
             :key="group.category.id"
             class="overflow-hidden"
+            :ui="isCategoryExpanded(group.category.id) ? undefined : { body: 'hidden' }"
           >
             <!-- Category header (clickable) -->
             <template #header>
@@ -1271,7 +1058,7 @@ const categoryOptions = computed(() => [
 
             <!-- Items table (collapsible) -->
             <div
-              v-show="isCategoryExpanded(group.category.id)"
+              v-if="isCategoryExpanded(group.category.id)"
               class="overflow-x-auto -mx-4 sm:-mx-6"
             >
               <table class="w-full">
@@ -1299,111 +1086,20 @@ const categoryOptions = computed(() => [
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[var(--color-border-subtle)]">
-                  <tr
+                  <CatalogItemRow
                     v-for="item in group.items"
                     :key="item.id"
-                    class="hover:bg-surface-muted"
-                  >
-                    <td class="py-2.5 px-4">
-                      <span class="font-mono text-sm text-muted dark:text-subtle">
-                        {{ item.internal_code }}
-                      </span>
-                    </td>
-                    <td class="py-2.5 px-4">
-                      <span class="font-medium text-default">
-                        {{ getItemName(item) }}
-                      </span>
-                      <UBadge
-                        v-if="item.is_system"
-                        variant="subtle"
-                        color="info"
-                        class="ml-2"
-                        size="xs"
-                      >
-                        {{ t('catalog.system') }}
-                      </UBadge>
-                      <UBadge
-                        v-if="item.deleted_at"
-                        variant="subtle"
-                        color="error"
-                        class="ml-2"
-                        size="xs"
-                      >
-                        {{ t('catalog.removed') }}
-                      </UBadge>
-                      <UBadge
-                        v-else-if="!item.is_active"
-                        variant="subtle"
-                        color="warning"
-                        class="ml-2"
-                        size="xs"
-                      >
-                        {{ t('common.inactive') }}
-                      </UBadge>
-                    </td>
-                    <td class="py-2.5 px-4 text-right font-medium">
-                      <CatalogPriceCell
-                        :item="item"
-                        :editable="canEditItems && !item.deleted_at"
-                        @save="price => savePrice(item, price)"
-                      />
-                    </td>
-                    <td class="hidden sm:table-cell py-2.5 px-4 text-center">
-                      <UBadge
-                        :color="getVatTypeBadgeColor(item.vat_type)"
-                        variant="subtle"
-                        size="xs"
-                      >
-                        {{ getVatTypeLabel(item.vat_type) }}
-                      </UBadge>
-                    </td>
-                    <td class="py-2.5 px-4 text-center">
-                      <UCheckbox
-                        :model-value="item.is_visible !== false"
-                        :disabled="!canEditItems || isTogglingVisibility(item.id) || Boolean(item.deleted_at)"
-                        @update:model-value="toggleVisible(item)"
-                      />
-                    </td>
-                    <td class="hidden md:table-cell py-2.5 px-4 text-center text-muted dark:text-subtle">
-                      {{ item.default_duration_minutes ? `${item.default_duration_minutes} min` : '-' }}
-                    </td>
-                    <td class="py-2.5 px-4 text-right">
-                      <div
-                        v-if="canEditItems"
-                        class="flex items-center justify-end gap-1"
-                      >
-                        <UButton
-                          v-if="item.deleted_at"
-                          icon="i-lucide-undo-2"
-                          size="xs"
-                          variant="ghost"
-                          color="neutral"
-                          :loading="isRestoring(item.id)"
-                          @click="restoreItem(item)"
-                        >
-                          {{ t('catalog.restore') }}
-                        </UButton>
-                        <template v-else>
-                          <UButton
-                            icon="i-lucide-pencil"
-                            size="xs"
-                            variant="ghost"
-                            color="neutral"
-                            :aria-label="t('actions.edit')"
-                            @click="openEditModal(item)"
-                          />
-                          <UButton
-                            icon="i-lucide-trash-2"
-                            size="xs"
-                            variant="ghost"
-                            color="error"
-                            :aria-label="t('actions.delete')"
-                            @click="confirmDelete(item)"
-                          />
-                        </template>
-                      </div>
-                    </td>
-                  </tr>
+                    :item="item"
+                    variant="grouped"
+                    :can-edit="canEditItems"
+                    :toggling="isTogglingVisibility(item.id)"
+                    :restoring="isRestoring(item.id)"
+                    @save-price="savePrice"
+                    @toggle-visible="toggleVisible"
+                    @edit="openEditModal"
+                    @delete="confirmDelete"
+                    @restore="restoreItem"
+                  />
                 </tbody>
               </table>
             </div>
@@ -1488,119 +1184,26 @@ const categoryOptions = computed(() => [
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--color-border-subtle)]">
-              <tr
+              <CatalogItemRow
                 v-for="item in filteredItems"
                 :key="item.id"
-                class="hover:bg-surface-muted"
-              >
-                <td class="py-3 px-4">
-                  <span class="font-mono text-sm text-muted dark:text-subtle">
-                    {{ item.internal_code }}
-                  </span>
-                </td>
-                <td class="py-3 px-4">
-                  <span class="font-medium text-default">
-                    {{ getItemName(item) }}
-                  </span>
-                  <UBadge
-                    v-if="item.is_system"
-                    variant="subtle"
-                    color="info"
-                    class="ml-2"
-                    size="xs"
-                  >
-                    {{ t('catalog.system') }}
-                  </UBadge>
-                  <UBadge
-                    v-if="item.deleted_at"
-                    variant="subtle"
-                    color="error"
-                    class="ml-2"
-                    size="xs"
-                  >
-                    {{ t('catalog.removed') }}
-                  </UBadge>
-                  <UBadge
-                    v-else-if="!item.is_active"
-                    variant="subtle"
-                    color="warning"
-                    class="ml-2"
-                    size="xs"
-                  >
-                    {{ t('common.inactive') }}
-                  </UBadge>
-                </td>
-                <td class="hidden md:table-cell py-3 px-4 text-muted dark:text-subtle">
-                  {{ getCategoryName(item.category_id) }}
-                </td>
-                <td class="py-3 px-4 text-right font-medium">
-                  <CatalogPriceCell
-                    :item="item"
-                    :editable="canEditItems && !item.deleted_at"
-                    @save="price => savePrice(item, price)"
-                  />
-                </td>
-                <td class="hidden sm:table-cell py-3 px-4 text-center">
-                  <UBadge
-                    :color="getVatTypeBadgeColor(item.vat_type)"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    {{ getVatTypeLabel(item.vat_type) }}
-                  </UBadge>
-                </td>
-                <td class="py-3 px-4 text-center">
-                  <UCheckbox
-                    :model-value="item.is_visible !== false"
-                    :disabled="!canEditItems || isTogglingVisibility(item.id) || Boolean(item.deleted_at)"
-                    @update:model-value="toggleVisible(item)"
-                  />
-                </td>
-                <td class="hidden lg:table-cell py-3 px-4 text-center text-muted dark:text-subtle">
-                  {{ item.default_duration_minutes ? `${item.default_duration_minutes} min` : '-' }}
-                </td>
-                <td class="py-3 px-4 text-right">
-                  <div
-                    v-if="canEditItems"
-                    class="flex items-center justify-end gap-1"
-                  >
-                    <UButton
-                      v-if="item.deleted_at"
-                      icon="i-lucide-undo-2"
-                      size="xs"
-                      variant="ghost"
-                      color="neutral"
-                      :loading="isRestoring(item.id)"
-                      @click="restoreItem(item)"
-                    >
-                      {{ t('catalog.restore') }}
-                    </UButton>
-                    <template v-else>
-                      <UButton
-                        icon="i-lucide-pencil"
-                        size="xs"
-                        variant="ghost"
-                        color="neutral"
-                        :aria-label="t('actions.edit')"
-                        @click="openEditModal(item)"
-                      />
-                      <UButton
-                        icon="i-lucide-trash-2"
-                        size="xs"
-                        variant="ghost"
-                        color="error"
-                        :aria-label="t('actions.delete')"
-                        @click="confirmDelete(item)"
-                      />
-                    </template>
-                  </div>
-                </td>
-              </tr>
+                :item="item"
+                variant="flat"
+                :category-name="getCategoryName(item.category_id)"
+                :can-edit="canEditItems"
+                :toggling="isTogglingVisibility(item.id)"
+                :restoring="isRestoring(item.id)"
+                @save-price="savePrice"
+                @toggle-visible="toggleVisible"
+                @edit="openEditModal"
+                @delete="confirmDelete"
+                @restore="restoreItem"
+              />
             </tbody>
           </table>
         </div>
       </UCard>
-    </template>
+    </div>
 
     <!-- Create/Edit Modal -->
     <CatalogItemModal

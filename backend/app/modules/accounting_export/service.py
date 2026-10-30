@@ -12,15 +12,13 @@ module imports no billing/payments models and owns no tables.
 
 from __future__ import annotations
 
-import csv
-import io
-import zipfile
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exports import to_csv, to_zip
 from app.modules.billing.service import InvoiceService
 
 # Non-draft statuses are the export universe. Drafts are not fiscal
@@ -128,27 +126,6 @@ class AccountingExportService:
         return to_zip({"facturas.csv": inv_csv, "cobros.csv": pay_csv})
 
 
-def _fmt(value, separator: str) -> str:
-    if isinstance(value, Decimal):
-        s = f"{value:.2f}"
-        # Spanish Excel pairs ";" with comma decimals; "," with dot.
-        return s.replace(".", ",") if separator == ";" else s
-    return "" if value is None else str(value)
-
-
-def to_csv(rows: list[dict], headers: list[str], separator: str = ",") -> bytes:
-    buf = io.StringIO()
-    writer = csv.writer(buf, delimiter=separator)
-    writer.writerow(headers)
-    for row in rows:
-        writer.writerow([_fmt(row[h], separator) for h in headers])
-    # UTF-8 BOM so Excel-ES detects the encoding and renders accents.
-    return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")
-
-
-def to_zip(files: dict[str, bytes]) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name, content in files.items():
-            zf.writestr(name, content)
-    return buf.getvalue()
+# ``to_csv`` / ``to_zip`` live in ``app.core.exports``: the Productividad
+# reports export tables too, and the BOM-and-separator rules have to be
+# the same file in both places or the two downloads drift apart.

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import FilterDateRange from '~~/app/components/shared/FilterDateRange.vue'
+import { PERMISSIONS } from '~~/app/config/permissions'
 import { useDashboardSnapshot } from '../../composables/useDashboardSnapshot'
 import CashCollectedTile from '../../components/dashboard/CashCollectedTile.vue'
 import PatientAdvanceCard from '../../components/dashboard/PatientAdvanceCard.vue'
@@ -11,26 +12,20 @@ import NewPatientsTile from '../../components/dashboard/NewPatientsTile.vue'
 import AppointmentFunnelTile from '../../components/dashboard/AppointmentFunnelTile.vue'
 import AvgCollectedTicketTile from '../../components/dashboard/AvgCollectedTicketTile.vue'
 import AgingReceivablesCard from '../../components/dashboard/AgingReceivablesCard.vue'
+import EmptyPeriodNotice from '../../components/EmptyPeriodNotice.vue'
+import ReportPdfButton from '~~/app/components/shared/ReportPdfButton.vue'
+import SummaryScheduleModal from '../../components/SummaryScheduleModal.vue'
+import MonthlyTargetsCard from '../../components/dashboard/MonthlyTargetsCard.vue'
 
 const { t } = useI18n()
 const { can } = usePermissions()
-const route = useRoute()
-const router = useRouter()
 
-const { filters, state } = useDashboardSnapshot()
+const { filters, state, periodIsEmpty } = useDashboardSnapshot()
 
-// Mirror filter changes into the URL so a manager can bookmark a range.
-// URL → filters hydration happens inside useDashboardSnapshot's useState
-// factory so the watch below doesn't double-fire on first mount.
-watch(
-  filters,
-  (range) => {
-    void router.replace({
-      query: { ...route.query, from: range.from, to: range.to }
-    })
-  },
-  { deep: true }
-)
+// One range for the whole section, mirrored into the URL so it can be
+// bookmarked and so a drill-down carries it over.
+const { model: dateRangeModel, syncQuery } = useReportPeriod()
+syncQuery()
 
 // A section shows only while its App runs (ADR 0037).
 const { on } = useReportApps()
@@ -38,19 +33,21 @@ const canPayments = computed(() => can('payments.reports.read') && on('payments'
 const canScheduling = computed(() => can('reports.scheduling.read') && on('agenda'))
 const canBilling = computed(() => can('reports.billing.read') && on('billing'))
 const canBudgets = computed(() => can('reports.budgets.read') && on('budget'))
+// The one-pager has a permission of its own: "see how the clinic is
+// doing" is granted separately from reading the invoice ledger.
+const canPrintSummary = computed(() => can(PERMISSIONS.reports.summaryRead))
+// Writing the standing order is its own grant: the dialog shows the
+// staff addresses that receive the summary.
+const canScheduleSummary = computed(() => can(PERMISSIONS.reports.summaryWrite))
+const schedulingSummary = ref(false)
+
+// Targets are monthly, the period is any range: the card shows the month
+// the period ends in, which is the only rule that needs no explaining.
+const targetsMonth = computed(() => `${filters.value.to.slice(0, 7)}-01`)
 
 const noAccess = computed(
   () => !canPayments.value && !canScheduling.value && !canBilling.value && !canBudgets.value
 )
-
-// FilterDateRange v-model expects { from: string|null, to: string|null }.
-// Adapter to bridge to our DashboardRange (non-null strings).
-const dateRangeModel = computed({
-  get: () => ({ from: filters.value.from, to: filters.value.to } as { from: string | null, to: string | null }),
-  set: (v: { from: string | null, to: string | null }) => {
-    if (v.from && v.to) filters.value = { from: v.from, to: v.to }
-  }
-})
 
 // Drill-down chips rendered right under the page header. The payments
 // chip is hardcoded (payments is in manifest.depends already) so we get
@@ -85,6 +82,13 @@ const drilldownCards = computed(() => [
     icon: 'i-lucide-wallet',
     to: '/reports/payments',
     visible: canPayments.value
+  },
+  {
+    key: 'actionable',
+    label: t('reports.actionable.title'),
+    icon: 'i-lucide-list-checks',
+    to: '/reports/actionable',
+    visible: can(PERMISSIONS.reports.actionableRead)
   }
 ])
 </script>
@@ -103,10 +107,27 @@ const drilldownCards = computed(() => [
           {{ t('reports.dashboard.subtitle') }}
         </p>
       </div>
-      <FilterDateRange
-        v-model="dateRangeModel"
-        :label="t('reports.dashboard.period')"
-      />
+      <div class="flex items-center gap-2">
+        <FilterDateRange
+          v-model="dateRangeModel"
+          :label="t('common.period')"
+        />
+        <ReportPdfButton
+          v-if="canPrintSummary"
+          endpoint="/api/v1/reports/summary.pdf"
+          :label="t('reports.summaryPdf.action')"
+        />
+        <UButton
+          v-if="canScheduleSummary"
+          variant="soft"
+          color="neutral"
+          icon="i-lucide-mail-plus"
+          :aria-label="t('reports.scheduleSummary.action')"
+          @click="schedulingSummary = true"
+        >
+          {{ t('reports.scheduleSummary.action') }}
+        </UButton>
+      </div>
     </header>
 
     <!-- Empty / no-access state -->
@@ -149,6 +170,8 @@ const drilldownCards = computed(() => [
           </NuxtLink>
         </template>
       </nav>
+
+      <EmptyPeriodNotice v-if="periodIsEmpty" />
 
       <!-- Hero row: the headline KPIs. Cash collected, patient credit
            (snapshot), production total, and average collected ticket. The
@@ -198,6 +221,12 @@ const drilldownCards = computed(() => [
         <AppointmentFunnelTile :state="state.funnel" />
       </section>
 
+      <!-- Goals, beside the figures they judge -->
+      <MonthlyTargetsCard
+        v-if="canPrintSummary"
+        :month="targetsMonth"
+      />
+
       <!-- Attention row -->
       <AgingReceivablesCard
         v-if="canPayments"
@@ -210,5 +239,10 @@ const drilldownCards = computed(() => [
         :ctx="{ filters }"
       />
     </template>
+
+    <SummaryScheduleModal
+      v-if="canScheduleSummary"
+      v-model:open="schedulingSummary"
+    />
   </div>
 </template>

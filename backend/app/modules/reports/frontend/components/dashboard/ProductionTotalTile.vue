@@ -36,6 +36,7 @@ const isEmpty = computed(() =>
     :title="t('reports.dashboard.kpi.production')"
     icon="i-lucide-activity"
     severity="info"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
     :value="value"

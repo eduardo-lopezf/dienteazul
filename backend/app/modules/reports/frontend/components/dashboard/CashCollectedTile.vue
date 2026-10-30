@@ -36,7 +36,7 @@ const isEmpty = computed(() => !props.state.loading && !props.state.data)
     :title="t('reports.dashboard.kpi.cashCollected')"
     icon="i-lucide-banknote"
     severity="success"
-    to="/reports/billing"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
     :value="value"

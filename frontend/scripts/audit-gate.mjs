@@ -10,22 +10,11 @@
 // each should go the moment its fix is reachable.
 import { spawnSync } from 'node:child_process'
 
-const ALLOWED = {
-  // No fixed release exists: the advisory covers every published
-  // version (<=1.4.0, the latest). `node-forge` arrives under `listhen`,
-  // the dev-server listener that mints a self-signed certificate for
-  // `nuxi dev --https`; the weakness is RSA PKCS#1 v1.5 signature
-  // verification, which this project never asks it to do. Verified on
-  // 2026-10-25: `listhen`, `nitropack` and `node-forge` are all absent
-  // from `.output/server/node_modules`, and nothing under `.output`
-  // mentions `node-forge`.
-  //
-  // `nuxt` itself needs no entry: its own advisories are closed as of
-  // 4.6.2, and it is listed only through this chain. The same bump took
-  // `@nuxt/devtools` to 3.4.4, which no longer depends on `simple-git` —
-  // the two `simple-git` entries that used to sit below are gone with it.
-  'node-forge': 'no published fix (<=1.4.0 is every version); dev-server TLS only, absent from .output'
-}
+// Empty, and that is the point: every high and critical advisory the
+// tree had is now fixed in the lockfile. `node-forge` was the last
+// entry — the advisory covered every published version until 1.4.2
+// closed it, and the bump removed the only exception the gate carried.
+const ALLOWED = {}
 
 const FAIL_AT = new Set(['high', 'critical'])
 
@@ -94,11 +83,11 @@ function parentsOf(name) {
  * Which packages inherit an allowlisted reason.
  *
  * A package with a high advisory of its own needs its own entry. A
- * package that is only high *because* something it depends on is — the
- * six here, `nuxt` and `nitropack` → `listhen` → `node-forge` among them
- * — inherits the reason from the package that carries the advisory.
- * Writing those out by hand would be six copies of one sentence, each
- * going stale on its own; this keeps the gate asking about the one
+ * package that is only high *because* something it depends on is — a
+ * chain like `nuxt` and `nitropack` → `listhen` → `node-forge` used to
+ * be — inherits the reason from the package that carries the advisory.
+ * Writing those out by hand would be one sentence copied per link, each
+ * going stale on its own; this keeps the gate asking only about the
  * package that is actually unfixable.
  *
  * Computed by elimination rather than by walking up, because the graph

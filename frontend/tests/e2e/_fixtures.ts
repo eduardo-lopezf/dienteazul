@@ -162,3 +162,88 @@ export async function dayWithAppointment(page: Page): Promise<string> {
 }
 
 export { expect }
+
+/**
+ * Describe the interactive controls that are visible, outside a
+ * `data-dense` surface, and smaller than the 44 px the design system
+ * requires. Empty means the screen passes.
+ *
+ * Dense surfaces (calendar grids, the periodontal chart) are excluded
+ * deliberately: they opt out of the touch minimums because their cells
+ * are units of time or anatomy, not buttons, and they get purpose-built
+ * touch interactions instead of bigger boxes.
+ *
+ * `scope` is a CSS selector to audit instead of the whole page — a modal
+ * that opens over a screen the sweep does not cover.
+ */
+export async function countUndersizedTargets(page: Page, scope?: string): Promise<string[]> {
+  return page.evaluate((scopeSelector) => {
+    const selector = [
+      'button',
+      'a',
+      'summary',
+      'select',
+      'input:not([type="hidden"])',
+      'textarea',
+      '[role="button"]',
+      '[role="tab"]',
+      '[role="slider"]'
+    ].join(',')
+
+    /** A control's box, grown by a `::after` hit area when it has one. */
+    function expandedRect(el: Element): DOMRect {
+      const rect = el.getBoundingClientRect()
+      const after = getComputedStyle(el, '::after')
+      if (after.content !== '""' || after.position !== 'absolute') return rect
+      const px = (v: string) => {
+        const n = Number.parseFloat(v)
+        return Number.isFinite(n) ? n : 0
+      }
+      const sides = [after.top, after.right, after.bottom, after.left].map(px)
+      // Only an outward inset counts; a decorative offset is not a target.
+      if (sides.some(v => v > 0)) return rect
+      const [top, right, bottom, left] = sides
+      return new DOMRect(
+        rect.x + left,
+        rect.y + top,
+        rect.width - left - right,
+        rect.height - top - bottom
+      )
+    }
+
+    // Named, not counted: "expected 0, received 1" says nothing about
+    // which control is small, and the whole point of a failure here is to
+    // go and resize that one control.
+    const root = scopeSelector ? document.querySelector(scopeSelector) : document
+    if (!root) return [`scope not found: ${scopeSelector}`]
+
+    const undersized: string[] = []
+    for (const el of root.querySelectorAll(selector)) {
+      // The Nuxt devtools anchor is dev-server furniture, not our UI.
+      if (el.closest('#nuxt-devtools-anchor,#nuxt-devtools-container')) continue
+      if (el.closest('[data-dense]')) continue
+
+      // The box a control draws is not always the box a finger hits: a
+      // checkbox keeps its 16px square and carries the 44px in an
+      // absolutely-positioned `::after` (see main.css). Measuring the
+      // element alone would report every checkbox as undersized while the
+      // target is fine, so the pseudo element is folded in.
+      const rect = expandedRect(el)
+      if (rect.width === 0 || rect.height === 0) continue
+      if (rect.bottom < 0 || rect.top > window.innerHeight) continue
+      if (rect.right < 0 || rect.left > window.innerWidth) continue
+
+      if (rect.width < 44 || rect.height < 44) {
+        const label = el.getAttribute('aria-label')
+          || (el.textContent || '').trim().slice(0, 40)
+          || '(no label)'
+        undersized.push(
+          `${el.tagName.toLowerCase()} "${label}" `
+          + `${Math.round(rect.width)}x${Math.round(rect.height)} `
+          + `[${(el.getAttribute('class') || '').slice(0, 60)}]`
+        )
+      }
+    }
+    return undersized
+  }, scope)
+}

@@ -3,6 +3,7 @@ import type { ToothTreatmentView } from '../../app/types'
 import {
   ALL_FINDINGS,
   MAIN_FINDINGS,
+  clearDraft,
   findingByKey,
   draftChanges,
   draftViews,
@@ -163,5 +164,59 @@ describe('a switch over several teeth, kept pending', () => {
     let draft = toggleDraft(finding('crowding'), [11], f, none)
     draft = toggleDraft(finding('bracket'), [11], f, draft)
     expect(draftViews(11, f, draft).map(v => v.clinical_type)).toEqual(['bracket'])
+  })
+})
+
+describe('*Limpiar*: the picked teeth as blank as the card can leave them', () => {
+  function facts(charted: Record<number, ToothTreatmentView[]>, statuses: Record<number, string> = {}): TeethFacts {
+    return {
+      viewsOf: tooth => charted[tooth] ?? [],
+      statusOf: tooth => (statuses[tooth] ?? null) as never
+    }
+  }
+  const none = new Map<string, boolean>()
+  const keys = (changes: ReturnType<typeof draftChanges>) =>
+    changes.map(c => `${c.finding.key}:${c.tooth}:${c.on ? 'on' : 'off'}`)
+
+  it('takes every charted finding off every picked tooth', () => {
+    const f = facts({
+      11: [view('crowding', { id: 'c11' }), view('bracket', { id: 'b11' })],
+      21: [view('diastema', { id: 'd21' })]
+    })
+    const { next, cleared, locked } = clearDraft([11, 21], f, none)
+    expect(keys(draftChanges(next)).sort()).toEqual(['bracket:11:off', 'crowding:11:off', 'diastema:21:off'])
+    expect({ cleared, locked }).toEqual({ cleared: 3, locked: 0 })
+  })
+
+  it('leaves what the card may not take off, and says how much', () => {
+    const f = facts({ 11: [view('bracket', { id: 'b11', catalog: true }), view('crowding', { id: 'c11' })] })
+    const { next, cleared, locked } = clearDraft([11], f, none)
+    expect(keys(draftChanges(next))).toEqual(['crowding:11:off'])
+    expect({ cleared, locked }).toEqual({ cleared: 1, locked: 1 })
+  })
+
+  it('clears a retained tooth through the eruption status', () => {
+    const { next, cleared } = clearDraft([18], facts({}, { 18: 'impacted' }), none)
+    expect(keys(draftChanges(next))).toEqual(['impacted:18:off'])
+    expect(cleared).toBe(1)
+  })
+
+  it('takes caries off, which only going back on needs the surface picker for', () => {
+    const f = facts({ 11: [view('caries', { id: 'k11' })] })
+    expect(keys(draftChanges(clearDraft([11], f, none).next))).toEqual(['caries:11:off'])
+  })
+
+  it('swallows a pending press instead of charting and removing it', () => {
+    const f = facts({})
+    const pressed = toggleDraft(finding('diastema'), [11], f, none)
+    const { next, cleared } = clearDraft([11], f, pressed)
+    expect(next.size).toBe(0)
+    expect(cleared).toBe(1)
+  })
+
+  it('has nothing to do on a tooth the card charts nothing on', () => {
+    const f = facts({ 11: [view('bracket', { id: 'b11', catalog: true })] })
+    expect(clearDraft([11], f, none)).toEqual({ next: new Map(), cleared: 0, locked: 1 })
+    expect(clearDraft([12], facts({}), none).cleared).toBe(0)
   })
 })

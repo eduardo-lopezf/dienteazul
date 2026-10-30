@@ -8,19 +8,23 @@ should not be cross-joined against invoice data.
 
 from __future__ import annotations
 
+import io
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.exports import period_filename, to_zip
 from app.core.schemas import ApiResponse, PaginatedApiResponse
 from app.database import get_db
 from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 
+from . import exports
 from .errors import payments_error, schedule_error, workflow_error
 from .schedules import ScheduleService
 from .schemas import (
@@ -460,6 +464,42 @@ async def reports_trends(
         db, ctx.clinic_id, ctx.clinic.currency, date_from, date_to, granularity, ctx.clinic.timezone
     )
     return ApiResponse(data=data)
+
+
+@router.get("/reports/export", response_class=StreamingResponse)
+async def reports_export(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("payments.reports.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    granularity: Literal["day", "week", "month", "year"] = "month",
+    separator: Literal[";", ","] = Query(default=";"),
+) -> StreamingResponse:
+    """The Cobros report as a ZIP of CSVs, one per card of the screen.
+
+    Same permission as reading it. ``separator`` is ``;`` (comma decimals,
+    which is what Excel-ES expects) or ``,`` (dots).
+
+    Collection axis only (ADR 0010) — see `exports.py`.
+    """
+    files = await exports.collection_files(
+        db,
+        ctx.clinic_id,
+        ctx.clinic.currency,
+        ctx.clinic.timezone,
+        date_from,
+        date_to,
+        granularity,
+        separator,
+    )
+    body = to_zip(files)
+    filename = period_filename("cobros", date_from, date_to)
+    return StreamingResponse(
+        io.BytesIO(body),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("", response_model=PaginatedApiResponse[PaymentResponse])

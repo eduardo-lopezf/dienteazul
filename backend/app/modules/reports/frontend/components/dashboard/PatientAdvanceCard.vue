@@ -32,12 +32,12 @@ const isEmpty = computed(() => !props.state.loading && !props.state.data)
     :title="t('reports.dashboard.kpi.patientAdvance')"
     icon="i-lucide-piggy-bank"
     severity="info"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
     :value="value"
     :hint="t('reports.dashboard.kpi.patientAdvanceHint')"
     snapshot
-    :snapshot-label="t('reports.dashboard.snapshotBadge')"
   >
     <template #empty>
       {{ t('reports.dashboard.empty.noData') }}

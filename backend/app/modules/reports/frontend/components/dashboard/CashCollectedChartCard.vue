@@ -45,8 +45,11 @@ function formatX(x: string): string {
   }
 }
 
-function onPoint(x: string) {
-  navigateTo({ path: '/reports/billing', query: { date: x } })
+// The series is money collected, so a point opens the collections report.
+// The card stays unwrapped: a `to` would make SummaryCard a link and a
+// point click would navigate twice.
+function onPoint() {
+  navigateTo('/reports/payments')
 }
 </script>
 

@@ -2,7 +2,7 @@
  * Orchestrator for /reports dashboard.
  *
  * Single composable surface for the index page. Owns:
- *   - the date-range filter ref (synced from URL query),
+ *   - the shared date-range filter ref (``useReportPeriod``),
  *   - per-card { loading, error, data } state,
  *   - parallel fan-out over reports + payments endpoints,
  *   - delta computation by re-fetching the previous equal-length range,
@@ -12,6 +12,7 @@
  * still call refresh(); endpoints we lack permission for return null/[]
  * gracefully (useApi 403s are caught silently here).
  */
+import type { ReportPeriod } from '~/composables/useReportPeriod'
 import { useReports } from './useReports'
 import type {
   AppointmentFunnel,
@@ -23,10 +24,8 @@ import type {
   PaymentsTrends
 } from './useReports'
 
-export interface DashboardRange {
-  from: string
-  to: string
-}
+/** The shared Productividad range (``useReportPeriod``). */
+export type DashboardRange = ReportPeriod
 
 interface CardState<T> {
   loading: boolean
@@ -57,13 +56,6 @@ function toIso(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-function defaultRange(): DashboardRange {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const first = new Date(today.getFullYear(), today.getMonth(), 1)
-  return { from: toIso(first), to: toIso(today) }
-}
-
 /** Previous range of the same length, ending the day before `from`. */
 function previousRange(range: DashboardRange): DashboardRange {
   const from = new Date(`${range.from}T00:00:00`)
@@ -92,20 +84,10 @@ export function useDashboardSnapshot() {
   const reports = useReports()
   const { can } = usePermissions()
   const { on } = useReportApps()
-  const route = useRoute()
 
-  // Seed filters from URL on first mount so a bookmarked period is
-  // honoured. Subsequent navigations don't reread (useState factory
-  // runs once); the page's URL-sync watch keeps them in step after.
-  const filters = useState<DashboardRange>(
-    'reports.dashboard.filters',
-    () => {
-      const qFrom = typeof route.query.from === 'string' ? route.query.from : null
-      const qTo = typeof route.query.to === 'string' ? route.query.to : null
-      if (qFrom && qTo) return { from: qFrom, to: qTo }
-      return defaultRange()
-    }
-  )
+  // One range for the whole section: the detail screens read and write
+  // the same state, so a drill-down keeps the period.
+  const { period: filters } = useReportPeriod()
 
   function makeRangeCard<T>(): RangeCard<T> {
     return { loading: true, error: false, data: null, delta: null, spark: [] }
@@ -261,6 +243,32 @@ export function useDashboardSnapshot() {
     await Promise.allSettled(tasks)
   }
 
+  /**
+   * True once everything has answered and the range holds nothing the
+   * user can see. Snapshot cards (patient credit, receivables) are left
+   * out on purpose: they describe today, not the range, so a clinic with
+   * old debt and a quiet month is still an empty period.
+   */
+  const periodIsEmpty = computed(() => {
+    const cards = Object.values(state) as { loading: boolean }[]
+    if (cards.some(card => card.loading)) return false
+
+    const canPayments = can('payments.reports.read') && on('payments')
+    const canScheduling = can('reports.scheduling.read') && on('agenda')
+    if (!canPayments && !canScheduling) return false
+
+    const paymentsEmpty
+      = !canPayments
+        || ((state.paymentsCurrent.data?.payment_count ?? 0) === 0
+          && (state.production.data?.length ?? 0) === 0)
+    const schedulingEmpty
+      = !canScheduling
+        || ((state.newPatients.data?.total_appointments ?? 0) === 0
+          && num(state.funnel.data?.total) === 0)
+
+    return paymentsEmpty && schedulingEmpty
+  })
+
   onMounted(() => {
     void refresh()
   })
@@ -277,5 +285,5 @@ export function useDashboardSnapshot() {
     if (controller) controller.abort()
   })
 
-  return { filters, state, refresh, previousRange }
+  return { filters, state, periodIsEmpty, refresh, previousRange }
 }

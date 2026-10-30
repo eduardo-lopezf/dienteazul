@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import SummaryCard from '~~/app/components/shared/SummaryCard.vue'
 import BarRow from '~~/app/components/charts/BarRow.vue'
+import SnapshotBadge from '../SnapshotBadge.vue'
 import type { PaymentsAgingBuckets } from '../../composables/useReports'
 
 type Tone = 'primary' | 'success' | 'danger' | 'info' | 'warning' | 'neutral'
@@ -51,18 +52,12 @@ const isEmpty = computed(() =>
     :title="t('reports.dashboard.kpi.aging')"
     icon="i-lucide-alert-circle"
     severity="warning"
-    to="/reports/billing"
+    to="/reports/payments"
     :loading="state.loading"
     :empty="isEmpty"
   >
     <template #header-trailing>
-      <span class="ml-auto inline-flex items-center gap-1 text-caption text-subtle">
-        <UIcon
-          name="i-lucide-clock"
-          class="w-3 h-3"
-        />
-        {{ t('reports.dashboard.snapshotBadge') }}
-      </span>
+      <SnapshotBadge class="ml-auto" />
     </template>
     <template #empty>
       {{ t('reports.dashboard.aging.empty') }}

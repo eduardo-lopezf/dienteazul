@@ -28,21 +28,22 @@ const entries = computed(() => resolve('finance.tabs', {}))
  * both stable and what a person would guess.
  */
 /**
- * Resumen leads, and the registers follow.
+ * Registros leads, and it is the page's own tab rather than a module's:
+ * it lists the way into every register, and no module should own the
+ * index of its siblings.
  *
- * It is the page's own tab rather than a module's because the figures on it
- * come from several — collections from `payments`, the till from `cashbox`
- * — and neither should own the other's number. The page owns the tab; each
- * module fills `finance.summary` with what it knows (see
- * `FinanceSummary.vue`).
- *
- * First and default on purpose: somebody who opens Finanzas is asking how
- * the clinic is doing, and the answer used to live one sidebar entry away
- * in Informes while this page offered five lists.
+ * It used to be `Resumen` and carried the clinic's money figures,
+ * contributed through `finance.summary`. Productividad answers the same
+ * question with a period, a comparison and a drill-down, so the two
+ * screens showed the same number and neither said which to act on —
+ * ADR 0063 gave the figures to Productividad and left the doors here.
  */
 const items = computed(() => [
   {
-    value: 'resumen',
+    // Renamed from `resumen` when the tab stopped carrying figures
+    // (ADR 0063). An old `?tab=resumen` link is not broken by it: an
+    // unknown key falls back to the first tab, which is this one.
+    value: 'registros',
     label: t('finance.summary.tab'),
     component: resolveComponent('FinanceSummary')
   },

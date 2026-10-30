@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import BackButton from './BackButton.vue'
+
 interface Props {
   title: string
   subtitle?: string
+  /** Destination of the back arrow left of the title. Omit for no arrow. */
+  back?: string
+  backLabel?: string
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  subtitle: undefined,
+  back: undefined,
+  backLabel: undefined
+})
 </script>
 
 <template>
@@ -17,6 +26,11 @@ defineProps<Props>()
     -->
     <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
       <div class="flex items-center gap-4 min-w-0">
+        <BackButton
+          v-if="back"
+          :to="back"
+          :label="backLabel"
+        />
         <div class="min-w-0">
           <h1 class="text-display text-default text-pretty">
             {{ title }}

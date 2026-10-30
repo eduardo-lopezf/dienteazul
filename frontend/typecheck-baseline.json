@@ -1,5 +1,5 @@
 {
-  "total": 141,
+  "total": 131,
   "errors": {
     "app/composables/useLocale.ts|TS2345|Argument of type 'string' is not assignable to parameter of type '\"en\" | \"es\"'.": 1,
     "app/constants/odontogram.ts|TS2322|Type '\"filling\"' is not assignable to type 'ClinicalType'.": 1,
@@ -66,9 +66,6 @@
     "backend/app/modules/periodontogram/frontend/components/PerioToothLateral.vue|TS18048|'gly' is possibly 'undefined'.": 1,
     "backend/app/modules/periodontogram/frontend/components/PerioToothLateral.vue|TS18048|'vbW' is possibly 'undefined'.": 1,
     "backend/app/modules/periodontogram/frontend/components/PerioToothLateral.vue|TS2322|Type 'PerioSite | null | undefined' is not assignable to type 'PerioSite | null'.": 2,
-    "backend/app/modules/reports/frontend/pages/reports/billing.vue|TS2345|Argument of type 'string | undefined' is not assignable to parameter of type 'string'.": 4,
-    "backend/app/modules/reports/frontend/pages/reports/budgets.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
-    "backend/app/modules/reports/frontend/pages/reports/budgets.vue|TS2345|Argument of type 'string | undefined' is not assignable to parameter of type 'string'.": 4,
     "backend/app/modules/reports/frontend/pages/reports/scheduling.vue|TS2345|Argument of type '\"collaborator\"; ... N more ...; readonly has_system_access: boolean; } | \"hygienist\" | { readonly id: string; readonly first_name: string; readonly last_name: string; readonly full_name: string; readonly professional_type: \"dentist\"' is not assignable to parameter of type 'Professional'.": 2,
     "backend/app/modules/schedules/frontend/components/settings/ClinicHoursPage.vue|TS2322|Type 'null | string | undefined' is not assignable to type 'string | undefined'.": 1,
     "backend/app/modules/schedules/frontend/components/settings/ProfessionalSchedulesPage.vue|TS2322|Type 'null | string | undefined' is not assignable to type 'string | undefined'.": 1,
@@ -83,7 +80,6 @@
     "backend/app/modules/treatment_plan/frontend/components/clinical/PlanDetailView.vue|TS2339|Property 'closure_reason' does not exist on type 'TreatmentPlanDetail'.": 1,
     "backend/app/modules/treatment_plan/frontend/components/clinical/PlanItemDoctorChip.vue|TS2345|Argument of type '\"collaborator\"; ... N more ...; readonly has_system_access: boolean; } | \"hygienist\" | { readonly id: string; readonly first_name: string; readonly last_name: string; readonly full_name: string; readonly professional_type: \"dentist\"' is not assignable to parameter of type 'Professional'.": 4,
     "backend/app/modules/treatment_plan/frontend/components/treatment-plans/PipelineTabPanel.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
-    "backend/app/modules/treatment_plan/frontend/components/treatment-plans/TreatmentPlanDetail.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
     "backend/app/modules/treatment_plan/frontend/components/treatment-plans/TreatmentPlanStatusBadge.vue|TS2322|Type 'string' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
     "backend/app/modules/verifactu/frontend/components/verifactu/InvoiceVerifactuPanel.vue|TS2322|Type '\"amber\" | \"gray\" | \"green\" | \"red\"' is not assignable to type '\"error\" | \"info\" | \"neutral\" | \"primary\" | \"secondary\" | \"success\" | \"warning\" | undefined'.": 1,
     "backend/app/modules/verifactu/frontend/components/verifactu/InvoiceVerifactuSlot.vue|TS2349|This expression is not callable.": 2,

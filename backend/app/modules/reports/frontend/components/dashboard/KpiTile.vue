@@ -2,6 +2,7 @@
 import SummaryCard from '~~/app/components/shared/SummaryCard.vue'
 import Sparkline from '~~/app/components/charts/Sparkline.vue'
 import DeltaBadge from './DeltaBadge.vue'
+import SnapshotBadge from '../SnapshotBadge.vue'
 
 type Severity = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 type Tone = 'primary' | 'success' | 'danger' | 'info' | 'warning' | 'neutral'
@@ -27,7 +28,6 @@ interface Props {
   deltaLabel?: string
   /** Show a "snapshot" badge to communicate this metric ignores the date filter. */
   snapshot?: boolean
-  snapshotLabel?: string
 }
 
 withDefaults(defineProps<Props>(), {
@@ -43,8 +43,7 @@ withDefaults(defineProps<Props>(), {
   delta: null,
   deltaInverted: false,
   deltaLabel: undefined,
-  snapshot: false,
-  snapshotLabel: undefined
+  snapshot: false
 })
 </script>
 
@@ -61,16 +60,7 @@ withDefaults(defineProps<Props>(), {
       v-if="snapshot"
       #header-trailing
     >
-      <span
-        class="ml-auto inline-flex items-center gap-1 text-caption text-subtle"
-        :title="snapshotLabel"
-      >
-        <UIcon
-          name="i-lucide-clock"
-          class="w-3 h-3"
-        />
-        {{ snapshotLabel }}
-      </span>
+      <SnapshotBadge class="ml-auto" />
     </template>
 
     <template #empty>

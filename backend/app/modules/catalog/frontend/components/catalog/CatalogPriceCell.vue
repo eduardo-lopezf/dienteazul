@@ -27,8 +27,12 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [price: number] }>()
 
 const { t } = useI18n()
-const { symbol } = useCurrency()
-const catalog = useCatalog()
+// Only the formatter: a cell is drawn once per row, and `useCatalog()` set up
+// the whole catalog composable (state, API client, toasts) for each of them.
+const { symbol, format } = useCurrency()
+const price = computed(() =>
+  props.item.default_price == null ? '-' : format(props.item.default_price)
+)
 
 const editing = ref(false)
 const saving = ref(false)
@@ -128,7 +132,7 @@ async function commit() {
       :text="t('catalog.priceFromSessions')"
     >
       <span class="inline-flex items-center gap-1 font-medium">
-        {{ catalog.formatPrice(item.default_price) }}
+        {{ price }}
         <UIcon
           name="i-lucide-layers"
           class="size-3.5 text-dimmed"
@@ -144,14 +148,14 @@ async function commit() {
       :disabled="saving"
       @click="open"
     >
-      {{ catalog.formatPrice(item.default_price) }}
+      {{ price }}
     </button>
 
     <span
       v-else
       class="font-medium"
     >
-      {{ catalog.formatPrice(item.default_price) }}
+      {{ price }}
     </span>
   </div>
 </template>

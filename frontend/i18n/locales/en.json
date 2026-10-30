@@ -101,7 +101,7 @@
     "appointments": "Schedule",
     "recalls": "Recalls",
     "treatmentPlans": "Treatment Plans",
-    "reports": "Reports",
+    "reports": "Productivity",
     "settings": "Settings",
     "catalog": "Catalog",
     "menu": "Menu",
@@ -632,7 +632,8 @@
       "clear": "Clear",
       "undoHint": "Undo the last change (Ctrl+Z)",
       "redoHint": "Redo the undone change (Ctrl+Shift+Z)",
-      "clearHint": "Drop every unsaved change: the card as it opened",
+      "clearHint": "Take off the picked teeth every finding this card may remove (undoable; nothing is saved until you accept)",
+      "clearLocked": "1 cannot be removed here | {count} cannot be removed here",
       "pending": "1 unsaved change | {count} unsaved changes",
       "saved": "Diagnosis saved",
       "saveFailed": "Could not save the tooth condition"
@@ -1969,8 +1970,8 @@
             "summary": "The patient's clinical record as a document."
           },
           "reports": {
-            "title": "Reports",
-            "summary": "Billing, budget and scheduling reports."
+            "title": "Productivity",
+            "summary": "Reports and tools to follow the clinic's business: billing, budgets and scheduling."
           },
           "ai": {
             "title": "AI",
@@ -2104,6 +2105,10 @@
     "edit": "Edit",
     "change": "change | changes",
     "back": "Back",
+    "period": "Period",
+    "apply": "Apply",
+    "export": "Export",
+    "exportFailed": "The export could not be generated",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -2572,12 +2577,7 @@
   "specialties": {
     "name": "Name",
     "namePlaceholder": "Type a specialty that is not on the list",
-    "suggestionsHint": "Recognised specialties you do not have yet. Tap one to add it:",
-    "clashActive": "You already have \"{name}\". File its treatments there instead of creating another.",
-    "clashInactive": "\"{name}\" already exists but is deactivated, with its treatments still assigned.",
-    "reactivate": "Reactivate it",
     "duplicate": "The clinic already has that specialty",
-    "new": "New Specialty",
     "edit": "Edit Specialty",
     "delete": "Delete Specialty",
     "showInactive": "Show inactive",
@@ -4290,16 +4290,81 @@
     }
   },
   "reports": {
-    "title": "Reports",
+    "title": "Productivity",
     "subtitle": "Clinic analytics and statistics",
     "viewReports": "View reports",
     "noAccess": "You don't have access to any reports",
+    "snapshotBadge": "Today",
+    "snapshotTooltip": "Not affected by the date range",
+    "targets": {
+      "title": "{month} targets",
+      "collected": "Cash collected",
+      "production": "Production",
+      "newPatients": "New patients",
+      "noGoal": "No target",
+      "ofGoal": "{ratio}% of target",
+      "elapsed": "{pct}% of the month gone",
+      "empty": "Set a target to see whether you are on track, not just how much you have.",
+      "edit": "Edit targets",
+      "clearHint": "Leave a field empty to set no target for that figure.",
+      "failed": "The targets could not be loaded"
+    },
+    "scheduleSummary": {
+      "title": "Scheduled send",
+      "subtitle": "Get the one-page summary by e-mail when a period closes",
+      "action": "Scheduled send",
+      "active": "Send automatically",
+      "cadence": "How often",
+      "cadences": {
+        "weekly": "Weekly (Monday)",
+        "monthly": "Monthly (the 1st)"
+      },
+      "recipients": "Recipients",
+      "recipientsHint": "Clinic staff addresses. Ten at most.",
+      "addRecipient": "Add recipient",
+      "removeRecipient": "Remove recipient",
+      "needsRecipient": "Add at least one recipient to switch it on",
+      "lastSent": "Last send: period ending {date}",
+      "saved": "Scheduled send saved",
+      "failed": "The scheduled send could not be saved"
+    },
+    "actionable": {
+      "title": "Actionable lists",
+      "subtitle": "Who to call today, and why",
+      "call": "Call",
+      "whatsapp": "Message on WhatsApp",
+      "failed": "The list could not be loaded",
+      "emptyHint": "Nobody outstanding here right now.",
+      "truncated": "Showing the first {count}. Work these and reload.",
+      "owes_not_booked": {
+        "tab": "Owes, not coming back",
+        "minimum": "Minimum amount",
+        "since": "Owing for {days} days · no next appointment",
+        "empty": "Nobody owes money without an appointment"
+      },
+      "accepted_not_booked": {
+        "tab": "Accepted, no date",
+        "empty": "Everything accepted has a date"
+      },
+      "no_visit": {
+        "tab": "Not seen",
+        "months": "Months without visiting",
+        "since": "Last visit {days} days ago · no next appointment",
+        "empty": "Nobody has been away that long"
+      }
+    },
+    "summaryPdf": {
+      "action": "PDF summary",
+      "failed": "The summary could not be generated"
+    },
+    "emptyPeriod": {
+      "title": "No data in this period",
+      "description": "Either the clinic had no activity, or the range is too narrow.",
+      "widen": "Widen to the last {months} months"
+    },
     "dashboard": {
-      "title": "Dashboard",
+      "title": "Productivity",
       "subtitle": "Your clinic at a glance",
-      "period": "Period",
-      "snapshotBadge": "Today",
-      "snapshotTooltip": "Not affected by the date range",
       "vsPrev": "vs. previous period",
       "empty": {
         "noData": "No data in this range"
@@ -4687,9 +4752,11 @@
   },
   "finance": {
     "summary": {
-      "tab": "Summary",
-      "empty": "No figures to show",
-      "emptyHint": "Your role can work the lists but cannot read the money reports."
+      "tab": "Registers",
+      "empty": "Nothing to open here",
+      "emptyHint": "Your role has no access to any of the money registers.",
+      "intro": "This is where the day's money is worked: collecting, the till, invoicing and payouts. To analyse a period and compare it with the previous one, go to Productivity.",
+      "analysis": "See the period's figures in Productivity"
     },
     "empty": "No finance module is installed.",
     "appsOff": {

@@ -400,6 +400,10 @@ async function saveFindingChanges(changes: FindingChange[]): Promise<boolean> {
   const done = new Map<string, { finding: ToothFinding, on: boolean, teeth: number[] }>()
   let ok = true
   let eruptionTouched = false
+  // What this save charts, so its toast can take it back off. The card's
+  // *Deshacer* only walks what is pending; once saved, Ctrl+Z was the only
+  // way back, and a tablet has no Ctrl+Z.
+  const chartedBefore = undoStack.value.length
   try {
     for (const { finding, tooth, on } of changes) {
       if (finding.kind === 'eruption') {
@@ -429,6 +433,11 @@ async function saveFindingChanges(changes: FindingChange[]): Promise<boolean> {
     findingsSaving.value = false
   }
   if (done.size) {
+    // Offered only when the whole save was work charted: a removal cannot be
+    // put back and an eruption status has no previous value kept here, so a
+    // mixed save would promise more than the button does.
+    const charted = undoStack.value.slice(chartedBefore).map(a => a.treatmentId)
+    const undoable = ok && charted.length === changes.length ? charted : []
     toast.add({
       title: t('odontogram.findings.saved'),
       description: [...done.values()].map(d =>
@@ -437,10 +446,22 @@ async function saveFindingChanges(changes: FindingChange[]): Promise<boolean> {
           teeth: [...d.teeth].sort((a, b) => a - b).join(', ')
         })
       ).join(' · '),
-      color: 'success'
+      color: 'success',
+      // `onClick`, not `click` — see `applyTreatment`'s toast.
+      ...(undoable.length
+        ? { actions: [{ label: t('common.undo'), onClick: () => undoFindingSave(undoable) }] }
+        : {})
     })
   }
   return ok
+}
+
+/** Takes back off everything one card save charted, not just the last tooth. */
+async function undoFindingSave(treatmentIds: string[]) {
+  for (const id of treatmentIds) await deleteTreatment(id, { silent: true })
+  undoStack.value = undoStack.value.filter(a => !treatmentIds.includes(a.treatmentId))
+  emit('treatmentsChanged')
+  toast.add({ title: t('common.undone'), color: 'neutral' })
 }
 
 const pendingTreatment = computed(() => {

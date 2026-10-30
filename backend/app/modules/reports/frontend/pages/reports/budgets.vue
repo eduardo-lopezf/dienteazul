@@ -5,6 +5,11 @@ import type {
   BudgetByTreatment,
   BudgetByStatus
 } from '../../composables/useReports'
+import FilterDateRange from '~~/app/components/shared/FilterDateRange.vue'
+import BackButton from '~~/app/components/shared/BackButton.vue'
+import EmptyPeriodNotice from '../../components/EmptyPeriodNotice.vue'
+import ReportExportButton from '~~/app/components/shared/ReportExportButton.vue'
+import { BUDGET_STATUS_ROLE, roleToUiColor, type BudgetStatus, type UiColor } from '~~/app/config/severity'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -30,66 +35,16 @@ const byProfessional = ref<BudgetByProfessional[]>([])
 const byTreatment = ref<BudgetByTreatment[]>([])
 const byStatus = ref<BudgetByStatus[]>([])
 
-// Date range
-const today = new Date()
-const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-const dateFrom = ref(firstDayOfMonth.toISOString().split('T')[0])
-const dateTo = ref(today.toISOString().split('T')[0])
+// One range for the whole Productividad section (``useReportPeriod``),
+// mirrored into the URL so the period survives the drill-down.
+const { period, model: dateRangeModel, syncQuery } = useReportPeriod()
+syncQuery()
 
-// Quick date range options
-const dateRangeOptions = computed(() => [
-  { label: t('reports.billing.thisMonth'), value: 'month' },
-  { label: t('reports.billing.thisQuarter'), value: 'quarter' },
-  { label: t('reports.billing.thisYear'), value: 'year' },
-  { label: t('reports.billing.lastMonth'), value: 'last_month' },
-  { label: t('reports.billing.lastQuarter'), value: 'last_quarter' },
-  { label: t('reports.billing.lastYear'), value: 'last_year' }
-])
-const selectedRange = ref('month')
-
-watch(selectedRange, (range) => {
-  const now = new Date()
-  let from: Date
-  let to: Date
-
-  switch (range) {
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1)
-      to = now
-      break
-    case 'quarter': {
-      const quarter = Math.floor(now.getMonth() / 3)
-      from = new Date(now.getFullYear(), quarter * 3, 1)
-      to = now
-      break
-    }
-    case 'year':
-      from = new Date(now.getFullYear(), 0, 1)
-      to = now
-      break
-    case 'last_month':
-      from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      to = new Date(now.getFullYear(), now.getMonth(), 0)
-      break
-    case 'last_quarter': {
-      const lastQuarter = Math.floor(now.getMonth() / 3) - 1
-      const year = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear()
-      const q = lastQuarter < 0 ? 3 : lastQuarter
-      from = new Date(year, q * 3, 1)
-      to = new Date(year, q * 3 + 3, 0)
-      break
-    }
-    case 'last_year':
-      from = new Date(now.getFullYear() - 1, 0, 1)
-      to = new Date(now.getFullYear() - 1, 11, 31)
-      break
-    default:
-      return
-  }
-
-  dateFrom.value = from.toISOString().split('T')[0]
-  dateTo.value = to.toISOString().split('T')[0]
-})
+// No budget was created in the range — every figure on this screen is
+// range-scoped, so the whole page is zeroes.
+const periodIsEmpty = computed(() =>
+  !isLoading.value && !!summary.value && summary.value.total_created === 0
+)
 
 // Load all report data
 async function loadReports() {
@@ -97,10 +52,10 @@ async function loadReports() {
 
   try {
     const [summaryData, professionalsData, treatmentsData, statusData] = await Promise.all([
-      fetchBudgetSummary(dateFrom.value, dateTo.value),
-      fetchBudgetsByProfessional(dateFrom.value, dateTo.value),
-      fetchBudgetsByTreatment(dateFrom.value, dateTo.value),
-      fetchBudgetsByStatus(dateFrom.value, dateTo.value)
+      fetchBudgetSummary(period.value.from, period.value.to),
+      fetchBudgetsByProfessional(period.value.from, period.value.to),
+      fetchBudgetsByTreatment(period.value.from, period.value.to),
+      fetchBudgetsByStatus(period.value.from, period.value.to)
     ])
 
     summary.value = summaryData
@@ -114,10 +69,10 @@ async function loadReports() {
   }
 }
 
-// Reload when dates change
-watch([dateFrom, dateTo], () => {
+// Reload when the shared period changes
+watch(period, () => {
   loadReports()
-})
+}, { deep: true })
 
 onMounted(() => {
   loadReports()
@@ -128,81 +83,41 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`
 }
 
-// Get status badge color
-function getStatusBadgeColor(status: string): string {
-  const colors: Record<string, 'neutral' | 'success' | 'error' | 'info' | 'warning'> = {
-    draft: 'neutral',
-    accepted: 'success',
-    rejected: 'error',
-    completed: 'info',
-    expired: 'warning',
-    cancelled: 'neutral'
-  }
-  return colors[status] || 'neutral'
-}
-
-function goBack() {
-  router.push('/reports')
+// `BUDGET_STATUS_ROLE` is the one table (`app/config/severity.ts`); a
+// local copy here is what let `sent` fall back to the draft grey.
+function getStatusBadgeColor(status: string): UiColor {
+  return roleToUiColor(BUDGET_STATUS_ROLE[status as BudgetStatus] ?? 'neutral')
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <UButton
-          variant="ghost"
-          color="neutral"
-          icon="i-lucide-arrow-left"
-          @click="goBack"
-        />
-        <div>
-          <h1 class="text-display text-default">
+    <!-- Header: back, title and the one period control -->
+    <header
+      class="sticky top-0 z-10 -mx-4 px-4 py-3 bg-surface border-b border-default flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div class="flex items-center gap-4 min-w-0">
+        <BackButton to="/reports" />
+        <div class="min-w-0">
+          <h1 class="text-display text-default truncate">
             {{ t('reports.budgets.title') }}
           </h1>
-          <p class="text-caption text-subtle">
+          <p class="text-caption text-subtle truncate">
             {{ t('reports.budgets.description') }}
           </p>
         </div>
       </div>
-    </div>
-
-    <!-- Date Range Filters -->
-    <UCard>
-      <div class="flex flex-wrap items-end gap-4">
-        <UFormField :label="t('reports.billing.period')">
-          <USelectMenu
-            v-model="selectedRange"
-            :aria-label="t('reports.billing.period')"
-            :items="dateRangeOptions"
-            value-key="value"
-            class="w-48"
-          />
-        </UFormField>
-
-        <UFormField :label="t('reports.billing.from')">
-          <UInput
-            v-model="dateFrom"
-            type="date"
-          />
-        </UFormField>
-
-        <UFormField :label="t('reports.billing.to')">
-          <UInput
-            v-model="dateTo"
-            type="date"
-          />
-        </UFormField>
-
-        <UButton
-          :loading="isLoading"
-          @click="loadReports"
-        >
-          {{ t('reports.billing.refresh') }}
-        </UButton>
+      <div class="flex items-center gap-2">
+        <FilterDateRange
+          v-model="dateRangeModel"
+          :label="t('common.period')"
+        />
+        <ReportExportButton
+          endpoint="/api/v1/reports/budgets/export"
+          stem="presupuestos"
+        />
       </div>
-    </UCard>
+    </header>
 
     <!-- Loading state -->
     <div
@@ -216,6 +131,8 @@ function goBack() {
     </div>
 
     <template v-else>
+      <EmptyPeriodNotice v-if="periodIsEmpty" />
+
       <!-- Summary Cards -->
       <div
         v-if="summary"
