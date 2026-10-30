@@ -49,11 +49,11 @@ function vatLabel(vatType: VatTypeBrief | undefined): string {
 }
 
 // Color based on rate: 0% = green, < 10% = yellow, >= 10% = red
-function vatColor(vatType: VatTypeBrief | undefined): string {
+function vatColor(vatType: VatTypeBrief | undefined): 'neutral' | 'success' | 'warning' | 'error' {
   if (!vatType) return 'neutral'
-  if (vatType.rate === 0) return 'green'
-  if (Number(vatType.rate) < 10) return 'yellow'
-  return 'red'
+  if (vatType.rate === 0) return 'success'
+  if (Number(vatType.rate) < 10) return 'warning'
+  return 'error'
 }
 
 function onSavePrice(price: number) {

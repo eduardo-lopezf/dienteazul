@@ -60,9 +60,10 @@ def test_count_owned_revisions_for_schedules() -> None:
     assert _count_owned_revisions("schedules") == 2
 
 
-def test_count_owned_revisions_for_legacy_main_linear_module_is_zero() -> None:
-    # reports has no migrations/versions/ directory at all.
-    assert _count_owned_revisions("reports") == 0
+def test_count_owned_revisions_without_versions_dir_is_zero() -> None:
+    # Every real module owns a branch now (reports gained one), so a name
+    # with no migrations/versions/ directory stands in for "no branch".
+    assert _count_owned_revisions("no_such_module") == 0
 
 
 def test_pg_dump_dsn_strips_async_driver_prefix() -> None:

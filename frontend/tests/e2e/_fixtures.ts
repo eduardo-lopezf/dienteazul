@@ -22,10 +22,14 @@ const testTokens = new WeakMap<BrowserContext, Map<Role, string>>()
 export async function login(page: Page, role: Role): Promise<void> {
   const ctx = page.context()
   const form = new URLSearchParams({ username: ROLES[role], password: 'demo1234' })
-  await ctx.request.get(`${APP_BASE}/api/v1/auth/setup/status`)
+  // The first spec's login is the dev server's first trip through the BFF
+  // proxy (and the backend's first password hash), which can outlast the
+  // 8 s actionTimeout these requests inherit.
+  await ctx.request.get(`${APP_BASE}/api/v1/auth/setup/status`, { timeout: 60_000 })
   const csrf = (await ctx.cookies(APP_BASE)).find(cookie => cookie.name === 'csrf_token')?.value
   const response = await ctx.request.post(`${APP_BASE}/api/v1/auth/login`, {
     data: form.toString(),
+    timeout: 60_000,
     headers: {
       'origin': APP_BASE,
       'content-type': 'application/x-www-form-urlencoded',
