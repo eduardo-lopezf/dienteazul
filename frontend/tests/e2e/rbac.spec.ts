@@ -27,7 +27,7 @@ const LABELS = {
   finance: /finance|finanzas/i,
   quotes: /quotes|budgets|presupuestos/i,
   invoices: /invoices|facturas/i,
-  reports: /reports|informes/i
+  reports: /productivity|productividad|reports|informes/i
 }
 
 test.describe('hygienist sees clinical + scheduling, no reports', () => {

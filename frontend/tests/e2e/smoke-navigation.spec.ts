@@ -21,7 +21,7 @@ const ADMIN_ROUTES = [
   { path: '/budgets', selector: /quotes|budgets|presupuesto/i },
   { path: '/invoices', selector: /invoices|facturas/i },
   { path: '/payments', selector: /payments|cobros/i },
-  { path: '/reports', selector: /reports|informes|dashboard/i },
+  { path: '/reports', selector: /productivity|productividad|reports|informes/i },
   { path: '/settings', selector: /settings|configuración|configuracion/i },
   { path: '/settings/catalog', selector: /catalog|catálogo|catalogo/i },
   { path: '/settings/vat-types', selector: /vat|iva/i },

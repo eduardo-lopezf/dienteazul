@@ -16,7 +16,7 @@ from limits.storage import MemoryStorage
 from starlette.requests import Request
 
 from app.config import Settings
-from app.core.auth.router import _bearer_rate_key, _login_rate_key, build_limiter
+from app.core.auth.router import _login_rate_key, bearer_rate_key, build_limiter
 from app.core.auth.service import create_access_token
 
 # Source-level rules and pure functions: no DB, no app. CI runs these
@@ -133,10 +133,10 @@ def test_an_authenticated_endpoint_is_counted_per_user() -> None:
         body=b"",
     )
 
-    assert _bearer_rate_key(request) == f"user:{user_id}"
+    assert bearer_rate_key(request) == f"user:{user_id}"
 
     # A token nobody signed must not become somebody's bucket.
     forged = _request(
         "POST", "/api/v1/auth/activity", headers={"authorization": "Bearer nope"}, body=b""
     )
-    assert _bearer_rate_key(forged) == "203.0.113.7"
+    assert bearer_rate_key(forged) == "203.0.113.7"
