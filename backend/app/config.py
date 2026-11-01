@@ -88,6 +88,14 @@ class Settings(BaseSettings):
     # server says otherwise) with room left for migrations and ``psql``.
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
+    # Print every statement SQLAlchemy runs. Off everywhere by default:
+    # it used to be on for the whole of ``development``, and one load of
+    # the home screen wrote 865 lines — twice to stdout and again to
+    # ``LOG_DIR``, enough to roll a 10 MiB file in an afternoon. Each
+    # line is a synchronous write from the event loop, so the cost lands
+    # on the request that caused it. Turn it on for the query you are
+    # chasing, then turn it off.
+    DB_ECHO: bool = False
 
     # Security
     SECRET_KEY: str
@@ -176,6 +184,14 @@ class Settings(BaseSettings):
     # thirty-day purge the database table did.
     ERROR_LOG_MAX_BYTES: int = 5 * 1024 * 1024
     ERROR_LOG_BACKUP_COUNT: int = 3
+    # A request that answers more slowly than this is recorded beside the
+    # server errors, with its route and how long it took. It is not a
+    # failure — the answer was correct — but from the screen it is
+    # indistinguishable from one, and the browser gives up before anyone
+    # can report it. Without this the operator's panel showed nothing at
+    # all for the stall that threw a user out mid-afternoon. Seconds; 0
+    # switches the watch off.
+    SLOW_REQUEST_SECONDS: float = 5.0
 
     # Rollover threshold for that file, in bytes. 10 MiB.
     LOG_MAX_BYTES: int = 10 * 1024 * 1024

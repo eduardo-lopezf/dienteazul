@@ -133,14 +133,38 @@ export function useSessionActivity() {
     async function signal(): Promise<void> {
       if (!sessionAuthenticated.value) return
       try {
-        await api.post('/api/v1/auth/activity', null)
+        await api.post('/api/v1/auth/activity', null, { silent: true })
         touch()
-      } catch {
-        // Left unstamped on purpose: if the backend did not take the
-        // signal, this tab must not believe the session is younger than
-        // the server does. A refusal that means the session is over has
-        // already been turned into a logout by `useApi`'s refresh path,
-        // which knows the code it was refused with.
+      } catch (error) {
+        // Two failures, and they are not the same fact.
+        //
+        // **A refusal** is the server's answer: it did not move its
+        // clock and it said so. Stamping would make this tab believe the
+        // session is younger than the server does, which is the drift
+        // this function exists to prevent. A refusal that means the
+        // session is over has already been turned into a logout by
+        // `useApi`'s refresh path, which knows the code it was refused
+        // with.
+        //
+        // **No answer at all** — a timeout, a connection that did not
+        // hold — says nothing about whether the signal landed, and it
+        // very often did: a stalled backend answered these with 204
+        // while the browser had already given up on them. Freezing the
+        // stamp there is the worse of the two mistakes, and it is the
+        // one that happened. The browser then aged a session the server
+        // considered fresh and logged the user out mid-afternoon from
+        // the inside, with nothing recorded anywhere.
+        //
+        // So an unanswered signal stamps. It cannot extend a session
+        // past what the server allows — the idle window is enforced by
+        // `record_activity`, and this cookie only decides whether the
+        // *client* gives up early (ADR 0062). If the signal truly never
+        // landed, the server refuses the next request with
+        // `auth.*.family_inactive`, `reasonForCode` reads that as
+        // `idle`, and the person is told it was inactivity. That is the
+        // server having the last word, which is the design. The other
+        // way round corrects itself never and costs somebody their work.
+        if (!(error as { statusCode?: number } | null)?.statusCode) touch()
       }
     }
 

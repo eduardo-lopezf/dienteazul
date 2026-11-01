@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -36,7 +37,9 @@ from app.core.privacy import PrivacyPolicy, incompatible_tiers
 from app.core.privacy.egress import log_egress_audit
 from app.core.scheduler import init_scheduler, shutdown_scheduler
 from app.core.schemas import ErrorResponse
+from app.core.server_errors import SLOW_REQUEST_TYPE
 from app.core.server_errors import record as record_server_error
+from app.core.server_errors import record_event as record_server_event
 from app.core.tenancy import SingleTenantResolver
 from app.database import async_session_maker, commit_before_response, engine, get_db
 
@@ -304,6 +307,43 @@ async def request_id_middleware(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def slow_request_middleware(request: Request, call_next):
+    """Record a request that took longer than anyone waits for.
+
+    The screen cannot tell "slow" from "broken": the browser gives up on
+    its own budget and reports a failure the server never sent, so an
+    answer that arrived in thirteen seconds left no trace anywhere an
+    operator looks. This writes one line beside the server errors
+    (``GET /api/v1/ops/errors``) naming the route, the status it finally
+    answered with and how long it took.
+
+    Registered outside ``request_id_middleware`` on purpose: it measures
+    everything that middleware and the route below it spend, and the id
+    it binds is on ``request.state`` by the time ``call_next`` returns,
+    which is what ties this line to the request's own log lines.
+    """
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - started
+    threshold = settings.SLOW_REQUEST_SECONDS
+    if threshold > 0 and elapsed >= threshold:
+        route = request.scope.get("route")
+        path = getattr(route, "path", None) or request.url.path
+        logger.warning("Slow request: %s %s took %.1fs", request.method, path, elapsed)
+        record_server_event(
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            error_type=SLOW_REQUEST_TYPE,
+            message=f"answered in {elapsed:.1f}s, over the {threshold:.1f}s mark",
+            request_id=getattr(request.state, "request_id", None),
+            clinic_id=getattr(request.state, "clinic_id", None),
+            user_id=getattr(request.state, "user_id", None),
+        )
+    return response
+
+
 def _cors_headers(request: Request) -> dict[str, str]:
     # CORSMiddleware can't add headers to responses produced by exception
     # handlers (BaseHTTPMiddleware-based stacks lose the response when an
@@ -468,6 +508,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # Mount auth router
 app.include_router(auth_router, prefix="/api/v1")
 
+# What the browser could not get an answer to, for the operator's console.
+from app.core.client_errors import router as client_errors_router  # noqa: E402
+
+app.include_router(client_errors_router, prefix="/api/v1")
+
 # Mount module management router (enable/upgrade/restart).
 from app.core.plugins.router import apps_router  # noqa: E402
 from app.core.plugins.router import router as modules_router  # noqa: E402
@@ -493,6 +538,11 @@ app.include_router(privacy_router, prefix="/api/v1")
 from app.core.announcements.router import router as announcements_router  # noqa: E402
 
 app.include_router(announcements_router, prefix="/api/v1")
+
+# What a member files when something did not work, in their own words.
+from app.core.error_reports.router import router as error_reports_router  # noqa: E402
+
+app.include_router(error_reports_router, prefix="/api/v1")
 
 # What the control plane reads: usage and access per clinic (ADR 0049).
 from app.core.ops.router import router as ops_router  # noqa: E402

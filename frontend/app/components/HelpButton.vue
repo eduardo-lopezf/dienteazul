@@ -8,12 +8,23 @@
  * (see `docs/portal/.vitepress/help.ts`) and served by nginx with CORS
  * + frame-embedding allowed for the `/help/` path.
  *
- * Hidden when `NUXT_PUBLIC_DOCS_URL` is empty (e.g. in dev without a
- * portal running).
+ * The drawer is also where a user reports something that did not work
+ * ("Reportar un error"): a short account in their own words, sent with
+ * the route they were on and the build of the interface, to the
+ * operator's control panel. It is the one witness there is when a screen
+ * simply stays loading and the server never raised a thing.
+ *
+ * So the button is shown even when `NUXT_PUBLIC_DOCS_URL` is empty (dev,
+ * or a deployment with no portal): the manual is missing then, not the
+ * way to say something is broken.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import type { ApiResponse } from '~/types'
 
 const { t } = useI18n()
+const route = useRoute()
+const api = useApi()
+const toast = useToast()
 const { helpUrl, fullManualUrl, isAvailable } = useHelp()
 
 const open = ref(false)
@@ -34,13 +45,49 @@ function handleOpen(value: boolean) {
   if (value) {
     loadFailed.value = false
     loading.value = true
+  } else {
+    reporting.value = false
+  }
+}
+
+// --- Reporting a problem ---------------------------------------------------
+
+const config = useRuntimeConfig()
+const reporting = ref(false)
+const description = ref('')
+const sending = ref(false)
+
+const MAX_DESCRIPTION = 2000
+
+/** The route, without its query string: that is where an identifier
+ *  would be, and the report has no business carrying one. */
+const reportedPath = computed(() => route.path)
+const canSend = computed(
+  () => description.value.trim().length > 0 && description.value.length <= MAX_DESCRIPTION
+)
+
+async function send() {
+  if (!canSend.value || sending.value) return
+  sending.value = true
+  try {
+    await api.post<ApiResponse<{ id: string }>>('/api/v1/error-reports', {
+      description: description.value.trim(),
+      path: reportedPath.value,
+      app_version: (config.public.appVersion as string) || ''
+    })
+    toast.add({ title: t('help.report.sent'), color: 'success' })
+    description.value = ''
+    reporting.value = false
+  } catch {
+    toast.add({ title: t('help.report.failed'), color: 'error' })
+  } finally {
+    sending.value = false
   }
 }
 </script>
 
 <template>
   <UButton
-    v-if="isAvailable"
     variant="ghost"
     color="neutral"
     size="sm"
@@ -63,11 +110,11 @@ function handleOpen(value: boolean) {
         <header class="flex items-center justify-between px-4 h-14 border-b border-default">
           <div class="flex items-center gap-2 min-w-0">
             <UIcon
-              name="i-lucide-circle-help"
+              :name="reporting ? 'i-lucide-bug' : 'i-lucide-circle-help'"
               class="w-4 h-4 text-subtle shrink-0"
             />
             <span class="text-h3 text-default truncate">
-              {{ t('help.drawerTitle', 'Help for this page') }}
+              {{ reporting ? t('help.report.title') : t('help.drawerTitle', 'Help for this page') }}
             </span>
           </div>
           <UButton
@@ -80,9 +127,42 @@ function handleOpen(value: boolean) {
           />
         </header>
 
-        <div class="relative flex-1 min-h-0 overflow-hidden">
+        <!-- Reporting replaces the manual in the drawer, rather than
+             opening a second window over it. -->
+        <form
+          v-if="reporting"
+          id="error-report"
+          class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3"
+          @submit.prevent="send"
+        >
+          <p class="text-default">
+            {{ t('help.report.intro') }}
+          </p>
+          <UFormField
+            :label="t('help.report.label')"
+            :help="t('help.report.noPatientData')"
+          >
+            <UTextarea
+              v-model="description"
+              :maxlength="MAX_DESCRIPTION"
+              :rows="6"
+              autoresize
+              :placeholder="t('help.report.placeholder')"
+              class="w-full"
+              data-testid="error-report-description"
+            />
+          </UFormField>
+          <p class="text-caption text-subtle">
+            {{ t('help.report.context', { path: reportedPath }) }}
+          </p>
+        </form>
+
+        <div
+          v-else
+          class="relative flex-1 min-h-0 overflow-hidden"
+        >
           <div
-            v-if="loading"
+            v-if="loading && isAvailable"
             class="absolute inset-0 flex items-center justify-center bg-surface"
           >
             <UIcon
@@ -92,7 +172,7 @@ function handleOpen(value: boolean) {
           </div>
 
           <div
-            v-if="loadFailed"
+            v-if="loadFailed || !isAvailable"
             class="absolute inset-0 flex flex-col items-center justify-center text-center px-6 gap-2 bg-surface"
           >
             <UIcon
@@ -100,11 +180,14 @@ function handleOpen(value: boolean) {
               class="w-6 h-6 text-warning"
             />
             <p class="text-default">
-              {{ t('help.unavailable', 'No contextual help available for this page yet.') }}
+              {{ isAvailable
+                ? t('help.unavailable', 'No contextual help available for this page yet.')
+                : t('help.notConfigured') }}
             </p>
           </div>
 
           <iframe
+            v-if="isAvailable"
             v-show="!loadFailed"
             :src="helpUrl"
             class="w-full h-full border-0"
@@ -116,18 +199,51 @@ function handleOpen(value: boolean) {
           />
         </div>
 
-        <footer class="flex items-center justify-end gap-2 px-4 h-12 border-t border-default">
-          <UButton
-            v-if="fullManualUrl"
-            variant="link"
-            color="primary"
-            size="sm"
-            icon="i-lucide-external-link"
-            :to="fullManualUrl"
-            target="_blank"
-          >
-            {{ t('help.openFullManual', 'Open full manual') }}
-          </UButton>
+        <footer class="flex items-center justify-between gap-2 px-4 h-12 border-t border-default">
+          <template v-if="reporting">
+            <UButton
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              icon="i-lucide-arrow-left"
+              @click="reporting = false"
+            >
+              {{ t('help.report.back') }}
+            </UButton>
+            <UButton
+              type="submit"
+              form="error-report"
+              size="sm"
+              :loading="sending"
+              :disabled="!canSend"
+              data-testid="error-report-send"
+            >
+              {{ t('help.report.send') }}
+            </UButton>
+          </template>
+          <template v-else>
+            <UButton
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              icon="i-lucide-bug"
+              data-testid="error-report-open"
+              @click="reporting = true"
+            >
+              {{ t('help.report.open') }}
+            </UButton>
+            <UButton
+              v-if="fullManualUrl"
+              variant="link"
+              color="primary"
+              size="sm"
+              icon="i-lucide-external-link"
+              :to="fullManualUrl"
+              target="_blank"
+            >
+              {{ t('help.openFullManual', 'Open full manual') }}
+            </UButton>
+          </template>
         </footer>
       </div>
     </template>

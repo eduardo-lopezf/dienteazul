@@ -97,7 +97,7 @@ async def auto_close_expired_plans() -> None:
     today = date.today()
     async with async_session_maker() as db:
         clinic_rows = (
-            await db.execute(text("SELECT id, settings FROM clinics WHERE deleted_at IS NULL"))
+            await db.execute(text("SELECT id, settings FROM clinics WHERE deactivated_at IS NULL"))
         ).all()
 
     sem = asyncio.Semaphore(_CLINIC_CONCURRENCY)

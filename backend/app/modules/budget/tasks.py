@@ -31,14 +31,14 @@ _CLINIC_CONCURRENCY = 5
 
 async def _list_clinics() -> list[UUID]:
     async with async_session_maker() as db:
-        rows = (await db.execute(text("SELECT id FROM clinics WHERE deleted_at IS NULL"))).all()
+        rows = (await db.execute(text("SELECT id FROM clinics WHERE deactivated_at IS NULL"))).all()
     return [row.id for row in rows]
 
 
 async def _list_clinics_with_settings() -> list[tuple[UUID, dict]]:
     async with async_session_maker() as db:
         rows = (
-            await db.execute(text("SELECT id, settings FROM clinics WHERE deleted_at IS NULL"))
+            await db.execute(text("SELECT id, settings FROM clinics WHERE deactivated_at IS NULL"))
         ).all()
     return [(row.id, row.settings or {}) for row in rows]
 

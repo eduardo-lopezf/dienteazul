@@ -133,16 +133,36 @@ def _rebind(directory: Path) -> logging.Logger | None:
     return writer
 
 
-def record(
-    exc: BaseException,
+#: What a request answered too slowly is filed as. Not an exception —
+#: the request succeeded, it just took longer than anyone can wait for
+#: (see ``SLOW_REQUEST_SECONDS``).
+SLOW_REQUEST_TYPE = "core.slow_request"
+
+#: What a browser that gave up waiting is filed as. The request may well
+#: have been delivered and applied; what is recorded is that nothing came
+#: back in time.
+CLIENT_TIMEOUT_TYPE = "core.client_timeout"
+
+
+def record_event(
     *,
     method: str,
     path: str,
+    status_code: int,
+    error_type: str,
+    message: str,
+    frames: str = "",
     request_id: str | None,
     clinic_id: str | None,
     user_id: str | None,
 ) -> None:
-    """Keep one occurrence as a JSON line. Never raises."""
+    """Keep one occurrence as a JSON line. Never raises.
+
+    The plain form, for what the panel must show that is not an
+    exception: a request that answered too slowly, a browser that gave
+    up on one. ``message`` is scrubbed here, so a caller may not leak a
+    value through it by accident.
+    """
     try:
         with _lock:
             writer = _rebind(log_dir())
@@ -154,10 +174,10 @@ def record(
                     "occurred_at": datetime.now(UTC).isoformat(),
                     "method": method[:10],
                     "path": path[:300],
-                    "status_code": 500,
-                    "error_type": f"{type(exc).__module__}.{type(exc).__qualname__}"[:200],
-                    "message": scrub(str(exc)) or type(exc).__name__,
-                    "frames": frames_of(exc),
+                    "status_code": status_code,
+                    "error_type": error_type[:200],
+                    "message": scrub(message),
+                    "frames": frames,
                     "request_id": request_id,
                     "clinic_id": clinic_id,
                     "user_id": user_id,
@@ -167,6 +187,29 @@ def record(
         )
     except Exception:  # noqa: BLE001 — recording must never be the next failure
         logger.exception("Could not record a server error")
+
+
+def record(
+    exc: BaseException,
+    *,
+    method: str,
+    path: str,
+    request_id: str | None,
+    clinic_id: str | None,
+    user_id: str | None,
+) -> None:
+    """Keep the occurrence of an unhandled exception."""
+    record_event(
+        method=method,
+        path=path,
+        status_code=500,
+        error_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
+        message=scrub(str(exc)) or type(exc).__name__,
+        frames=frames_of(exc),
+        request_id=request_id,
+        clinic_id=clinic_id,
+        user_id=user_id,
+    )
 
 
 def _files_newest_first(directory: Path) -> list[Path]:

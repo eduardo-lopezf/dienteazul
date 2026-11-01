@@ -2,7 +2,22 @@
   "announcements": {
     "kind": {
       "maintenance": "Maintenance",
-      "feature": "What's new"
+      "feature": "What's new",
+      "survey": "Survey"
+    },
+    "survey": {
+      "optional": "Every question is optional.",
+      "noPatientData": "Please do not include patient data.",
+      "yes": "Yes",
+      "no": "No",
+      "expand": "Add a comment",
+      "collapse": "Remove the comment",
+      "expandPlaceholder": "Tell us why, if you like (optional).",
+      "openPlaceholder": "Write your suggestion.",
+      "progress": "{done} of {total} answered",
+      "send": "Send",
+      "sent": "Thank you, we have received your answers.",
+      "failed": "Your answers could not be sent."
     },
     "until": "Until {date}",
     "dismiss": "Hide"
@@ -2138,6 +2153,8 @@
     "required": "This field is required",
     "invalidEmail": "Invalid email",
     "networkError": "Connection error",
+    "slowServer": "The server is slow",
+    "slowServerHint": "Still waiting for the answer",
     "timeoutError": "The server took too long to answer",
     "timeoutWrite": "The server took too long to answer. The change may have been saved: reload the page before trying again",
     "serverError": "Server error. If it happens again, give this reference to support",
@@ -4601,7 +4618,21 @@
     "openHelp": "Open help",
     "drawerTitle": "Help for this page",
     "unavailable": "No contextual help available for this page yet.",
-    "openFullManual": "Open full manual"
+    "notConfigured": "This installation has no online manual. You can still report a problem from here.",
+    "openFullManual": "Open full manual",
+    "report": {
+      "open": "Report a problem",
+      "title": "Report a problem",
+      "intro": "Tell us what you expected and what happened. We will also send the page you are on and the version of the program.",
+      "label": "What happened?",
+      "placeholder": "For example: saving the budget keeps loading and nothing happens.",
+      "context": "Page: {path}",
+      "noPatientData": "Please do not include patient data.",
+      "send": "Send",
+      "back": "Back to help",
+      "sent": "Thank you, we have received your report.",
+      "failed": "The report could not be sent. Please try again."
+    }
   },
   "treatments": {
     "title": "Treatments",

@@ -18,7 +18,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -33,11 +33,18 @@ from starlette.background import BackgroundTask
 
 from app.config import settings
 from app.core import server_errors
-from app.core.announcements.models import Announcement
+from app.core.announcements.models import (
+    MAX_QUESTION_TEXT,
+    MAX_QUESTIONS,
+    MAX_TITLE,
+    Announcement,
+    SurveyAnswer,
+)
 from app.core.auth.models import Clinic, ClinicMembership, TierLimit, User
 from app.core.auth.schemas import _validate_iana_timezone
 from app.core.auth.service import hash_password, validate_password_strength
 from app.core.contracts import ReferenceSpecialties, provider
+from app.core.error_reports.models import STATES, ErrorReport
 from app.core.events import event_bus
 from app.core.events.types import EventType
 from app.core.plugins.apps import (
@@ -1074,11 +1081,34 @@ async def import_snapshot(
 # --- Notices to clinics ------------------------------------------------------
 
 
+class QuestionWrite(BaseModel):
+    """One question as the operator writes it.
+
+    ``id`` is echoed back from a survey being edited so the question —
+    and every answer already attached to it — survives a reorder or a
+    corrected typo. Left out, the question is new and is given an id.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str | None = Field(default=None, max_length=40)
+    kind: Literal["yes_no", "open"]
+    text: str = Field(min_length=1, max_length=MAX_QUESTION_TEXT)
+
+
 class AnnouncementWrite(BaseModel):
     """A notice as the operator writes it."""
 
-    kind: Literal["maintenance", "feature"]
+    kind: Literal["maintenance", "feature", "survey"]
     message: str = Field(min_length=1, max_length=280)
+    #: What the banner shows for a survey ("Encuesta de Calidad").
+    #: Required for a survey — ten questions have no single line to show
+    #: there — and refused for the other kinds, whose ``message`` is the
+    #: line itself.
+    title: str | None = Field(default=None, max_length=MAX_TITLE)
+    #: A survey's questions, in the order they are asked. Required for a
+    #: survey and refused for the other kinds, which ask nothing.
+    questions: list[QuestionWrite] | None = None
     #: Left out, it shows from now.
     starts_at: datetime | None = None
     #: Left out, it shows until it is taken down.
@@ -1099,6 +1129,33 @@ class AnnouncementWrite(BaseModel):
             raise ValueError("ends_at must come after starts_at")
         return self
 
+    @model_validator(mode="after")
+    def a_survey_asks_something(self) -> AnnouncementWrite:
+        """Only a survey asks, and a survey asks something answerable."""
+        if self.kind != "survey":
+            if self.questions:
+                raise ValueError("Only a survey has questions")
+            if self.title:
+                raise ValueError("Only a survey has a title")
+            self.questions = None
+            self.title = None
+            return self
+
+        if not (self.title or "").strip():
+            raise ValueError("A survey needs a title: it is what the banner shows")
+        self.title = self.title.strip() if self.title else None
+
+        questions = self.questions or []
+        if not 1 <= len(questions) <= MAX_QUESTIONS:
+            raise ValueError(f"A survey asks between 1 and {MAX_QUESTIONS} questions")
+        for question in questions:
+            question.text = question.text.strip()
+            if not question.text:
+                raise ValueError("A question is empty")
+        if len({q.text for q in questions}) != len(questions):
+            raise ValueError("Two questions read the same")
+        return self
+
 
 class OpsAnnouncementResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -1106,15 +1163,22 @@ class OpsAnnouncementResponse(BaseModel):
     id: UUID
     kind: str
     message: str
+    #: What the banner shows for a survey; ``None`` for the other kinds.
+    title: str | None
+    #: A survey's questions, in order; ``None`` for the other kinds.
+    questions: list[dict] | None
     starts_at: datetime
     ends_at: datetime | None
     clinic_ids: list[UUID] | None
     created_at: datetime
     #: ``scheduled`` (not yet), ``active`` or ``ended``, read now.
     status: str = "active"
+    #: How many members have answered anything, when it is a survey. The
+    #: result itself is read one notice at a time, at ``/responses``.
+    responses: int = 0
 
 
-def _announcement(row: Announcement) -> OpsAnnouncementResponse:
+def _announcement(row: Announcement, responses: int = 0) -> OpsAnnouncementResponse:
     now = datetime.now(UTC)
     status_now = (
         "scheduled"
@@ -1123,12 +1187,37 @@ def _announcement(row: Announcement) -> OpsAnnouncementResponse:
         if row.ends_at is not None and row.ends_at <= now
         else "active"
     )
-    return OpsAnnouncementResponse.model_validate(row).model_copy(update={"status": status_now})
+    return OpsAnnouncementResponse.model_validate(row).model_copy(
+        update={"status": status_now, "responses": responses}
+    )
+
+
+def _questions(row: Announcement, data: AnnouncementWrite) -> list[dict[str, str]] | None:
+    """The survey's questions with their ids settled.
+
+    A question the operator is editing keeps the id it came back with, so
+    the answers already given stay attached to it. Anything else is new
+    and is given one. An id that names no question of *this* survey is
+    treated as new rather than trusted.
+    """
+    if data.questions is None:
+        return None
+    known = {q["id"] for q in (row.questions or [])}
+    return [
+        {
+            "id": q.id if q.id in known else uuid4().hex[:12],
+            "kind": q.kind,
+            "text": q.text,
+        }
+        for q in data.questions
+    ]
 
 
 def _apply(row: Announcement, data: AnnouncementWrite) -> None:
     row.kind = data.kind
     row.message = data.message
+    row.title = data.title
+    row.questions = _questions(row, data)
     row.starts_at = data.starts_at or datetime.now(UTC)
     row.ends_at = data.ends_at
     row.clinic_ids = [str(c) for c in data.clinic_ids] if data.clinic_ids else None
@@ -1142,9 +1231,21 @@ def _apply(row: Announcement, data: AnnouncementWrite) -> None:
 async def list_ops_announcements(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ApiResponse[list[OpsAnnouncementResponse]]:
-    """Every notice, newest first, with whether it shows now."""
-    rows = await db.scalars(select(Announcement).order_by(Announcement.starts_at.desc()))
-    return ApiResponse(data=[_announcement(row) for row in rows])
+    """Every notice, newest first, with whether it shows now and — for a
+    survey — how many members have answered it."""
+    rows = (await db.scalars(select(Announcement).order_by(Announcement.starts_at.desc()))).all()
+    # Members who answered *anything*, not answers given: ten questions
+    # from one person is one respondent.
+    answered = dict(
+        (
+            await db.execute(
+                select(
+                    SurveyAnswer.announcement_id, func.count(func.distinct(SurveyAnswer.user_id))
+                ).group_by(SurveyAnswer.announcement_id)
+            )
+        ).all()
+    )
+    return ApiResponse(data=[_announcement(row, answered.get(row.id, 0)) for row in rows])
 
 
 @router.post(
@@ -1189,6 +1290,272 @@ async def delete_announcement(
 ) -> None:
     """Take a notice down for good."""
     await db.delete(await _found(db, announcement_id))
+
+
+# --- What a survey came back with --------------------------------------------
+
+
+class AnswerComment(BaseModel):
+    """What one member wrote, under the inquilino they wrote it from.
+
+    Free text from a staff member: it may name a patient without meaning
+    to, so it is shown here, in the operator's console, and goes nowhere
+    else — never to a model, never out in a subject export (ADR 0049
+    rule 5). Who wrote it is not reported; which inquilino is.
+    """
+
+    clinic_id: UUID
+    clinic_name: str | None
+    text: str
+
+
+class QuestionResult(BaseModel):
+    """One question and what came back to it."""
+
+    id: str
+    kind: str
+    text: str
+    #: For a ``yes_no`` question. Both zero for an ``open`` one.
+    yes: int = 0
+    no: int = 0
+    #: What members added: the elaborations on a yes/no, or the whole of
+    #: an open answer.
+    comments: list[AnswerComment] = Field(default_factory=list)
+
+
+class SurveyClinicResult(BaseModel):
+    """How many of one inquilino's members answered."""
+
+    clinic_id: UUID
+    #: ``None`` when the clinic has since been deleted.
+    clinic_name: str | None
+    respondents: int
+
+
+class SurveyResult(BaseModel):
+    """A survey as the panel reads it."""
+
+    id: UUID
+    title: str | None
+    message: str
+    #: Members who answered anything at all.
+    respondents: int
+    questions: list[QuestionResult]
+    clinics: list[SurveyClinicResult]
+
+
+@router.get("/announcements/{announcement_id}/responses", response_model=ApiResponse[SurveyResult])
+async def survey_result(
+    announcement_id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
+) -> ApiResponse[SurveyResult]:
+    """What a survey came back with: per question the yes/no counts and
+    what members wrote, plus how many answered per inquilino.
+
+    Who answered what is not reported. The rows name the member — one
+    answer each per question is what keeps the counts honest — but the
+    operator reads the inquilino, never the person.
+    """
+    row = await _found(db, announcement_id)
+    if row.kind != "survey":
+        raise HTTPException(status.HTTP_409_CONFLICT, "That notice is not a survey")
+
+    answers = list(
+        await db.scalars(
+            select(SurveyAnswer)
+            .where(SurveyAnswer.announcement_id == announcement_id)
+            .order_by(SurveyAnswer.created_at)
+        )
+    )
+    names = dict(
+        (
+            await db.execute(
+                select(Clinic.id, Clinic.name).where(
+                    Clinic.id.in_({a.clinic_id for a in answers} or [None])
+                )
+            )
+        ).all()
+    )
+
+    questions: list[QuestionResult] = []
+    for question in row.questions or []:
+        mine = [a for a in answers if a.question_id == question["id"]]
+        questions.append(
+            QuestionResult(
+                id=question["id"],
+                kind=question["kind"],
+                text=question["text"],
+                yes=sum(1 for a in mine if a.yes is True),
+                no=sum(1 for a in mine if a.yes is False),
+                comments=[
+                    AnswerComment(
+                        clinic_id=a.clinic_id,
+                        clinic_name=names.get(a.clinic_id),
+                        text=a.comment,
+                    )
+                    for a in mine
+                    if a.comment
+                ],
+            )
+        )
+
+    # A question the operator has since removed takes its answers out of
+    # the reading with it, rather than appearing as a question nobody can
+    # see the text of.
+    per_clinic: dict[UUID, set[UUID]] = {}
+    for answer in answers:
+        per_clinic.setdefault(answer.clinic_id, set()).add(answer.user_id)
+
+    return ApiResponse(
+        data=SurveyResult(
+            id=row.id,
+            title=row.title,
+            message=row.message,
+            respondents=len({a.user_id for a in answers}),
+            questions=questions,
+            clinics=sorted(
+                (
+                    SurveyClinicResult(
+                        clinic_id=clinic_id,
+                        clinic_name=names.get(clinic_id),
+                        respondents=len(users),
+                    )
+                    for clinic_id, users in per_clinic.items()
+                ),
+                key=lambda c: (-c.respondents, c.clinic_name or ""),
+            ),
+        )
+    )
+
+
+@router.delete("/announcements/{announcement_id}/responses", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_survey_result(
+    announcement_id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
+) -> None:
+    """Empty a survey's result, keeping the survey.
+
+    For when the operator has read it, or wants to ask the same thing
+    again from zero. The questions, the dates and the audience stay as
+    they are; the members may answer again, and the clinics are told
+    nothing. It cannot be undone — what people wrote is gone.
+    """
+    await _found(db, announcement_id)
+    await db.execute(delete(SurveyAnswer).where(SurveyAnswer.announcement_id == announcement_id))
+
+
+# --- What a member said went wrong ------------------------------------------
+
+
+class ErrorReportResponse(BaseModel):
+    """A report as the panel shows it.
+
+    ``description`` is the member's own prose, so it may name a patient
+    without meaning to. It stays inside the operator's console: it is
+    never sent to a model and never leaves through an export (ADR 0049
+    rule 5).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    description: str
+    path: str
+    app_version: str
+    state: str
+    created_at: datetime
+    clinic_id: UUID
+    #: Filled in beside the row; ``None`` when the clinic or the user has
+    #: since been deleted.
+    clinic_name: str | None = None
+    user_email: str | None = None
+
+
+class ErrorReportUpdate(BaseModel):
+    """Where the operator has got to with a report."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: Literal["new", "read", "archived"]
+
+
+@router.get("/error-reports", response_model=ApiResponse[list[ErrorReportResponse]])
+async def list_error_reports(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    state: Annotated[str | None, Query(description="Only reports in this state.")] = None,
+) -> ApiResponse[list[ErrorReportResponse]]:
+    """Every report, newest first, with who filed it and from where."""
+    if state is not None and state not in STATES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No such state")
+    query = (
+        select(ErrorReport, Clinic.name, User.email)
+        .outerjoin(Clinic, Clinic.id == ErrorReport.clinic_id)
+        .outerjoin(User, User.id == ErrorReport.user_id)
+        .order_by(ErrorReport.created_at.desc())
+    )
+    if state is not None:
+        query = query.where(ErrorReport.state == state)
+    return ApiResponse(
+        data=[
+            ErrorReportResponse.model_validate(row).model_copy(
+                update={"clinic_name": clinic_name, "user_email": user_email}
+            )
+            for row, clinic_name, user_email in (await db.execute(query)).all()
+        ]
+    )
+
+
+@router.delete("/error-reports", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_error_reports(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    state: Annotated[str | None, Query(description="Only clear the reports in this state.")] = None,
+) -> None:
+    """Empty the reported errors, as ``DELETE /ops/errors`` empties the
+    server's own.
+
+    ``?state=archived`` clears only what the operator has already dealt
+    with, which is the usual tidy-up; without it, everything goes. It
+    cannot be undone — what people wrote is gone, and the clinics are
+    told nothing.
+    """
+    if state is not None and state not in STATES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No such state")
+    query = delete(ErrorReport)
+    if state is not None:
+        query = query.where(ErrorReport.state == state)
+    await db.execute(query)
+
+
+@router.delete("/error-reports/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_error_report(
+    report_id: UUID, db: Annotated[AsyncSession, Depends(get_db)]
+) -> None:
+    """Forget one report for good."""
+    row = await db.get(ErrorReport, report_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Error report not found")
+    await db.delete(row)
+
+
+@router.patch("/error-reports/{report_id}", response_model=ApiResponse[ErrorReportResponse])
+async def update_error_report(
+    report_id: UUID, data: ErrorReportUpdate, db: Annotated[AsyncSession, Depends(get_db)]
+) -> ApiResponse[ErrorReportResponse]:
+    """Mark a report read, or archive it. Nothing else about it changes:
+    what the member wrote is theirs."""
+    row = await db.get(ErrorReport, report_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Error report not found")
+    row.state = data.state
+    await db.flush()
+    clinic = await db.get(Clinic, row.clinic_id)
+    user = await db.get(User, row.user_id)
+    return ApiResponse(
+        data=ErrorReportResponse.model_validate(row).model_copy(
+            update={
+                "clinic_name": clinic.name if clinic else None,
+                "user_email": user.email if user else None,
+            }
+        )
+    )
 
 
 # --- Server errors -----------------------------------------------------------

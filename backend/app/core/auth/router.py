@@ -119,7 +119,7 @@ async def _refresh_rate_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-def _bearer_rate_key(request: Request) -> str:
+def bearer_rate_key(request: Request) -> str:
     """Key a limiter by the access token's subject, not the socket peer.
 
     Same reasoning as :func:`_refresh_rate_key`, which only ever covered
@@ -515,7 +515,7 @@ async def refresh_token(
 
 
 @router.post("/activity", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("30/minute", key_func=_bearer_rate_key)
+@limiter.limit("30/minute", key_func=bearer_rate_key)
 async def record_activity(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -585,7 +585,7 @@ async def logout(
 
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("5/minute", key_func=_bearer_rate_key)
+@limiter.limit("5/minute", key_func=bearer_rate_key)
 async def change_password(
     request: Request,
     data: PasswordChange,

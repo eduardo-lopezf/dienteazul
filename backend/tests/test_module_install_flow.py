@@ -29,6 +29,29 @@ async def _reconcile(db_session: AsyncSession) -> None:
     await ModuleService(db_session).reconcile_with_db()
 
 
+def _pretend_alembic_ran(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make ``applied_revisions`` describe a database Alembic migrated.
+
+    The suite's schema comes from ``metadata.create_all``, so there is no
+    ``alembic_version`` at all and reconcile correctly records nothing as
+    applied. The tests below are about a deployment that *did* run its
+    branches, which is what every real database is.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.alembic_paths import resolve_module_branch_head
+
+    heads = {
+        head
+        for module in module_registry.list_discovered()
+        if (head := resolve_module_branch_head(module)) is not None
+    }
+
+    async def _heads(db: AsyncSession) -> set[str]:
+        return heads
+
+    monkeypatch.setattr(service_mod, "applied_revisions", _heads)
+
+
 @pytest.mark.asyncio
 async def test_uninstall_blocked_for_non_removable_module(db_session: AsyncSession) -> None:
     """Non-removable modules must reject uninstall even when they ship an
@@ -171,8 +194,11 @@ async def _get(db_session: AsyncSession, name: str) -> ModuleRecord:
 
 
 @pytest.mark.asyncio
-async def test_module_without_auto_install_starts_disabled(db_session: AsyncSession) -> None:
+async def test_module_without_auto_install_starts_disabled(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never ``uninstalled``: its tables are there, it just does not run."""
+    _pretend_alembic_ran(monkeypatch)
     await _reconcile(db_session)
 
     verifactu = await _get(db_session, "verifactu")
@@ -183,8 +209,15 @@ async def test_module_without_auto_install_starts_disabled(db_session: AsyncSess
 
 
 @pytest.mark.asyncio
-async def test_reconcile_turns_never_installed_into_disabled(db_session: AsyncSession) -> None:
-    """Databases that predate ADR 0035 hold these rows as ``uninstalled``."""
+async def test_reconcile_turns_never_installed_into_disabled(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Databases that predate ADR 0035 hold these rows as ``uninstalled``.
+
+    Such a database ran its migrations, so ``applied_revision`` is on the
+    record and it is not mistaken for a real uninstall (which clears it).
+    """
+    _pretend_alembic_ran(monkeypatch)
     await _reconcile(db_session)
 
     verifactu = await _get(db_session, "verifactu")

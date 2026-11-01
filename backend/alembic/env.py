@@ -38,7 +38,9 @@ from app.core.agents.models import (  # noqa: F401
     AgentAuditLog,
     AgentSession,
 )
+from app.core.announcements.models import Announcement, SurveyAnswer  # noqa: F401
 from app.core.auth.models import Clinic, ClinicMembership, User  # noqa: F401
+from app.core.error_reports.models import ErrorReport  # noqa: F401
 from app.core.plugins.alembic_paths import discover_version_locations
 from app.core.plugins.db_models import (  # noqa: F401
     ExternalId,

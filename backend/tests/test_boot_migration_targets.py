@@ -223,3 +223,158 @@ async def test_uninstalled_branches_are_never_migrated(
 
     assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
     assert migrated == []
+
+
+async def test_a_modules_first_migration_is_applied_not_assumed(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """A module installed before it shipped any migration must still migrate.
+
+    ``reports`` was auto-installed when it owned no table, so its record
+    carried ``base_revision = NULL``. When ``rep_0001`` shipped,
+    ``reconcile_with_db`` backfilled *both* revision columns at head —
+    the backfill meant for databases predating ``base_revision``, which
+    really were migrated — and the catch-up then saw nothing to do.
+    ``reports_summary_schedule`` was never created and the scheduled
+    summary job raised ``relation ... does not exist`` every day.
+
+    ``alembic_version`` is the arbiter: here it holds nothing, which is
+    the shape of a branch that never ran.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    async def no_revisions(db) -> set[str]:
+        return set()
+
+    monkeypatch.setattr(service_mod, "applied_revisions", no_revisions)
+
+    head = resolve_module_branch_head(module_registry.get(UNLABELLED))
+    record = _record(UNLABELLED, ModuleState.INSTALLED, None)
+    record.base_revision = None  # the module had no branch when it was installed
+    db_session.add(record)
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    # The branch is recorded so an uninstall can downgrade it, but
+    # nothing claims it was applied.
+    assert row.base_revision == head
+    assert row.applied_revision is None
+
+    # ...so the catch-up is the step that creates the tables. Reconcile
+    # inserts a record for every discovered module, so the run covers
+    # more than this one branch — what matters is that it covers it.
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert head in migrated
+
+
+async def test_a_branch_alembic_already_ran_is_recorded_without_migrating(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """The other half: a database bootstrapped with ``upgrade heads``.
+
+    ``alembic_version`` holds the branch head, so reconcile may record it
+    and no Alembic runs on the next boot.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    head = resolve_module_branch_head(module_registry.get(UNLABELLED))
+
+    async def ran_the_branch(db) -> set[str]:
+        return {head}
+
+    monkeypatch.setattr(service_mod, "applied_revisions", ran_the_branch)
+
+    record = _record(UNLABELLED, ModuleState.INSTALLED, None)
+    record.base_revision = None
+    db_session.add(record)
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.applied_revision == head
+
+    # Only this branch is in ``alembic_version``, so only this one is
+    # left alone; the other modules' records are new and do migrate.
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert head not in migrated
+
+
+async def test_a_schema_built_from_the_models_counts_every_branch_as_applied(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """The third shape, and the one that took the whole app down.
+
+    No ``alembic_version`` table at all is not "nothing has been
+    applied" — it is "Alembic never built this schema". The models did,
+    through ``metadata.create_all``, so every table is already the shape
+    its branch would have produced.
+
+    Read as "nothing applied", the catch-up replays each branch from its
+    base onto tables that already exist, every ``CREATE TABLE`` raises,
+    and :meth:`PendingProcessor._migrate_installed` hands the boot a set
+    of failures that keeps those modules unmounted. The whole suite's app
+    then came up with no agenda, no patients and no treatments in it.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    async def no_alembic_version(db) -> set[str] | None:
+        return None
+
+    monkeypatch.setattr(service_mod, "applied_revisions", no_alembic_version)
+
+    head = resolve_module_branch_head(module_registry.get(UNLABELLED))
+    record = _record(UNLABELLED, ModuleState.INSTALLED, None)
+    record.base_revision = None
+    db_session.add(record)
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.applied_revision == head
+
+    # Nothing to catch up, so no Alembic runs and nothing fails: the
+    # modules stay mountable.
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert migrated == []
+
+
+async def test_a_database_without_alembic_version_says_so(db_session: AsyncSession) -> None:
+    """``None``, not an empty set — the two mean opposite things.
+
+    The suite's own schema comes from ``metadata.create_all``, so this
+    reads the real distinction rather than a monkeypatched one.
+    """
+    from app.core.plugins.service import applied_revisions
+
+    assert await applied_revisions(db_session) is None

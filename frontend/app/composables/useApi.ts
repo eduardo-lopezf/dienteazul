@@ -37,6 +37,13 @@ interface UseApiOptions {
   // (debounced lookups, component unmount, etc.).
   signal?: AbortSignal
   responseType?: 'blob' | 'arrayBuffer' | 'text' | 'stream'
+  // Raise no toast for this request, whatever happens to it. For the
+  // ones nobody asked for: the session heartbeat fires every 30 s of
+  // interaction, and when the backend stalls it would tell the user
+  // their *change* may not have been saved — about a request they never
+  // made. What is reported to the operator is unaffected; only the
+  // screen stays quiet.
+  silent?: boolean
 }
 
 function _withQuery(path: string, query?: UseApiOptions['query']): string {
@@ -49,6 +56,21 @@ function _withQuery(path: string, query?: UseApiOptions['query']): string {
   if (!s) return path
   return path.includes('?') ? `${path}&${s}` : `${path}?${s}`
 }
+
+/**
+ * When a request that is still running is worth mentioning, and when it
+ * stops being slow and starts being broken.
+ *
+ * It used to be one number, 10 s, and crossing it was reported as a
+ * failure. A backend whose host is short of memory stalls for ten or
+ * fifteen seconds and then answers correctly: the screen called that a
+ * failure, the user was told the server had timed out, and nothing
+ * anywhere recorded it. Saying "this is slow" and waiting is the honest
+ * account of it, and the ceiling is high enough that reaching it really
+ * does mean nothing is coming.
+ */
+const SLOW_AFTER_MS = 8_000
+const GIVE_UP_AFTER_MS = 45_000
 
 /**
  * The message with the reference after it, when there is one.
@@ -66,11 +88,66 @@ export function useApi() {
   const { t } = useI18n()
   const toast = useToast()
 
+  /**
+   * Run the request, saying it is slow rather than giving up on it.
+   *
+   * The notice is a toast with no duration, taken down in `finally`: it
+   * is up only while the request it is about is still in flight, so an
+   * answer that arrives at thirteen seconds closes it on the way past
+   * and the user sees the screen fill, not an error.
+   */
+  async function send<T>(url: string, init: Record<string, unknown>, quiet: boolean): Promise<T> {
+    let notice: string | number | null = null
+    const warn = import.meta.client && !quiet
+      ? setTimeout(() => {
+          notice = toast.add({
+            title: t('common.slowServer'),
+            description: t('common.slowServerHint'),
+            color: 'warning',
+            duration: 0
+          }).id
+        }, SLOW_AFTER_MS)
+      : undefined
+    try {
+      return await auth.request<T>(url, { timeout: GIVE_UP_AFTER_MS, ...init })
+    } finally {
+      if (warn !== undefined) clearTimeout(warn)
+      if (notice !== null) toast.remove(notice)
+    }
+  }
+
+  /**
+   * Tell the backend about a request it never answered.
+   *
+   * A request that times out leaves nothing on the server to look at, so
+   * the operator's error console showed an empty afternoon while users
+   * were being thrown out. The browser is the only witness; this is its
+   * statement, and it carries no text of its own — the route, the verb,
+   * the wait and which of the two cases, nothing a patient's name could
+   * ride in on. Sent and forgotten: a report that fails is not worth a
+   * second error on screen.
+   */
+  function report(path: string, method: HttpMethod, waitedMs: number, timedOut: boolean): void {
+    if (!import.meta.client || path.startsWith('/api/v1/client-errors')) return
+    void auth.request('/api/v1/client-errors', {
+      method: 'POST',
+      body: {
+        path: path.split('?')[0],
+        method,
+        waited_ms: Math.min(Math.round(waitedMs), 600_000),
+        kind: timedOut ? 'timeout' : 'network'
+      },
+      timeout: 5_000
+    }).catch(() => undefined)
+  }
+
   async function $api<T>(
     path: string,
     options: UseApiOptions = {}
   ): Promise<T> {
-    const { skipAuth, method, body, headers: optionHeaders, signal, query, responseType } = options
+    const { skipAuth, method, body, headers: optionHeaders, signal, query, responseType, silent } = options
+    const started = Date.now()
+    const quiet = silent === true
 
     const headers: Record<string, string> = {
       ...(optionHeaders || {})
@@ -79,14 +156,7 @@ export function useApi() {
     const url = _withQuery(path, query)
 
     try {
-      return await auth.request<T>(url, {
-        timeout: 10000, // 10 seconds
-        method,
-        body,
-        headers,
-        signal,
-        responseType
-      })
+      return await send<T>(url, { method, body, headers, signal, responseType }, quiet)
     } catch (error: unknown) {
       const fetchError = error as {
         name?: string
@@ -134,14 +204,7 @@ export function useApi() {
           throw error
         }
         if (refreshed) {
-          return await auth.request<T>(url, {
-            timeout: 10000,
-            method,
-            body,
-            headers,
-            signal,
-            responseType
-          })
+          return await send<T>(url, { method, body, headers, signal, responseType }, quiet)
         } else {
           throw error
         }
@@ -170,11 +233,13 @@ export function useApi() {
           await navigateTo('/onboarding')
           throw error
         }
-        toast.add({
-          title: t('common.error'),
-          description: limitReached ? t(limitReached) : t('common.forbidden', 'Acceso denegado'),
-          color: 'error'
-        })
+        if (!quiet) {
+          toast.add({
+            title: t('common.error'),
+            description: limitReached ? t(limitReached) : t('common.forbidden', 'Acceso denegado'),
+            color: 'error'
+          })
+        }
         throw error
       }
 
@@ -197,11 +262,13 @@ export function useApi() {
         // message is deliberately vague (it could quote patient data), so
         // what the person needs is the string that leads whoever looks
         // straight to this request's log lines and its `ServerError` row.
-        toast.add({
-          title: t('common.error'),
-          description: withReference(t('common.serverError'), failure.reference),
-          color: 'error'
-        })
+        if (!quiet) {
+          toast.add({
+            title: t('common.error'),
+            description: withReference(t('common.serverError'), failure.reference),
+            color: 'error'
+          })
+        }
         throw error
       }
 
@@ -216,13 +283,18 @@ export function useApi() {
       if (!fetchError.statusCode) {
         const timedOut = fetchError.cause?.name === 'TimeoutError'
         const writing = method !== undefined && method !== 'GET'
-        toast.add({
-          title: t('common.error'),
-          description: timedOut
-            ? t(writing ? 'common.timeoutWrite' : 'common.timeoutError')
-            : t('common.networkError'),
-          color: 'error'
-        })
+        // Reported either way: a heartbeat that got no answer is the
+        // clearest evidence there is that the backend stalled.
+        report(path, method ?? 'GET', Date.now() - started, timedOut)
+        if (!quiet) {
+          toast.add({
+            title: t('common.error'),
+            description: timedOut
+              ? t(writing ? 'common.timeoutWrite' : 'common.timeoutError')
+              : t('common.networkError'),
+            color: 'error'
+          })
+        }
       }
 
       throw error

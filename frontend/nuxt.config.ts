@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Plugin } from 'vite'
+import { version } from './package.json'
 
 /**
  * Load Nuxt Layer paths from `modules.json`.
@@ -113,6 +114,11 @@ export default defineNuxtConfig({
       // Documentation portal origin used by the in-app help drawer
       // (Fase 5 of issue #75). Empty disables the help button.
       docsUrl: process.env.NUXT_PUBLIC_DOCS_URL || 'https://docs.dienteazul.com',
+      // The build of the interface, as the error report states it
+      // ("Reportar un error" in the help drawer). Read from package.json
+      // so there is one version to bump; overridable at runtime for a
+      // deployment that names its builds differently.
+      appVersion: process.env.NUXT_PUBLIC_APP_VERSION || version,
       // Minutes without interaction before a session ends and the user is
       // sent to login (ADR 0030). Overridable at runtime with
       // NUXT_PUBLIC_SESSION_IDLE_MINUTES.

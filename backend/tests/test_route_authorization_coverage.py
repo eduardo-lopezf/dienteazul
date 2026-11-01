@@ -91,6 +91,25 @@ UNAUTHENTICATED: dict[str, str] = {
     "DELETE /api/v1/ops/announcements/{announcement_id}": (
         "control plane only, by signed token; takes a notice down"
     ),
+    "GET /api/v1/ops/announcements/{announcement_id}/responses": (
+        "control plane only, by signed token; a survey's counts per option and "
+        "per inquilino, never who answered what"
+    ),
+    "DELETE /api/v1/ops/announcements/{announcement_id}/responses": (
+        "control plane only, by signed token; empties a survey's result, keeping the survey"
+    ),
+    "DELETE /api/v1/ops/error-reports": (
+        "control plane only, by signed token; forgets the reported errors"
+    ),
+    "DELETE /api/v1/ops/error-reports/{report_id}": (
+        "control plane only, by signed token; forgets one report"
+    ),
+    "GET /api/v1/ops/error-reports": (
+        "control plane only, by signed token; what a clinic's users reported, in their own words"
+    ),
+    "PATCH /api/v1/ops/error-reports/{report_id}": (
+        "control plane only, by signed token; marks a report read or archived"
+    ),
     "GET /api/v1/ops/limits": "control plane only, by signed token; what each tier is allowed",
     "PUT /api/v1/ops/limits": "control plane only, by signed token; sets what each tier is allowed",
     "GET /api/v1/ops/apps": "control plane only, by signed token; the App catalog",
@@ -133,7 +152,25 @@ AUTHENTICATED_ONLY: dict[str, str] = {
         "the operator's notices in force for the caller's own clinic; about the "
         "system, never about anyone, so every member reads them"
     ),
+    "PUT /api/v1/announcements/{announcement_id}/answers": (
+        "the caller's own answers to one of the operator's surveys, in force for "
+        "their own clinic: one row per member per question. A survey asks the "
+        "people who use the software, not the ones who administer it, so it is "
+        "not a permission; and it decides nothing about the clinic. What they "
+        "write is their own and only the operator reads it"
+    ),
+    "POST /api/v1/error-reports": (
+        "the caller's own account of something that did not work, filed from the "
+        "Help drawer. Being stuck is not a permission. Capped at 10/hour per "
+        "user, write-only for the clinic — only the operator reads them"
+    ),
     "GET /api/v1/auth/me": "the caller's own profile",
+    "POST /api/v1/client-errors": (
+        "the caller reports a request of their own that never came back. No role "
+        "fits it — any member whose screen fails is the witness — and it carries "
+        "no free text: four bounded fields, with the recorded message composed "
+        "server-side, capped at 20 a minute per user"
+    ),
     "POST /api/v1/auth/activity": "the caller's own session-family activity timestamp",
     "POST /api/v1/auth/password": "replaces the caller's own password, proven by the current one",
     "GET /api/v1/auth/clinics": "returns the caller's own clinic, taken from the context",

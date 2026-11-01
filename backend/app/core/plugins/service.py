@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .alembic_paths import resolve_module_branch_head
@@ -30,6 +30,57 @@ from .state import ModuleCategory, ModuleState
 from .topology import MissingDependencyError, topological_sort
 
 logger = logging.getLogger(__name__)
+
+
+async def applied_revisions(db: AsyncSession) -> set[str] | None:
+    """Every revision ``alembic_version`` says this database has run.
+
+    The only honest answer to "is this module's branch applied?".
+    ``core_module.applied_revision`` is bookkeeping that can be wrong;
+    this table is what Alembic itself reads.
+
+    **``None`` when there is no ``alembic_version`` table at all**, which
+    is a different question from an empty one and needs the opposite
+    answer. No table means the schema did not come from Alembic — it came
+    from ``metadata.create_all``, as the test suite's does — so every
+    table is already at the shape its models describe and there is
+    nothing for the catch-up to apply. Told "nothing is applied" instead,
+    the catch-up replays each branch from its base onto tables that
+    already exist, every ``CREATE TABLE`` raises, and the boot leaves
+    those modules unmounted: the suite's whole app comes up with no
+    agenda in it.
+
+    A table that exists and simply does not list a branch is the real
+    case this function was written for: that branch has not run, and the
+    catch-up is what must run it.
+
+    ``to_regclass`` answers ``NULL`` for a missing table instead of
+    raising: selecting from one directly would abort the caller's
+    transaction, and this runs inside reconcile's.
+    """
+    try:
+        async with db.begin_nested():
+            if await db.scalar(text("SELECT to_regclass('alembic_version')")) is None:
+                return None
+            rows = await db.execute(text("SELECT version_num FROM alembic_version"))
+            return {row[0] for row in rows}
+    except Exception:
+        # The table is there and could not be read. Assuming nothing is
+        # applied is the safe direction here: the upgrade it provokes is
+        # a no-op when the branch had in fact run.
+        logger.exception("Could not read alembic_version; assuming no branch is applied")
+        return set()
+
+
+def _ran(branch_head: str | None, applied: set[str] | None) -> bool:
+    """Whether ``branch_head`` may be recorded as already applied.
+
+    ``applied is None`` — no ``alembic_version`` at all — means the
+    schema was built from the models, so every branch counts as run.
+    """
+    if branch_head is None:
+        return False
+    return applied is None or branch_head in applied
 
 
 async def installed_module_names(db: AsyncSession) -> set[str]:
@@ -197,6 +248,9 @@ class ModuleService:
         discovered = self.discovered()
         existing = await self._load_existing_records()
         now = datetime.now(UTC)
+        # What Alembic actually ran, so a branch is never recorded as
+        # applied on the strength of being on disk.
+        on_disk_applied = await applied_revisions(self.db)
 
         for module in discovered:
             try:
@@ -227,10 +281,13 @@ class ModuleService:
                 # lifecycle install() hook is NOT called and their event
                 # handlers do not fire until somebody enables them.
                 #
-                # Either way the branch is recorded at head: a new
-                # database was bootstrapped with ``alembic upgrade
-                # heads``, so the tables are there, and the processor
-                # keeps both states migrated from here on.
+                # Either way the branch is recorded at head *if the
+                # database has really run it* — a new database
+                # bootstrapped with ``alembic upgrade heads`` has, and
+                # the processor keeps both states migrated from here on.
+                # A module arriving in an existing deployment has not,
+                # and recording head would tell the processor's catch-up
+                # there is nothing to apply.
                 if manifest.auto_install:
                     initial_state = ModuleState.INSTALLED.value
                     initial_installed_at = now
@@ -250,7 +307,9 @@ class ModuleService:
                         last_state_change=now,
                         manifest_snapshot=manifest.to_snapshot(),
                         base_revision=branch_head,
-                        applied_revision=branch_head,
+                        applied_revision=(
+                            branch_head if _ran(branch_head, on_disk_applied) else None
+                        ),
                     )
                 )
                 logger.info(
@@ -290,9 +349,22 @@ class ModuleService:
             # Backfill base_revision for modules reconciled before this
             # logic existed — enables uninstall of already-installed
             # removable modules.
+            #
+            # ``applied_revision`` is only filled when ``alembic_version``
+            # confirms the branch ran. Both a database predating
+            # ``base_revision`` and a module that shipped its first
+            # migration *after* it was installed arrive here with
+            # ``base_revision is None``, and the two need opposite
+            # answers: the first really is migrated, the second has no
+            # tables at all. Assuming the first is how
+            # ``reports_summary_schedule`` ended up missing in production
+            # while the record claimed head — the catch-up in
+            # ``PendingProcessor._migrate_installed`` skips any branch
+            # whose recorded revision already equals the head, so the
+            # claim stopped the one step that would have created it.
             if record.base_revision is None and branch_head is not None:
                 record.base_revision = branch_head
-                if record.applied_revision is None:
+                if record.applied_revision is None and _ran(branch_head, on_disk_applied):
                     record.applied_revision = branch_head
 
         await self.db.commit()

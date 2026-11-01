@@ -56,8 +56,19 @@ function interact(): void {
   window.dispatchEvent(new Event('pointerdown'))
 }
 
+/**
+ * Let the request chain finish whatever it has queued.
+ *
+ * This counted four microtask ticks, which was however many the chain
+ * happened to need at the time. It then grew a `try/finally` around the
+ * request and a CSRF round-trip in front of it, and four stopped being
+ * enough — the failure path reached its `catch` after this returned, so
+ * a correct stamp looked like a missing one. One macrotask turn drains
+ * the queue however long it gets, and leaves a request that is still in
+ * flight still in flight, which the first case below depends on.
+ */
 async function settle(): Promise<void> {
-  for (let i = 0; i < 4; i++) await Promise.resolve()
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
 }
 
 /**
@@ -114,11 +125,38 @@ describe('useSessionActivity', () => {
     stop()
   })
 
-  it('leaves the cookie alone when the signal did not land', async () => {
+  it('leaves the cookie alone when the server refused the signal', async () => {
     const mock = await fetchMock()
     const stop = await authenticatedWatch()
     clearStamp()
 
+    // A refusal carries a status: the server answered, and its answer is
+    // that it did not move its clock. No stamp, or this tab would
+    // believe the session is younger than the server does.
+    mock.mockImplementation(((path: string) =>
+      path === ACTIVITY
+        ? Promise.reject(Object.assign(new Error('rate limited'), { statusCode: 429 }))
+        : Promise.resolve(undefined)) as never)
+    interact()
+    await settle()
+
+    expect(activityCalls(mock)).toHaveLength(1)
+    expect(stamp()).toBeNull()
+    stop()
+  })
+
+  it('stamps the cookie when the signal got no answer at all', async () => {
+    const mock = await fetchMock()
+    const stop = await authenticatedWatch()
+    clearStamp()
+
+    // A timeout or a dropped connection has no status, and says nothing
+    // about whether the signal landed — a stalled backend answered these
+    // with 204 after the browser had given up. Freezing the stamp here
+    // is what aged a session the server considered fresh and logged a
+    // working user out from the inside. It cannot overstay the server's
+    // window: `record_activity` is what enforces that, and this cookie
+    // only decides whether the client gives up early.
     mock.mockImplementation(((path: string) =>
       path === ACTIVITY
         ? Promise.reject(new Error('offline'))
@@ -126,10 +164,8 @@ describe('useSessionActivity', () => {
     interact()
     await settle()
 
-    // The whole point: no stamp means this tab does not believe the
-    // session is younger than the server does.
     expect(activityCalls(mock)).toHaveLength(1)
-    expect(stamp()).toBeNull()
+    expect(stamp()).not.toBeNull()
     stop()
   })
 

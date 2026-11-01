@@ -2,7 +2,22 @@
   "announcements": {
     "kind": {
       "maintenance": "Mantenimiento",
-      "feature": "Novedad"
+      "feature": "Novedad",
+      "survey": "Encuesta"
+    },
+    "survey": {
+      "optional": "Todas las preguntas son opcionales.",
+      "noPatientData": "No incluyas datos de pacientes.",
+      "yes": "Sí",
+      "no": "No",
+      "expand": "Ampliar",
+      "collapse": "Quitar el comentario",
+      "expandPlaceholder": "Si quieres, cuéntanos por qué (opcional).",
+      "openPlaceholder": "Escribe tu propuesta.",
+      "progress": "{done} de {total} respondidas",
+      "send": "Enviar",
+      "sent": "Gracias, hemos recibido tus respuestas.",
+      "failed": "No se pudieron enviar tus respuestas."
     },
     "until": "Hasta el {date}",
     "dismiss": "Ocultar"
@@ -2139,6 +2154,8 @@
     "required": "Este campo es requerido",
     "invalidEmail": "Email inválido",
     "networkError": "Error de conexión",
+    "slowServer": "El servidor va lento",
+    "slowServerHint": "Seguimos esperando la respuesta",
     "timeoutError": "El servidor tardó demasiado en responder",
     "timeoutWrite": "El servidor tardó demasiado en responder. El cambio puede haberse guardado: recarga la página antes de reintentar",
     "serverError": "Error del servidor. Si vuelve a ocurrir, pasa esta referencia a soporte",
@@ -4633,7 +4650,21 @@
     "openHelp": "Abrir ayuda",
     "drawerTitle": "Ayuda de esta página",
     "unavailable": "Aún no hay ayuda contextual para esta página.",
-    "openFullManual": "Abrir manual completo"
+    "notConfigured": "Esta instalación no tiene manual en línea. Puedes reportar un error desde aquí.",
+    "openFullManual": "Abrir manual completo",
+    "report": {
+      "open": "Reportar un error",
+      "title": "Reportar un error",
+      "intro": "Cuéntanos qué esperabas y qué ocurrió. Enviaremos también la página en la que estás y la versión del programa.",
+      "label": "¿Qué ha pasado?",
+      "placeholder": "Por ejemplo: al guardar el presupuesto se queda cargando y no pasa nada.",
+      "context": "Página: {path}",
+      "noPatientData": "No incluyas datos de pacientes.",
+      "send": "Enviar",
+      "back": "Volver a la ayuda",
+      "sent": "Gracias, hemos recibido tu reporte.",
+      "failed": "No se pudo enviar el reporte. Inténtalo de nuevo."
+    }
   },
   "treatments": {
     "title": "Tratamientos",
