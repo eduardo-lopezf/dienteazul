@@ -8,6 +8,7 @@ should not be cross-joined against invoice data.
 
 from __future__ import annotations
 
+import asyncio
 import io
 from datetime import date
 from decimal import Decimal
@@ -493,7 +494,7 @@ async def reports_export(
         granularity,
         separator,
     )
-    body = to_zip(files)
+    body = await asyncio.to_thread(to_zip, files)
     filename = period_filename("cobros", date_from, date_to)
     return StreamingResponse(
         io.BytesIO(body),

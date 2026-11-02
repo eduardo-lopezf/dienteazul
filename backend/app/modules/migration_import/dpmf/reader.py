@@ -15,12 +15,13 @@ don't leave plaintext copies on disk.
 
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
 import sqlite3
 import tempfile
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import ExitStack, asynccontextmanager, contextmanager
 from pathlib import Path
 
 from .compress import ZSTD_MAGIC, decompress_to
@@ -158,6 +159,46 @@ class DpmfHandle:
         yield from cursor
 
 
+def _materialise(path: Path, tmpdir: Path, passphrase: str | None) -> Path:
+    """Unwrap ``path`` into a plain SQLite file under ``tmpdir``.
+
+    The whole cost of opening a DPMF is here: AES-GCM over the entire
+    envelope (one seal, so the file is read whole) plus the zstd pass.
+    Kept as its own function so the async entry point can hand it to a
+    thread — minutes of CPU on a large file, and nothing in it awaits.
+    """
+    layering = detect_layering(path)
+
+    if layering is Layering.RAW:
+        return path
+    if layering is Layering.ZSTD:
+        sqlite_path = tmpdir / "inner.sqlite"
+        decompress_to(path, sqlite_path)
+        return sqlite_path
+    if layering is Layering.ENCRYPTED:
+        if not passphrase:
+            raise DpmeError("encrypted DPMF requires a passphrase")
+        inner_path = tmpdir / "decrypted.bin"
+        header = decrypt_to(path, inner_path, passphrase=passphrase)
+        if header.inner_layout == "zstd":
+            sqlite_path = tmpdir / "inner.sqlite"
+            decompress_to(inner_path, sqlite_path)
+            return sqlite_path
+        return inner_path
+    raise DpmfFormatError(f"unhandled layering: {layering}")
+
+
+@contextmanager
+def _connect(sqlite_path: Path) -> Iterator[DpmfHandle]:
+    # Read-only connection: prevents accidental writes to the DPMF
+    # (uri=True so we can pass ``mode=ro``).
+    conn = sqlite3.connect(f"file:{sqlite_path}?mode=ro", uri=True)
+    try:
+        yield DpmfHandle(conn, _read_meta(conn))
+    finally:
+        conn.close()
+
+
 @contextmanager
 def open_dpmf(path: Path, *, passphrase: str | None = None) -> Iterator[DpmfHandle]:
     """Open a DPMF file regardless of layering.
@@ -168,39 +209,33 @@ def open_dpmf(path: Path, *, passphrase: str | None = None) -> Iterator[DpmfHand
     ``passphrase`` is required for encrypted files. Pass ``None`` for
     raw / zstd files; a ``DpmeError`` is raised if ``DPME`` magic is
     detected without a passphrase.
+
+    Blocking. From a coroutine use :func:`open_dpmf_async`.
     """
-    layering = detect_layering(path)
-
     with tempfile.TemporaryDirectory(prefix="dpmf-") as tmpdir_str:
-        tmpdir = Path(tmpdir_str)
-
-        if layering is Layering.RAW:
-            sqlite_path = path
-        elif layering is Layering.ZSTD:
-            sqlite_path = tmpdir / "inner.sqlite"
-            decompress_to(path, sqlite_path)
-        elif layering is Layering.ENCRYPTED:
-            if not passphrase:
-                raise DpmeError("encrypted DPMF requires a passphrase")
-            inner_path = tmpdir / "decrypted.bin"
-            header = decrypt_to(path, inner_path, passphrase=passphrase)
-            if header.inner_layout == "zstd":
-                sqlite_path = tmpdir / "inner.sqlite"
-                decompress_to(inner_path, sqlite_path)
-            else:
-                sqlite_path = inner_path
-        else:
-            raise DpmfFormatError(f"unhandled layering: {layering}")
-
-        # Read-only connection: prevents accidental writes to the DPMF
-        # (uri=True so we can pass ``mode=ro``).
-        conn = sqlite3.connect(f"file:{sqlite_path}?mode=ro", uri=True)
-        try:
-            meta = _read_meta(conn)
-            handle = DpmfHandle(conn, meta)
+        with _connect(_materialise(path, Path(tmpdir_str), passphrase)) as handle:
             yield handle
-        finally:
-            conn.close()
+
+
+@asynccontextmanager
+async def open_dpmf_async(
+    path: Path, *, passphrase: str | None = None
+) -> AsyncIterator[DpmfHandle]:
+    """:func:`open_dpmf` with the unwrapping off the event loop.
+
+    Only the decrypt/decompress goes to a thread; the SQLite connection
+    is opened here and therefore belongs to the loop's thread, which is
+    what reads from it (``sqlite3`` refuses a connection used from a
+    thread other than the one that made it).
+
+    The temporary directory is held open across the ``yield`` by an
+    ``ExitStack``, so the plaintext is wiped on the way out exactly as
+    the synchronous version wipes it.
+    """
+    with ExitStack() as stack:
+        tmpdir = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="dpmf-")))
+        sqlite_path = await asyncio.to_thread(_materialise, path, tmpdir, passphrase)
+        yield stack.enter_context(_connect(sqlite_path))
 
 
 def _read_meta(conn: sqlite3.Connection) -> dict[str, str]:

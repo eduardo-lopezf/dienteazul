@@ -138,7 +138,7 @@ async function save() {
               </p>
             </div>
             <UInput
-              v-model="row.quantity"
+              v-model.number="row.quantity"
               class="w-28"
               type="number"
               min="0"

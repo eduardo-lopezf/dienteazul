@@ -96,14 +96,14 @@ async function save() {
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField :label="t('purchasing.form.taxId')">
             <UInput
-              v-model="form.tax_id"
+              v-model.nullable.optional="form.tax_id"
               class="w-full"
               :aria-label="t('purchasing.form.taxId')"
             />
           </UFormField>
           <UFormField :label="t('purchasing.form.contactName')">
             <UInput
-              v-model="form.contact_name"
+              v-model.nullable.optional="form.contact_name"
               class="w-full"
               :aria-label="t('purchasing.form.contactName')"
             />
@@ -113,7 +113,7 @@ async function save() {
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField :label="t('purchasing.form.email')">
             <UInput
-              v-model="form.email"
+              v-model.nullable.optional="form.email"
               class="w-full"
               type="email"
               :aria-label="t('purchasing.form.email')"
@@ -121,7 +121,7 @@ async function save() {
           </UFormField>
           <UFormField :label="t('purchasing.form.phone')">
             <UInput
-              v-model="form.phone"
+              v-model.nullable.optional="form.phone"
               class="w-full"
               :aria-label="t('purchasing.form.phone')"
             />
@@ -130,7 +130,7 @@ async function save() {
 
         <UFormField :label="t('purchasing.form.notes')">
           <UInput
-            v-model="form.notes"
+            v-model.nullable.optional="form.notes"
             class="w-full"
             :aria-label="t('purchasing.form.notes')"
           />

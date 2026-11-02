@@ -226,7 +226,7 @@ onMounted(async () => {
               </td>
               <td class="p-3">
                 <UInput
-                  v-model="row.counted"
+                  v-model.number="row.counted"
                   class="ml-auto w-28"
                   type="number"
                   min="0"

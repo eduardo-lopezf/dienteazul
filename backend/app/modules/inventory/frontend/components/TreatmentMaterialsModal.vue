@@ -167,7 +167,7 @@ async function save() {
               </p>
             </div>
             <UInput
-              v-model="line.quantity_base"
+              v-model.number="line.quantity_base"
               type="number"
               min="0"
               step="0.001"

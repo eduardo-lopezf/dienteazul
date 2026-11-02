@@ -187,7 +187,7 @@ async function save() {
           </UFormField>
           <UFormField :label="t('inventory.implants.tooth')">
             <UInput
-              v-model="toothNumber"
+              v-model.number="toothNumber"
               class="w-full"
               type="number"
               min="11"

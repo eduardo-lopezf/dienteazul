@@ -14,6 +14,7 @@ Eight endpoints behind ``/api/v1/migration_import/``:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -533,7 +534,10 @@ async def upload_sheet(
                 raise migration_error("migration_import.sheet.too_large")
             await out.write(chunk)
     try:
-        sheet = read_sheet(staged_path)
+        # openpyxl parses the whole book synchronously; off the event loop
+        # so a big sheet does not stall every other request (including
+        # ``/health``, which is what the proxy reads).
+        sheet = await asyncio.to_thread(read_sheet, staged_path)
     except SheetError as exc:
         staged_path.unlink(missing_ok=True)
         raise migration_error("migration_import.sheet.invalid_content", detail=str(exc)) from exc
@@ -635,7 +639,7 @@ async def convert_sheet(
         raise migration_error("migration_import.sheet.patients_unavailable")
 
     sheet_path = Path(job.file_path)
-    sheet = read_sheet(sheet_path)
+    sheet = await asyncio.to_thread(read_sheet, sheet_path)
     problems: list[tuple[str | None, str]] = []
     mapping = {int(index): field for index, field in body.mapping.items()}
     if any(index < 0 or index >= len(sheet.headers) for index in mapping):
@@ -673,7 +677,7 @@ async def convert_sheet(
         )
         counts = convert_patients(**common, existing=existing, on_duplicate=body.on_duplicate)
     # The rows that did not go in whole, as a sheet to fix and upload again.
-    report = problems_report(sheet, problems)
+    report = await asyncio.to_thread(problems_report, sheet, problems)
     report_path = _problems_report_path(sheet_path, job.id)
     report_path.unlink(missing_ok=True)
     if report is not None:

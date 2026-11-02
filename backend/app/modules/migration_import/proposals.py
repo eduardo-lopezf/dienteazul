@@ -29,7 +29,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .dpmf import open_dpmf
+from .dpmf import open_dpmf_async
 from .mappers.base import MapperContext, MappingResolver
 from .mappers.catalog import CatalogItemMapper
 from .models import ImportJob, MappingDecision
@@ -78,7 +78,7 @@ class ProposalsService:
         mapper = CatalogItemMapper()
         action_counts: Counter[str] = Counter()
 
-        with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
+        async with open_dpmf_async(Path(job.file_path), passphrase=passphrase) as handle:
             for row in handle.entity_iter(_PROPOSAL_ENTITY_TYPE):
                 canonical_uuid, source_id, _src_system, payload_json, raw_json, _ts = row
                 if canonical_uuid in already_proposed:

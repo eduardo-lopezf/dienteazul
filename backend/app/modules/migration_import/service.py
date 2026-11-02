@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.plugins import module_registry
 from app.database import async_session_maker
 
-from .dpmf import DpmfHandle, open_dpmf
+from .dpmf import DpmfHandle, open_dpmf_async
 from .dpmf.crypto import DpmeError
 from .dpmf.reader import DpmfFormatError
 from .events import (
@@ -140,7 +140,7 @@ class ImportJobService:
         await db.flush()
 
         try:
-            with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
+            async with open_dpmf_async(Path(job.file_path), passphrase=passphrase) as handle:
                 meta = handle.meta
                 ImportJobService._fill_meta(job, meta)
                 ImportJobService._check_format_version(meta)
@@ -205,7 +205,7 @@ class ImportJobService:
         job.status = "previewing"
         await db.flush()
 
-        with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
+        async with open_dpmf_async(Path(job.file_path), passphrase=passphrase) as handle:
             previews = ImportJobService._build_entity_previews(handle)
             warnings = ImportJobService._build_warnings(handle)
             files = ImportJobService._build_files_summary(handle)
@@ -442,7 +442,7 @@ class ImportJobService:
             professional_filters=_build_filter_options(job.execute_options),
         )
 
-        with open_dpmf(Path(job.file_path), passphrase=passphrase) as handle:
+        async with open_dpmf_async(Path(job.file_path), passphrase=passphrase) as handle:
             # Expose the handle to mappers that need a sibling-row
             # pre-pass (e.g. the applied_treatment shadow-pairing
             # logic). Mappers that don't care simply ignore it.

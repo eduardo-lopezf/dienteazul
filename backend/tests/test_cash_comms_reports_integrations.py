@@ -38,7 +38,16 @@ MANIFESTS = {
     "liquidations": {"payments", "professionals"},
     "notifications": {"patients", "agenda", "budget", "billing", "catalog", "professionals"},
     "whatsapp_kapso": {"patients"},
-    "reports": {"patients", "agenda", "catalog", "budget", "billing", "payments", "professionals"},
+    "reports": {
+        "patients",
+        "agenda",
+        "catalog",
+        "budget",
+        "billing",
+        "payments",
+        "professionals",
+        "inventory",
+    },
 }
 
 

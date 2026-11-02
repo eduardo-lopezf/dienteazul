@@ -6,7 +6,7 @@ not imported, is announced in the preview, and leaves one warning in the
 run; one whose App only adds a part (a note) is imported without it.
 """
 
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 import pytest
@@ -92,11 +92,11 @@ async def test_a_run_skips_what_belongs_to_an_app_that_is_off(
 ) -> None:
     _without(monkeypatch, "recalls", "clinical_notes")
 
-    @contextmanager
-    def fake_open(path, passphrase=None):
+    @asynccontextmanager
+    async def fake_open(path, passphrase=None):
         yield _Handle()
 
-    monkeypatch.setattr(import_service, "open_dpmf", fake_open)
+    monkeypatch.setattr(import_service, "open_dpmf_async", fake_open)
     me = await client.get("/api/v1/auth/me", headers=auth_headers)
     user_id = me.json()["data"]["user"]["id"]
     clinic = Clinic(id=uuid4(), name="Migration Clinic", tax_id="B22222222", account_tier="clinic")

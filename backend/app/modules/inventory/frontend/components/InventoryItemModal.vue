@@ -179,7 +179,7 @@ async function save() {
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField :label="t('inventory.form.reorderPoint')">
             <UInput
-              v-model="form.reorder_point"
+              v-model.nullable.optional="form.reorder_point"
               class="w-full"
               type="number"
               min="0"
@@ -190,7 +190,7 @@ async function save() {
 
           <UFormField :label="t('inventory.form.reorderQuantity')">
             <UInput
-              v-model="form.reorder_quantity"
+              v-model.nullable.optional="form.reorder_quantity"
               class="w-full"
               type="number"
               min="0"

@@ -17,6 +17,7 @@ the collection figures arrive through the `CollectionReport` contract
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from decimal import Decimal
 from html import escape
@@ -227,14 +228,23 @@ distintos y no se restan entre sí.</p>
 </body></html>"""
 
 
-async def render_pdf(db: AsyncSession, clinic: Clinic, date_from: date, date_to: date) -> bytes:
-    """The page as a PDF. WeasyPrint, like every other document here."""
+def _html_to_pdf(html: str) -> bytes:
     from weasyprint import HTML
 
-    html = await build_html(db, clinic, date_from, date_to)
     buffer = BytesIO()
     HTML(string=html).write_pdf(buffer)
     return buffer.getvalue()
+
+
+async def render_pdf(db: AsyncSession, clinic: Clinic, date_from: date, date_to: date) -> bytes:
+    """The page as a PDF. WeasyPrint, like every other document here.
+
+    And off the event loop, like every other document here: the render
+    is seconds of CPU and nothing else in the process answers while it
+    runs.
+    """
+    html = await build_html(db, clinic, date_from, date_to)
+    return await asyncio.to_thread(_html_to_pdf, html)
 
 
 def filename(clinic_id: UUID, date_from: date, date_to: date) -> str:  # noqa: ARG001

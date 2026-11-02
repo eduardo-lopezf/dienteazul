@@ -186,8 +186,8 @@ export interface ItemInput {
   base_unit: string
   category: ItemCategory
   tracks_lots: boolean
-  reorder_point?: string | null
-  reorder_quantity?: string | null
+  reorder_point?: string | number | null
+  reorder_quantity?: string | number | null
   cost_per_base_unit?: string | null
   notes?: string | null
 }
@@ -214,8 +214,8 @@ export interface ItemUpdateInput {
   name?: string
   base_unit?: string
   category?: ItemCategory
-  reorder_point?: string | null
-  reorder_quantity?: string | null
+  reorder_point?: string | number | null
+  reorder_quantity?: string | number | null
   cost_per_base_unit?: string | null
   notes?: string | null
   status?: 'active' | 'archived'
@@ -306,7 +306,7 @@ export function useInventoryErrors() {
 export function useInventory() {
   const api = useApi()
 
-  function query(filters: Record<string, unknown>): string {
+  function query(filters: object): string {
     const qs = new URLSearchParams()
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '' || value === false) continue

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,7 @@ from app.modules.migration_import.dpmf import (
     Layering,
     detect_layering,
     open_dpmf,
+    open_dpmf_async,
 )
 from app.modules.migration_import.dpmf.compress import ZSTD_MAGIC
 from app.modules.migration_import.dpmf.reader import (
@@ -208,3 +210,46 @@ def test_wrong_passphrase_raises(tmp_path: Path) -> None:
     with pytest.raises(DpmeError):
         with open_dpmf(enc, passphrase="wrong-passphrase"):
             pass
+
+
+@pytest.mark.asyncio
+async def test_open_dpmf_async_unwraps_off_the_event_loop(tmp_path: Path) -> None:
+    """The async door reads the same file, and decompresses in a thread.
+
+    What it is for: decrypt + decompress is the whole cost of opening a
+    DPMF, and a 500 MB envelope held the only event loop for all of it.
+    The assertion is on the thread, because reading the right hash would
+    pass just as well with the work left where it was.
+    """
+    import threading
+
+    import zstandard
+
+    from app.modules.migration_import.dpmf import reader
+
+    raw = tmp_path / "raw.dpm"
+    expected_hash = _build_minimal_dpmf(raw)
+    zst = tmp_path / "wrapped.dpm.zst"
+    cctx = zstandard.ZstdCompressor()
+    with raw.open("rb") as src, zst.open("wb") as dst:
+        cctx.copy_stream(src, dst)
+
+    loop_thread = threading.get_ident()
+    worked_in: list[int] = []
+    real = reader.decompress_to
+
+    def spy(*args, **kwargs):
+        worked_in.append(threading.get_ident())
+        return real(*args, **kwargs)
+
+    reader.decompress_to = spy
+    try:
+        async with open_dpmf_async(zst) as handle:
+            assert handle.recompute_integrity_hash() == expected_hash
+            tmpdirs = list(Path(tempfile.gettempdir()).glob("dpmf-*"))
+    finally:
+        reader.decompress_to = real
+
+    assert worked_in and loop_thread not in worked_in
+    # The plaintext goes with the context, exception paths included.
+    assert all(not d.exists() for d in tmpdirs)

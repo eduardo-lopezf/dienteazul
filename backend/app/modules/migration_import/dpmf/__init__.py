@@ -6,14 +6,16 @@ The public surface used by the rest of the module is:
 - :func:`detect_layering` — peek the first 4 bytes and classify
 - :func:`open_dpmf` — full pipeline: detect → decrypt → decompress →
   open SQLite read-only. Returns a context manager yielding a
-  :class:`DpmfHandle`.
+  :class:`DpmfHandle`. Blocking.
+- :func:`open_dpmf_async` — the same, with the unwrapping in a thread.
+  What a coroutine uses.
 
 Everything else (canonical iteration, integrity verification) is exposed
 through :class:`DpmfHandle` so call sites never juggle raw connections.
 """
 
 from .integrity import compute_logical_hash
-from .reader import DpmfHandle, Layering, detect_layering, open_dpmf
+from .reader import DpmfHandle, Layering, detect_layering, open_dpmf, open_dpmf_async
 
 __all__ = [
     "DpmfHandle",
@@ -21,4 +23,5 @@ __all__ = [
     "compute_logical_hash",
     "detect_layering",
     "open_dpmf",
+    "open_dpmf_async",
 ]
