@@ -8,6 +8,7 @@ import ProductionTotalTile from '../../components/dashboard/ProductionTotalTile.
 import PaymentMethodsTile from '../../components/dashboard/PaymentMethodsTile.vue'
 import CashCollectedChartCard from '../../components/dashboard/CashCollectedChartCard.vue'
 import ProductionByDoctorCard from '../../components/dashboard/ProductionByDoctorCard.vue'
+import MaterialCostCard from '../../components/dashboard/MaterialCostCard.vue'
 import NewPatientsTile from '../../components/dashboard/NewPatientsTile.vue'
 import AppointmentFunnelTile from '../../components/dashboard/AppointmentFunnelTile.vue'
 import AvgCollectedTicketTile from '../../components/dashboard/AvgCollectedTicketTile.vue'
@@ -33,6 +34,9 @@ const canPayments = computed(() => can('payments.reports.read') && on('payments'
 const canScheduling = computed(() => can('reports.scheduling.read') && on('agenda'))
 const canBilling = computed(() => can('reports.billing.read') && on('billing'))
 const canBudgets = computed(() => can('reports.budgets.read') && on('budget'))
+// What the material cost comes from the Inventario App, which a
+// deployment may not run at all.
+const canMaterials = computed(() => can('reports.materials.read') && on('inventory'))
 // The one-pager has a permission of its own: "see how the clinic is
 // doing" is granted separately from reading the invoice ledger.
 const canPrintSummary = computed(() => can(PERMISSIONS.reports.summaryRead))
@@ -210,6 +214,12 @@ const drilldownCards = computed(() => [
       <ProductionByDoctorCard
         v-if="canPayments"
         :state="state.production"
+      />
+
+      <!-- What the work consumed, beside what it earned -->
+      <MaterialCostCard
+        v-if="canMaterials"
+        :state="state.materials"
       />
 
       <!-- Operations row -->

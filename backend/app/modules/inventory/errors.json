@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "inventory.item.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Article not found",
+      "description": "The inventory article does not exist in the active clinic."
+    },
+    {
+      "code": "inventory.location.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Location not found",
+      "description": "The inventory location does not exist in the active clinic."
+    },
+    {
+      "code": "inventory.lot.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "Lot not found",
+      "description": "The lot does not exist for this article in the active clinic."
+    },
+    {
+      "code": "inventory.item.code_taken",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "That article code is already used",
+      "description": "An article code identifies one article within a clinic and cannot be reused."
+    },
+    {
+      "code": "inventory.location.name_taken",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "That location name is already used",
+      "description": "Two locations of the same clinic cannot share a name."
+    },
+    {
+      "code": "inventory.lot.code_taken",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "That lot already exists",
+      "description": "A lot code identifies one batch of one article and cannot be recorded twice."
+    },
+    {
+      "code": "inventory.lot.required",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Name the lot for this article",
+      "description": "An article that tracks lots requires a lot on every movement, so expiry stays answerable."
+    },
+    {
+      "code": "inventory.lot.not_tracked",
+      "category": "validation",
+      "status_code": 422,
+      "message": "This article does not track lots",
+      "description": "Lots can only be recorded for an article created with lot tracking enabled."
+    },
+    {
+      "code": "inventory.stock.insufficient",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "Not enough stock",
+      "description": "The movement would leave a negative quantity. Only an adjustment may, and it must say why."
+    },
+    {
+      "code": "inventory.movement.zero",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A movement of zero changes nothing",
+      "description": "Every ledger line must move a non-zero quantity."
+    },
+    {
+      "code": "inventory.movement.sign_invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "This movement needs a positive quantity",
+      "description": "Only an adjustment carries its own sign; every other reason knows which way stock went."
+    },
+    {
+      "code": "inventory.location.archived",
+      "category": "validation",
+      "status_code": 422,
+      "message": "That location is archived",
+      "description": "Stock cannot move into or out of a location the clinic has retired."
+    },
+    {
+      "code": "inventory.location.not_empty",
+      "category": "conflict",
+      "status_code": 422,
+      "message": "That location still holds stock",
+      "description": "Archiving a location that holds material would drop that material out of every total while it is still on a shelf."
+    },
+    {
+      "code": "inventory.transfer.same_location",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A transfer needs two different locations",
+      "description": "The origin and the destination of a transfer cannot be the same location."
+    },
+    {
+      "code": "inventory.implant.not_traceable",
+      "category": "validation",
+      "status_code": 422,
+      "message": "An implantable device must track lots",
+      "description": "A trace without a batch traces nothing: enable lot tracking on the article before recording implants of it."
+    },
+    {
+      "code": "inventory.request.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Inventory request is invalid",
+      "description": "An inventory operation failed a domain validation rule."
+    }
+  ]
+}

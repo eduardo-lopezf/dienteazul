@@ -38,6 +38,11 @@ class ReportsModule(BaseModule):
             "billing",
             "payments",
             "professionals",
+            # Layer 5 of the inventory: what the material used actually
+            # cost, read through the `MaterialCost` contract. Integrated,
+            # never required — with the Inventario App off the section
+            # answers 404 and the rest of Productividad is untouched.
+            "inventory",
         ],
         "egress": [
             {
@@ -63,7 +68,9 @@ class ReportsModule(BaseModule):
         "removable": False,
         "role_permissions": {
             "admin": ["*"],
-            "dentist": ["billing.read", "scheduling.read"],
+            # What material costs is a clinical-economics figure a
+            # dentist acts on; reception works the money axis, not this.
+            "dentist": ["billing.read", "scheduling.read", "materials.read"],
             "hygienist": ["scheduling.read"],
             "assistant": ["scheduling.read"],
             "receptionist": ["billing.read", "scheduling.read"],
@@ -98,6 +105,10 @@ class ReportsModule(BaseModule):
             "billing.read",  # View billing reports
             "budgets.read",  # View budget reports
             "scheduling.read",  # View scheduling reports
+            # What the material used actually cost. Its own family, as
+            # every report family here has: it is a cost figure read
+            # from the Inventario App, not part of the invoice axis.
+            "materials.read",
             "summary.read",  # Print the clinic's one-page summary
             "summary.write",  # Decide when the summary goes out, and to whom
             "actionable.read",  # Work the lists of patients to contact

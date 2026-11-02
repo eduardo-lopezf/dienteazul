@@ -17,6 +17,7 @@ import { useReports } from './useReports'
 import type {
   AppointmentFunnel,
   FirstVisitsSummary,
+  MaterialCostSummary,
   PaymentsAgingBuckets,
   PaymentsMethodBreakdown,
   PaymentsProfessionalBreakdown,
@@ -48,6 +49,8 @@ export interface DashboardState {
   production: CardState<PaymentsProfessionalBreakdown[]>
   newPatients: RangeCard<FirstVisitsSummary>
   funnel: RangeCard<AppointmentFunnel>
+  /** What the material used in the period cost (Inventario App). */
+  materials: CardState<MaterialCostSummary>
   // Point-in-time
   aging: CardState<PaymentsAgingBuckets>
 }
@@ -99,6 +102,7 @@ export function useDashboardSnapshot() {
   const state = reactive<DashboardState>({
     paymentsCurrent: makeRangeCard<PaymentsSummaryReport>(),
     paymentsTrends: makeCard<PaymentsTrends>(),
+    materials: makeCard<MaterialCostSummary>(),
     methods: makeCard<PaymentsMethodBreakdown[]>(),
     production: makeCard<PaymentsProfessionalBreakdown[]>(),
     newPatients: makeRangeCard<FirstVisitsSummary>(),
@@ -127,6 +131,7 @@ export function useDashboardSnapshot() {
     // A section reads only while its App runs (ADR 0037).
     const canPayments = can('payments.reports.read') && on('payments')
     const canScheduling = can('reports.scheduling.read') && on('agenda')
+    const canMaterials = can('reports.materials.read') && on('inventory')
 
     const tasks: Promise<unknown>[] = []
 
@@ -165,6 +170,22 @@ export function useDashboardSnapshot() {
           }
         })
       )
+
+      // The Inventario App supplies this one, and may be off. Asking
+      // anyway would draw a failed card where the right answer is no
+      // card at all (ADR 0037).
+      if (canMaterials) {
+        tasks.push(
+          reports.fetchMaterialCost(range.from, range.to, { signal }).then((data) => {
+            if (signal.aborted) return
+            state.materials.loading = false
+            state.materials.data = data
+            if (!data) state.materials.error = true
+          })
+        )
+      } else {
+        state.materials.loading = false
+      }
 
       tasks.push(
         reports.fetchPaymentsByMethod(range.from, range.to, { signal }).then((rows) => {

@@ -167,6 +167,93 @@ def test_periodontogram_uninstall_roundtrip_is_branch_scoped() -> None:
     )
 
 
+def test_purchasing_uninstall_roundtrip_is_branch_scoped() -> None:
+    """install → uninstall → reinstall drops only purchasing's tables.
+
+    Its line table carries a foreign key into `inv_items`, so the branch
+    declares ``depends_on = ("inventory",)`` rather than hanging off the
+    inventory head. This proves the distinction: downgrading purchasing
+    must leave every inventory table standing.
+    """
+    tables = _declared_tables("purchasing")
+    inventory_tables = _declared_tables("inventory")
+
+    _alembic("upgrade", "heads")
+    before = _list_tables()
+    assert tables.issubset(before), (
+        f"expected purchasing tables at heads; missing: {tables - before}"
+    )
+    baseline_others = before - tables
+
+    _alembic("downgrade", f"purchasing@-{_count_owned_revisions('purchasing')}")
+
+    after_down = _list_tables()
+    assert tables.isdisjoint(after_down), (
+        f"purchasing tables survived downgrade: {tables & after_down}"
+    )
+    assert inventory_tables <= after_down, (
+        f"downgrading purchasing took inventory tables with it: {inventory_tables - after_down}"
+    )
+    assert baseline_others <= after_down, (
+        f"downgrade leaked into other modules; missing tables: {baseline_others - after_down}"
+    )
+
+    _alembic("upgrade", "purchasing@head")
+    after_up = _list_tables()
+    assert before <= after_up, (
+        f"reinstall did not restore every table; missing: {before - after_up}"
+    )
+
+
+def test_inventory_uninstall_roundtrip_is_branch_scoped() -> None:
+    """install → uninstall → reinstall drops only the Inventario App's tables.
+
+    The App is `removable=True` because stock is not a legal record: a
+    clinic that gives up on counting material can drop the whole thing.
+
+    **The dependent comes down first.** `purchasing` declares
+    `depends: ["inventory"]`, and its order lines carry a foreign key
+    into `inv_items`, so its migration branch declares
+    ``depends_on = ("inventory",)``. Downgrading the inventory alone
+    makes Alembic walk the dependent down with it — which is correct,
+    and is also why `ModuleService` refuses that uninstall outright
+    (`Cannot uninstall 'inventory' — required by: ['purchasing']`).
+    This test therefore does what the application does: purchasing
+    first, then the inventory, asserting that between them they take
+    their own tables and nobody else's.
+    """
+    inventory_tables = _declared_tables("inventory")
+    purchasing_tables = _declared_tables("purchasing")
+    app_tables = inventory_tables | purchasing_tables
+
+    _alembic("upgrade", "heads")
+    before = _list_tables()
+    assert app_tables.issubset(before), (
+        f"expected the App's tables at heads; missing: {app_tables - before}"
+    )
+    baseline_others = before - app_tables
+
+    # The order the uninstall flow enforces: the dependent, then what it
+    # depends on.
+    _alembic("downgrade", f"purchasing@-{_count_owned_revisions('purchasing')}")
+    _alembic("downgrade", f"inventory@-{_count_owned_revisions('inventory')}")
+
+    after_down = _list_tables()
+    assert app_tables.isdisjoint(after_down), (
+        f"the App's tables survived downgrade: {app_tables & after_down}"
+    )
+    assert baseline_others <= after_down, (
+        f"downgrade leaked into other modules; missing tables: {baseline_others - after_down}"
+    )
+
+    _alembic("upgrade", "inventory@head")
+    _alembic("upgrade", "purchasing@head")
+    after_up = _list_tables()
+    assert before <= after_up, (
+        f"reinstall did not restore every table; missing: {before - after_up}"
+    )
+
+
 def test_calendar_feed_uninstall_roundtrip_is_branch_scoped() -> None:
     """install → uninstall → reinstall drops only the feed's own table.
 

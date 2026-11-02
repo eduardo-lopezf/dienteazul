@@ -36,6 +36,7 @@ from .schemas import (
     DurationVarianceStats,
     FirstVisitsSummary,
     HoursByProfessional,
+    MaterialCostSummary,
     MonthlyTargetResponse,
     MonthlyTargetUpdate,
     NumberingGap,
@@ -53,6 +54,7 @@ from .services import (
     AppointmentLifecycleService,
     BillingReportService,
     BudgetReportService,
+    MaterialCostReportService,
     SchedulingReportService,
 )
 
@@ -234,6 +236,31 @@ async def actionable_no_visit(
 # ============================================================================
 # Billing Reports
 # ============================================================================
+
+
+@router.get(
+    "/materials/cost",
+    response_model=ApiResponse[MaterialCostSummary],
+    dependencies=[Depends(needs("inventory"))],
+)
+async def get_material_cost(
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("reports.materials.read"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: date = Query(..., description="Start date for the report period"),
+    date_to: date = Query(..., description="End date for the report period"),
+) -> ApiResponse[MaterialCostSummary]:
+    """What the material used in the period actually cost, by treatment.
+
+    Read from the Inventario App through the ``MaterialCost`` contract.
+    With that App off this route answers 404 and the screen hides the
+    section (ADR 0037) — the rest of Productividad is untouched.
+
+    It is costed from the stock ledger, at what each movement cost when
+    it happened, so re-running the report later gives the same answer.
+    """
+    data = await MaterialCostReportService.by_treatment(db, ctx.clinic_id, date_from, date_to)
+    return ApiResponse(data=MaterialCostSummary(**data))
 
 
 @router.get(

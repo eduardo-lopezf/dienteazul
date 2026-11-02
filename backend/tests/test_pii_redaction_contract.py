@@ -46,6 +46,9 @@ _NOT_PERSONAL: frozenset[tuple[str, str]] = frozenset(
         ("patients_clinical_medication", "name"),
         ("patients_clinical_systemic_disease", "name"),
         ("cabinets", "name"),
+        # An article on a shelf and the shelf it sits on.
+        ("inv_items", "name"),
+        ("inv_locations", "name"),
         ("whatsapp_kapso_templates", "name"),
         # The shape of a plan ("primera visita", "implante unitario"),
         # authored by the clinic and reused across patients. Tokenizing it

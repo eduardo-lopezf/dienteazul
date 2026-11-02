@@ -38,6 +38,7 @@ export const APP_CATALOG: Record<string, AppPresentation> = {
   professionals: { icon: 'i-lucide-stethoscope' },
   clinical_record: { icon: 'i-lucide-book-open-text', settingsPath: '/settings/apps/clinical-record' },
   reports: { icon: 'i-lucide-bar-chart-3' },
+  inventory: { icon: 'i-lucide-package' },
   ai: { icon: 'i-lucide-sparkles' },
   data_migration: {
     icon: 'i-lucide-database-backup',

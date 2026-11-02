@@ -270,3 +270,12 @@ class EventType:
     COPILOT_TOOL_INVOKED = "copilot.tool.invoked"
     COPILOT_BUDGET_THRESHOLD_REACHED = "copilot.budget.threshold_reached"
     COPILOT_DIGEST_SENT = "copilot.digest.sent"
+
+    # Inventory events (inventory module — stock ledger, ADR 0065).
+    # The inventory notifies nobody itself: `notifications` decides what
+    # to do with these. Payload of each is in
+    # docs/technical/inventory/events.md.
+    INVENTORY_MOVEMENT_RECORDED = "inventory.movement.recorded"
+    INVENTORY_STOCK_LOW = "inventory.stock.low"
+    INVENTORY_STOCK_OUT = "inventory.stock.out"
+    INVENTORY_ITEM_EXPIRING = "inventory.item.expiring"

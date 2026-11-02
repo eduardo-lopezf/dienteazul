@@ -248,7 +248,11 @@ test.describe('periodontogram — receptionist permission boundary', () => {
     // page that never rendered gives you: this test passed green through
     // a run where the whole app answered 500 and no screen hydrated,
     // which is the one moment it should have shouted.
-    await loggedIn.waitForSelector('html[data-ua]', { state: 'attached', timeout: 60_000 })
+    // 90 s, like every other spec that waits on a cold client bundle: a
+    // receptionist renders a different slot set from the admin tests
+    // above, so the dev server still has chunks left to transform here
+    // and 60 s ran out in CI.
+    await loggedIn.waitForSelector('html[data-ua]', { state: 'attached', timeout: 90_000 })
 
     // Receptionists cannot read perio, so the slot resolves to zero
     // entries and the diagnosis container falls back to the bare

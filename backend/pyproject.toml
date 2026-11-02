@@ -101,6 +101,8 @@ cashbox = "app.modules.cashbox:CashboxModule"
 liquidations = "app.modules.liquidations:LiquidationsModule"
 record = "app.modules.record:RecordModule"
 calendar_feed = "app.modules.calendar_feed:CalendarFeedModule"
+inventory = "app.modules.inventory:InventoryModule"
+purchasing = "app.modules.purchasing:PurchasingModule"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -117,6 +119,8 @@ where = ["."]
 "app.modules.consents" = ["errors.json"]
 "app.modules.migration_import" = ["errors.json"]
 "app.modules.media" = ["errors.json"]
+"app.modules.inventory" = ["errors.json"]
+"app.modules.purchasing" = ["errors.json"]
 "app.modules.liquidations" = ["errors.json"]
 "app.modules.notifications" = ["errors.json"]
 "app.modules.odontogram" = ["errors.json"]

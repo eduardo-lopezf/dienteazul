@@ -63,6 +63,7 @@ from app.modules.treatment_plan.models import (
 from app.modules.treatment_plan.templates_service import PlanTemplateService
 from app.seeds.demo_data import (
     CLINIC_ID,
+    USER_ASSISTANT_ID,
     USER_DENTIST_ID,
     USER_HYGIENIST_ID,
     USER_RECEPTIONIST_ID,
@@ -833,6 +834,21 @@ async def main(lang: str = "en") -> None:
                     f"Done: {stats['done']} | "
                     f"Needs review: {stats['needs_review']} | "
                     f"Attempts logged: {stats['attempts']}"
+                )
+
+            if await _module_is_installed(db, "inventory"):
+                print("\n[opt] Creating inventory demo (module installed)...")
+                from app.modules.inventory.seed import seed_inventory_demo
+
+                # The assistant is who actually puts the delivery away, so
+                # the movements are attributed to them.
+                stats = await seed_inventory_demo(
+                    db, clinic_id=CLINIC_ID, user_id=USER_ASSISTANT_ID
+                )
+                print(
+                    f"  Articles: {stats['items']} | "
+                    f"Lots: {stats['lots']} | "
+                    f"Movements: {stats['movements']}"
                 )
 
             await db.commit()

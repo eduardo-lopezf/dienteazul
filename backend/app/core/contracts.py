@@ -440,6 +440,81 @@ class WorkingHours(Protocol):
         ``at``. Those who are working are left out."""
 
 
+@dataclass(frozen=True, slots=True)
+class CatalogItemBrief:
+    """Enough of a catalogue treatment to name it outside the catalog.
+
+    ``names`` is the localized JSONB as stored; the consumer collapses it
+    to whatever locale it is rendering, as the catalog's own tools do.
+    """
+
+    id: UUID
+    internal_code: str
+    names: dict[str, str]
+
+
+class TreatmentCatalogue(Protocol):
+    """The clinic's treatments, to whoever needs to point at one.
+
+    Added for the inventory's materials-per-treatment list: it stores a
+    ``catalog_item_id`` with no foreign key, so it needs a way to read
+    the names behind those ids and to offer a picker — without importing
+    the catalog (ADR 0039). ``None`` from :func:`provider` means the
+    Treatments App is off, and the consumer carries on with the ids it
+    already has.
+    """
+
+    async def briefs(
+        self, db: AsyncSession, clinic_id: UUID, item_ids: Collection[UUID]
+    ) -> dict[UUID, CatalogItemBrief]:
+        """Keyed by id. Ids that are not this clinic's are left out."""
+
+    async def list_active(self, db: AsyncSession, clinic_id: UUID) -> list[CatalogItemBrief]:
+        """Every treatment the clinic currently offers."""
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialCostLine:
+    """What one treatment type cost in material over a period."""
+
+    #: ``None`` groups everything consumed against a planned treatment
+    #: whose catalogue item could not be resolved — the Treatments App
+    #: may be off, or the item may have been free-hand.
+    catalog_item_id: UUID | None
+    #: How many planned treatments contributed.
+    treatments: int
+    cost: Decimal
+    #: Movements in this line whose material had no price on file. A
+    #: cost is only as complete as this is zero, and a consumer that
+    #: hides it turns "nobody priced the gloves" into "gloves are free".
+    unpriced: int = 0
+
+
+class MaterialCost(Protocol):
+    """What the material a clinic used actually cost.
+
+    The inventory's first outward contract. It is read by `reports`,
+    which must never import this module: a clinic can switch the
+    Inventario App off, and Productividad has to keep working without
+    the figure rather than break (ADR 0037, ADR 0039).
+
+    The figures come from the stock ledger's own ``cost_per_base_unit``,
+    stamped on each movement when it happened — not from today's price
+    (ADR 0065).
+    """
+
+    async def by_treatment(
+        self, db: AsyncSession, clinic_id: UUID, date_from: date, date_to: date
+    ) -> list[MaterialCostLine]:
+        """Material consumed against treatments, grouped by treatment type."""
+
+    async def consumed_total(
+        self, db: AsyncSession, clinic_id: UUID, date_from: date, date_to: date
+    ) -> Decimal:
+        """Everything that left the shelf in the period, at what it cost —
+        treatments, write-offs and hand-recorded use alike."""
+
+
 def providers(contract: type[T]) -> list[T]:
     """Every running module's implementation of ``contract``.
 

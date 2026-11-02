@@ -117,6 +117,7 @@
     "recalls": "Recalls",
     "treatmentPlans": "Treatment Plans",
     "reports": "Productivity",
+    "inventory": "Inventory",
     "settings": "Settings",
     "catalog": "Catalog",
     "menu": "Menu",
@@ -1983,6 +1984,10 @@
           "clinical_record": {
             "title": "Clinical record",
             "summary": "The patient's clinical record as a document."
+          },
+          "inventory": {
+            "title": "Inventory",
+            "summary": "The clinic's stock: articles, locations, lots with expiry dates and reorder alerts."
           },
           "reports": {
             "title": "Productivity",
@@ -4417,6 +4422,17 @@
         "unassigned": "Unassigned",
         "others": "Others",
         "treatmentCount": "{count} treatments"
+      },
+      "materials": {
+        "title": "Material cost",
+        "consumed": "consumed in the period",
+        "treatment": "Treatment",
+        "count": "Treatments",
+        "perTreatment": "Per treatment",
+        "total": "Total",
+        "empty": "No treatment consumed material in this period.",
+        "more": "and {count} more treatments",
+        "unpriced": "Some material has no price on file and counts as 0. Price it in Inventory → Articles for the figure to be real."
       },
       "aging": {
         "bucket0_30": "0-30 days",

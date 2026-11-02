@@ -117,6 +117,7 @@
     "recalls": "Recordatorios",
     "treatmentPlans": "Planes de tratamiento",
     "reports": "Productividad",
+    "inventory": "Inventario",
     "settings": "Configuración",
     "catalog": "Catálogo",
     "menu": "Menú",
@@ -1983,6 +1984,10 @@
           "clinical_record": {
             "title": "Expediente clínico",
             "summary": "El expediente clínico del paciente como documento."
+          },
+          "inventory": {
+            "title": "Inventario",
+            "summary": "El almacén de la clínica: artículos, ubicaciones, lotes con caducidad y avisos de reposición."
           },
           "reports": {
             "title": "Productividad",
@@ -4310,6 +4315,17 @@
         "unassigned": "Sin doctor asignado",
         "others": "Otros",
         "treatmentCount": "{count} tratamientos"
+      },
+      "materials": {
+        "title": "Coste de material",
+        "consumed": "consumido en el periodo",
+        "treatment": "Tratamiento",
+        "count": "Tratamientos",
+        "perTreatment": "Por tratamiento",
+        "total": "Total",
+        "empty": "Ningún tratamiento consumió material en este periodo.",
+        "more": "y {count} tratamientos más",
+        "unpriced": "Algún material no tiene precio registrado y cuenta como 0. Ponle precio en Inventario → Artículos para que la cifra sea real."
       },
       "aging": {
         "bucket0_30": "0-30 días",

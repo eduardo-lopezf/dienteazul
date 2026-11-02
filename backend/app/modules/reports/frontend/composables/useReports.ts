@@ -2,6 +2,21 @@ import type { ApiResponse, BillingSummary, Money, NumberingGap, OverdueInvoice, 
 import { paymentMethodLabel } from '~~/app/utils/paymentMethod'
 
 // Budget report types
+export interface MaterialCostLine {
+  catalog_item_id: string | null
+  treatment_name: string
+  treatments: number
+  cost: string
+  cost_per_treatment: string
+}
+
+export interface MaterialCostSummary {
+  total: string
+  /** True when some of the material consumed had no price on file. */
+  unpriced_note: boolean
+  lines: MaterialCostLine[]
+}
+
 export interface BudgetSummary {
   period_start: string
   period_end: string
@@ -545,6 +560,28 @@ export function useReports() {
     }
   }
 
+  /**
+   * What the material used in the period cost, by treatment.
+   *
+   * Answers 404 while the Inventario App is off, which the caller gates
+   * on rather than letting it look like an error (ADR 0037).
+   */
+  async function fetchMaterialCost(
+    dateFrom: string,
+    dateTo: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<MaterialCostSummary | null> {
+    try {
+      const response = await api.get<ApiResponse<MaterialCostSummary>>(
+        `/api/v1/reports/materials/cost?date_from=${dateFrom}&date_to=${dateTo}`,
+        { signal: options?.signal }
+      )
+      return response.data
+    } catch {
+      return null
+    }
+  }
+
   async function fetchPaymentsByMethod(
     dateFrom: string,
     dateTo: string,
@@ -668,6 +705,7 @@ export function useReports() {
     // Payments
     fetchPaymentsSummary,
     fetchPaymentsTrends,
+    fetchMaterialCost,
     fetchPaymentsByMethod,
     fetchPaymentsByProfessional,
     fetchAgingReceivables,

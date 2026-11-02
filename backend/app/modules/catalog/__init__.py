@@ -73,11 +73,11 @@ class CatalogModule(BaseModule):
         return router
 
     def get_providers(self) -> dict[type, object]:
-        from app.core.contracts import ReferenceSpecialties
+        from app.core.contracts import ReferenceSpecialties, TreatmentCatalogue
 
-        from .providers import specialties
+        from .providers import specialties, treatments
 
-        return {ReferenceSpecialties: specialties}
+        return {ReferenceSpecialties: specialties, TreatmentCatalogue: treatments}
 
     def get_event_handlers(self) -> dict:
         from .events import on_clinic_created, on_clinic_specialties_set

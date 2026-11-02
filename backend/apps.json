@@ -79,6 +79,13 @@
       "modules": ["record", "consents"]
     },
     {
+      "name": "inventory",
+      "version": "0.1",
+      "tier": "optional",
+      "status": "enabled",
+      "modules": ["inventory", "purchasing"]
+    },
+    {
       "name": "reports",
       "version": "0.1",
       "tier": "optional",

@@ -74,6 +74,9 @@ Join our [**Telegram channel**](https://t.me/dienteazul) for support, installati
 ### Payments Chart
 ![Payments Chart](docs/screenshots/payments-chart.png)
 
+### Inventory
+![Inventory](docs/screenshots/inventory.png)
+
 ### Settings
 ![Settings](docs/screenshots/settings.png)
 
@@ -135,6 +138,18 @@ See [docs/user-manual/demo.md](docs/user-manual/demo.md) for full details on dem
 - **Budgets/Estimates** — Create treatment budgets, track approval workflow (draft → pending → approved/rejected), patient signature capture, PDF generation
 - **Invoices** — Generate invoices from budgets or standalone, automatic numbering, multiple payment methods, PDF export
 - **Payments** — Track partial payments, payment history, balance calculation
+
+### Inventory & Purchasing
+- **Stock That Explains Itself** — Every figure is the sum of an append-only ledger: what came in, what was used, what was adjusted, with who and why. Nothing is edited in place, so a number you don't trust can always be traced
+- **Lots & Expiry** — Batch tracking with expiry dates, warnings before material goes out of date, and write-offs recorded rather than quietly deducted
+- **Reorder Points & Alerts** — Per-article minimums measured across every location, with a daily low-stock and expiry sweep
+- **Physical Counts** — Count a cabinet, review the differences, post them as adjustments with a motive. A blank line is not a zero
+- **Purchasing** — Suppliers, purchase orders with their own numbering, and partial goods receipt that books stock in at the price paid, keeping a weighted-average cost per article
+- **Automatic Consumption** — Define what each treatment uses and the material leaves the shelf when the treatment is completed
+- **Implant Traceability** — Which batch of which device went into which patient, so a manufacturer's recall can be answered with a list of names. Exported on request, never erased
+- **Real Material Cost** — What the work consumed, by treatment type, beside what it earned on the productivity dashboard
+
+Inventory is an **optional App**: a clinic that doesn't want it switches it off and nothing else changes.
 
 ### Practice Management
 - **Role-based Access Control** — Five roles (admin, dentist, hygienist, assistant, receptionist) with granular permissions

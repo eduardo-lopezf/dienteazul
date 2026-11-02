@@ -376,3 +376,25 @@ class ActionableListOut(BaseModel):
     key: Literal["owes_not_booked", "accepted_not_booked", "no_visit"]
     rows: list[ActionableRowOut]
     truncated: bool
+
+
+class MaterialCostLineResponse(BaseModel):
+    catalog_item_id: UUID | None
+    treatment_name: str
+    treatments: int
+    cost: Decimal
+    cost_per_treatment: Decimal
+
+
+class MaterialCostSummary(BaseModel):
+    """What the clinic spent in material over the period.
+
+    ``total`` is everything that left the shelf, treatments or not;
+    ``lines`` is only what left against a treatment. ``unpriced_note``
+    is true when some of it had no price on file, so a zero is not read
+    as "free".
+    """
+
+    total: Decimal
+    unpriced_note: bool
+    lines: list[MaterialCostLineResponse]

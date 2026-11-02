@@ -96,6 +96,58 @@ test.describe('touch adaptation', () => {
   })
 
   /**
+   * The stock screen is read standing up, on a tablet, often with gloves
+   * on — it is the most finger-driven screen in the product after the
+   * agenda. It carries no `data-dense`: its rows are stock, not units of
+   * time or anatomy, so they get full-size targets rather than an opt-out.
+   *
+   * The article it looks for is seeded by
+   * `backend/app/modules/inventory/seed.py`; assert against that, never
+   * against whatever a local database happens to hold.
+   */
+  test('the stock screen meets the 44 px minimum and shows the seeded shelf', async ({ loggedIn: page }) => {
+    const admin = { authorization: `Bearer ${await tokenFor(page)}` }
+    const active = ((await (await page.request.get(`${API_BASE}/api/v1/modules/-/active`, { headers: admin })).json()) as {
+      data: { name: string }[]
+    }).data
+    test.skip(
+      !active.some(m => m.name === 'inventory'),
+      'the Inventory app is not enabled in this environment'
+    )
+
+    await page.goto('/inventario', { waitUntil: 'domcontentloaded', timeout: 120_000 })
+    await awaitDetection(page)
+    await expect(page.locator('main')).toBeVisible()
+    await page.waitForTimeout(2000)
+
+    await expect(page.getByText('Guantes de nitrilo talla M').first()).toBeVisible()
+    expect(await countUndersizedTargets(page), 'undersized targets on /inventario').toEqual([])
+
+    // The count screen is typed into while holding the tablet in one
+    // hand, and the master data is edited from the same device, so they
+    // are part of the same guarantee.
+    for (const route of [
+      '/inventario/recuento',
+      '/inventario/articulos',
+      '/inventario/ubicaciones',
+      '/inventario/movimientos',
+      // Layer 2's screens. The delivery is unpacked standing at a
+      // counter, so they are held to the same touch minimum.
+      '/inventario/compras',
+      '/inventario/proveedores',
+      '/inventario/escandallos',
+      '/inventario/implantes'
+    ]) {
+      await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 120_000 })
+      await awaitDetection(page)
+      await expect(page.locator('main')).toBeVisible()
+      await page.waitForTimeout(2000)
+
+      expect(await countUndersizedTargets(page), `undersized targets on ${route}`).toEqual([])
+    }
+  })
+
+  /**
    * The bandeja rows used to lay themselves out from `md:`, a *viewport*
    * breakpoint. Held upright the viewport is 800 px while the card is
    * barely 500, so the row went horizontal in a box that could not hold

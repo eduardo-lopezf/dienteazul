@@ -45,6 +45,9 @@ IMPORTS: dict[str, set[str]] = {
     "clinical_record": {"patients"},
     "reports": {"patients", "agenda", "treatments", "budgets_payments", "professionals"},
     "ai": set(),
+    # The inventory stands alone: stock control is useful with every
+    # other App off, which is the point of ADR 0037.
+    "inventory": set(),
     "data_migration": {
         "patients",
         "agenda",

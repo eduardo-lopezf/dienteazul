@@ -304,6 +304,12 @@ class TestCoverage:
         # test_liquidations_stays_free_of_patient_data.
         "liquidations",
         "professionals",
+        # Suppliers, orders and their lines. A supplier is a
+        # counterparty, not a patient, and no table here has a
+        # `patient_id`: an order says what the clinic bought, never for
+        # whom. What a patient was treated with reaches `inventory`,
+        # which contributes.
+        "purchasing",
         "reports",
         "schedules",
         "whatsapp_kapso",

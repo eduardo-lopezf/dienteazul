@@ -24,7 +24,9 @@
     "/module_layers/treatment_plan/frontend",
     "/module_layers/calendar_feed/frontend",
     "/module_layers/clinical_notes/frontend",
-    "/module_layers/periodontogram/frontend"
+    "/module_layers/inventory/frontend",
+    "/module_layers/periodontogram/frontend",
+    "/module_layers/purchasing/frontend"
   ],
   "modules": [
     {
@@ -124,8 +126,16 @@
       "path": "/module_layers/clinical_notes/frontend"
     },
     {
+      "name": "inventory",
+      "path": "/module_layers/inventory/frontend"
+    },
+    {
       "name": "periodontogram",
       "path": "/module_layers/periodontogram/frontend"
+    },
+    {
+      "name": "purchasing",
+      "path": "/module_layers/purchasing/frontend"
     }
   ],
   "version": 1

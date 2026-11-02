@@ -40,6 +40,22 @@ export const PERMISSIONS = {
     treatmentsRead: 'odontogram.treatments.read',
     treatmentsWrite: 'odontogram.treatments.write'
   },
+  purchasing: {
+    suppliersRead: 'purchasing.suppliers.read',
+    suppliersWrite: 'purchasing.suppliers.write',
+    ordersRead: 'purchasing.orders.read',
+    ordersWrite: 'purchasing.orders.write',
+    ordersReceive: 'purchasing.orders.receive'
+  },
+  inventory: {
+    stockRead: 'inventory.stock.read',
+    stockWrite: 'inventory.stock.write',
+    stockAdjust: 'inventory.stock.adjust',
+    itemsRead: 'inventory.items.read',
+    itemsWrite: 'inventory.items.write',
+    implantsRead: 'inventory.implants.read',
+    implantsWrite: 'inventory.implants.write'
+  },
   catalog: {
     read: 'catalog.read',
     write: 'catalog.write',
@@ -75,6 +91,7 @@ export const PERMISSIONS = {
     billingRead: 'reports.billing.read',
     budgetsRead: 'reports.budgets.read',
     schedulingRead: 'reports.scheduling.read',
+    materialsRead: 'reports.materials.read',
     summaryRead: 'reports.summary.read',
     actionableRead: 'reports.actionable.read',
     summaryWrite: 'reports.summary.write'
