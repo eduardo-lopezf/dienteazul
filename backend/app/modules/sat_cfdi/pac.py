@@ -32,7 +32,8 @@ BASE_URLS = {
     "sandbox": "https://apisandbox.facturama.mx",
     "production": "https://api.facturama.mx",
 }
-_TIMEOUT = 30.0
+#: How long a call to Facturama may take before it is given up on.
+TIMEOUT = 30.0
 
 
 class PacError(Exception):
@@ -94,7 +95,7 @@ class FacturamaClient:
             )
         try:
             async with httpx.AsyncClient(
-                base_url=self._base, auth=self._auth, timeout=_TIMEOUT, transport=self._transport
+                base_url=self._base, auth=self._auth, timeout=TIMEOUT, transport=self._transport
             ) as client:
                 response = await client.request(method, path, json=payload)
         except httpx.HTTPError as exc:

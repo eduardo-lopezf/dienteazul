@@ -1,14 +1,5 @@
 {
   "professionals": {
-    "appSettings": {
-      "intro": "The modules the App is made of. Those the App needs to run are always on; the clinic switches the optional ones on or off.",
-      "required": "Needed by the App: cannot be switched off",
-      "optional": "Optional",
-      "clinicOnly": "Only available to clinics",
-      "switchedOn": "{name} switched on",
-      "switchedOff": "{name} switched off",
-      "keepsData": "Switching it off deletes nothing: it comes back as it was when switched on again."
-    },
     "workload": {
       "title": "Assigned work",
       "patients": "Patients seen",

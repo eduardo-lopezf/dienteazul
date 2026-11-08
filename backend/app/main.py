@@ -37,7 +37,7 @@ from app.core.privacy import PrivacyPolicy, incompatible_tiers
 from app.core.privacy.egress import log_egress_audit
 from app.core.scheduler import init_scheduler, shutdown_scheduler
 from app.core.schemas import ErrorResponse
-from app.core.server_errors import SLOW_REQUEST_TYPE
+from app.core.server_errors import SLOW_REQUEST_TYPE, slow_threshold
 from app.core.server_errors import record as record_server_error
 from app.core.server_errors import record_event as record_server_event
 from app.core.tenancy import SingleTenantResolver
@@ -318,6 +318,10 @@ async def slow_request_middleware(request: Request, call_next):
     (``GET /api/v1/ops/errors``) naming the route, the status it finally
     answered with and how long it took.
 
+    The threshold is ``SLOW_REQUEST_SECONDS``, except on a route that
+    declares its own with ``slow_budget`` because it waits on someone
+    else's server.
+
     Registered outside ``request_id_middleware`` on purpose: it measures
     everything that middleware and the route below it spend, and the id
     it binds is on ``request.state`` by the time ``call_next`` returns,
@@ -326,9 +330,9 @@ async def slow_request_middleware(request: Request, call_next):
     started = time.perf_counter()
     response = await call_next(request)
     elapsed = time.perf_counter() - started
-    threshold = settings.SLOW_REQUEST_SECONDS
+    route = request.scope.get("route")
+    threshold = slow_threshold(route, settings.SLOW_REQUEST_SECONDS)
     if threshold > 0 and elapsed >= threshold:
-        route = request.scope.get("route")
         path = getattr(route, "path", None) or request.url.path
         logger.warning("Slow request: %s %s took %.1fs", request.method, path, elapsed)
         record_server_event(

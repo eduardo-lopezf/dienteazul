@@ -102,7 +102,7 @@ def fake_pac(monkeypatch) -> FakePac:
     environments: list[str] = []
 
     def client_for(settings) -> FakePac:
-        environments.append(settings.environment)
+        environments.append(settings.environment if settings else "sandbox")
         return fake
 
     monkeypatch.setattr(pac, "client_for", client_for)

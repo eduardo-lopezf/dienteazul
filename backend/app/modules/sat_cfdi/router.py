@@ -13,11 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
 from app.core.schemas import ApiResponse
+from app.core.server_errors import slow_budget
 from app.database import get_db
 
 from .csd import CsdError
 from .errors import certificate_error, certificate_missing, pac_error, rfc_invalid
 from .issuer import CertificateMissingError, SatIssuerService
+from .pac import TIMEOUT as PAC_TIMEOUT
 from .pac import PacError
 from .receivers import SatReceiverService
 from .schemas import (
@@ -35,6 +37,11 @@ from .service import SatCfdiService
 
 # No prefix: `_mount_one` mounts every module router at ``/api/v1/<module name>``.
 router = APIRouter(tags=["sat_cfdi"])
+
+#: Registering a CSD waits on Facturama, so a healthy answer takes seconds
+#: (``SLOW_REQUEST_SECONDS`` is five). Past the PAC's own timeout the wait
+#: is ours, not theirs, and worth recording.
+PAC_WAIT = PAC_TIMEOUT + 5.0
 
 
 @router.get("/invoices/{invoice_id}/cfdis", response_model=ApiResponse[list[SatCfdiOut]])
@@ -127,6 +134,7 @@ async def save_facturama_credentials(
 
 
 @router.post("/certificate", response_model=ApiResponse[SatCertificateOut], status_code=201)
+@slow_budget(PAC_WAIT)
 async def upload_certificate(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("sat_cfdi.settings.configure"))],
@@ -154,6 +162,7 @@ async def upload_certificate(
 
 
 @router.post("/certificate/register", response_model=ApiResponse[SatCertificateOut])
+@slow_budget(PAC_WAIT)
 async def register_certificate(
     ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
     _: Annotated[None, Depends(require_permission("sat_cfdi.settings.configure"))],

@@ -1,14 +1,5 @@
 {
   "professionals": {
-    "appSettings": {
-      "intro": "Los módulos que forman la App. Los que la App necesita para funcionar están siempre habilitados; los opcionales los habilita o deshabilita la clínica.",
-      "required": "Necesario para la App: no se puede deshabilitar",
-      "optional": "Opcional",
-      "clinicOnly": "Solo disponible para clínicas",
-      "switchedOn": "{name} habilitado",
-      "switchedOff": "{name} deshabilitado",
-      "keepsData": "Al deshabilitarlo no se borra nada: vuelve tal como estaba al habilitarlo de nuevo."
-    },
     "workload": {
       "title": "Lo asignado",
       "patients": "Pacientes que atiende",

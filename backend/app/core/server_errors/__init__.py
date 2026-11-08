@@ -138,6 +138,34 @@ def _rebind(directory: Path) -> logging.Logger | None:
 #: (see ``SLOW_REQUEST_SECONDS``).
 SLOW_REQUEST_TYPE = "core.slow_request"
 
+#: Where a route keeps its own slow-request budget, when it has one.
+_SLOW_BUDGET = "__slow_request_seconds__"
+
+
+def slow_budget(seconds: float):
+    """Give one route its own slow-request threshold.
+
+    ``SLOW_REQUEST_SECONDS`` is what a screen waits for, and nearly every
+    route answers well inside it. A few cannot: an upload that registers a
+    CSD with the PAC before storing it waits on someone else's server, so
+    even a healthy answer takes seconds. Filing those as slow buries the
+    requests that are slow by accident. The route that owns the wait says
+    how long it may honestly take; everything else keeps the deployment's
+    threshold.
+    """
+
+    def declare(endpoint):
+        setattr(endpoint, _SLOW_BUDGET, seconds)
+        return endpoint
+
+    return declare
+
+
+def slow_threshold(route: object, default: float) -> float:
+    """What counts as slow for this route: its own budget, or the default."""
+    return getattr(getattr(route, "endpoint", None), _SLOW_BUDGET, default)
+
+
 #: What a browser that gave up waiting is filed as. The request may well
 #: have been delivered and applied; what is recorded is that nothing came
 #: back in time.
