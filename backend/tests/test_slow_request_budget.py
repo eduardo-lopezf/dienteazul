@@ -50,7 +50,11 @@ async def test_the_middleware_reads_the_routes_budget(monkeypatch) -> None:
     """Nothing is recorded for a route whose budget it stayed inside."""
     recorded: list[dict] = []
     monkeypatch.setattr("app.main.record_server_event", lambda **kwargs: recorded.append(kwargs))
-    monkeypatch.setattr("app.main.settings.SLOW_REQUEST_SECONDS", 0.001)
+    # Smaller than any request can take, rather than "small": at a 1 ms
+    # default an in-process ASGI call sometimes answers inside the budget,
+    # and the route that must be recorded was not — the middleware was
+    # fine, the threshold was a race.
+    monkeypatch.setattr("app.main.settings.SLOW_REQUEST_SECONDS", 1e-9)
 
     app = FastAPI()
     router = APIRouter()

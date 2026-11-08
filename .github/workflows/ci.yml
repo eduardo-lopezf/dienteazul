@@ -463,7 +463,14 @@ jobs:
 
       - name: Run E2E
         working-directory: frontend
-        run: npx playwright test --reporter=list
+        # `list` for the log, `html` for the artifact below: the report is
+        # what carries each failure's trace, video and screenshot, and with
+        # `list` alone `playwright-report/` was never written, so the
+        # upload step kept uploading nothing. `never` because the reporter
+        # otherwise starts a server to show it and the step would hang.
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npx playwright test --reporter=list,html
 
       - name: Upload Nuxt log on failure
         if: failure()

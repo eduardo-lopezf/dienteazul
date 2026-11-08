@@ -15,11 +15,14 @@ from typing import Annotated
 import pytest
 from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core import server_errors
 from app.core.auth.dependencies import ClinicContext, get_clinic_context
-from app.core.auth.models import Clinic
+from app.core.auth.models import Clinic, User
+from app.core.auth.service import create_access_token
 from app.core.server_errors import scrub
 from app.main import app
 
@@ -86,6 +89,46 @@ async def test_a_server_error_is_kept_with_its_origin(
     # What it was working on stays out.
     assert "ana.perez" not in error["message"]
     assert "5512345678" not in error["message"]
+
+
+async def test_a_clients_report_carries_the_clinic_it_came_from(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    ops_enabled: None,
+    test_clinic: Clinic,
+) -> None:
+    """A request that never came back is still somebody's.
+
+    `POST /client-errors` asks for no clinic context — any member whose
+    screen fails is the witness — so the line it records used to have no
+    clinic on it at all, and an operator reading a deployment of several
+    could not tell whose users were losing requests. The clinic comes
+    from the access token's own claim, bound in `get_current_user`.
+    """
+    user = (
+        await db_session.execute(select(User).where(User.email == "test@example.com"))
+    ).scalar_one()
+    token = create_access_token(user.id, clinic_id=test_clinic.id, token_version=user.token_version)
+
+    reported = await client.post(
+        "/api/v1/client-errors",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "path": "/api/v1/reports/billing/overdue?page=1",
+            "method": "GET",
+            "waited_ms": 45_000,
+            "kind": "timeout",
+        },
+    )
+    assert reported.status_code == 204, reported.text
+
+    listed = await client.get("/api/v1/ops/errors", headers=_token())
+    [error] = listed.json()["data"]
+    assert error["error_type"] == "core.client_timeout"
+    assert error["clinic_id"] == str(test_clinic.id)
+    assert error["user_id"] == str(user.id)
+    # The query string is dropped: what it carries is usually an identifier.
+    assert error["path"] == "/api/v1/reports/billing/overdue"
 
 
 async def test_only_the_control_plane_reads_or_clears_them(

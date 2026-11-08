@@ -139,6 +139,18 @@ async def get_current_user(
             )
 
     request.state.auth_family_id = family_id
+    # Which clinic this session is working in, for whatever is recorded
+    # about the request after the handler is gone. `get_clinic_context`
+    # sets the same field from the membership it resolves, and overwrites
+    # this; what needs it here are the routes that never ask for a
+    # context — a client's report of a request that never came back
+    # (`core.client_timeout`) filed every line with no clinic on it, so
+    # the operator could not tell whose users were losing requests. The
+    # claim is the token's own, minted at login beside the user's id, and
+    # it is used for attribution only: nothing is authorized from it.
+    token_clinic = payload.get("clinic_id")
+    if token_clinic:
+        request.state.clinic_id = str(token_clinic)
 
     return user
 

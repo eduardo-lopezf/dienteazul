@@ -31,11 +31,17 @@ async function logInThroughForm(page: Page): Promise<void> {
   // between is anonymous and comes back 302. Where it lands is the test's
   // business — `/` or the deep link it was sent from — so wait for the
   // login screen to be gone, not for a particular page.
-  await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 })
+  // Same budget as `navigationTimeout`, and for the same reason: what this
+  // waits for is a route the Nuxt **dev** server has not compiled yet. In CI
+  // every route is cold, and a dashboard that took longer than a minute to
+  // build read here as "the click did nothing" — the form still on `/login`
+  // with the session already created.
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 120_000 })
 }
 
-// Cold dev-server compiles of /patients and /login.
-test.describe.configure({ timeout: 180_000 })
+// Cold dev-server compiles of /login, / and /patients — and some tests sign
+// in twice, so the budget has to hold two of them.
+test.describe.configure({ timeout: 300_000 })
 
 test.describe('session inactivity', () => {
   test('a deep link opened without a session returns there after login', async ({ browser }) => {
@@ -43,7 +49,7 @@ test.describe('session inactivity', () => {
     const page = await context.newPage()
 
     await page.goto('/patients', { waitUntil: 'domcontentloaded', timeout: 120_000 })
-    await expect(page).toHaveURL(/\/login\?/, { timeout: 60_000 })
+    await expect(page).toHaveURL(/\/login\?/, { timeout: 120_000 })
     // Parsed rather than matched: whether `/` is escaped in a query is the
     // router's business, not this test's.
     const url = new URL(page.url())
@@ -52,7 +58,7 @@ test.describe('session inactivity', () => {
     expect(url.searchParams.get('reason')).toBeNull()
 
     await logInThroughForm(page)
-    await expect(page).toHaveURL(/\/patients$/, { timeout: 60_000 })
+    await expect(page).toHaveURL(/\/patients$/, { timeout: 120_000 })
 
     await context.close()
   })
@@ -90,7 +96,7 @@ test.describe('session inactivity', () => {
     expect(cookies.some(c => c.name === 'access_token' || c.name === 'refresh_token')).toBe(false)
 
     await logInThroughForm(page)
-    await expect(page).toHaveURL(/\/patients\?page=1$/, { timeout: 60_000 })
+    await expect(page).toHaveURL(/\/patients\?page=1$/, { timeout: 120_000 })
 
     await context.close()
   })
@@ -216,7 +222,7 @@ test.describe('session inactivity', () => {
     await page.getByPlaceholder('Correo electrónico').fill('admin@demo.clinic')
     await page.getByPlaceholder('Contraseña').fill('demo1234')
     await page.getByPlaceholder('Contraseña').press('Enter')
-    await expect(page).toHaveURL(/localhost:3000\/$/, { timeout: 60_000 })
+    await expect(page).toHaveURL(/localhost:3000\/$/, { timeout: 120_000 })
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click()
     await expect(page).toHaveURL(/\/login$/, { timeout: 30_000 })
@@ -224,7 +230,7 @@ test.describe('session inactivity', () => {
     await page.getByPlaceholder('Correo electrónico').fill('admin@demo.clinic')
     await page.getByPlaceholder('Contraseña').fill('demo1234')
     await page.getByRole('button', { name: 'Entrar' }).click()
-    await expect(page).toHaveURL(/localhost:3000\/$/, { timeout: 60_000 })
+    await expect(page).toHaveURL(/localhost:3000\/$/, { timeout: 120_000 })
 
     await context.close()
   })
