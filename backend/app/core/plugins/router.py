@@ -25,6 +25,7 @@ from app.core.auth.dependencies import (
     require_permission,
 )
 from app.core.auth.permissions import has_permission
+from app.core.events import EventType, event_bus
 from app.core.schemas import ApiResponse
 from app.database import get_db
 
@@ -35,6 +36,7 @@ from .apps import (
     load_app_catalog,
     modules_disabled_by_app,
     modules_outside,
+    optional_modules_on,
     required_apps,
     required_modules,
     statuses_on_disk,
@@ -61,6 +63,7 @@ async def list_apps(
     on_disk = statuses_on_disk()
     chosen = clinic_apps(ctx.clinic.apps, ctx.clinic.account_tier)
     offered = ctx.clinic.available_apps or []
+    switched_on = optional_modules_on(ctx.clinic.modules, ctx.clinic.account_tier)
     return ApiResponse(
         data=[
             {
@@ -87,6 +90,16 @@ async def list_apps(
                 "modules": list(app.modules),
                 "requires": required_modules(app),
                 "integrates": integrated_modules(app),
+                # Its modules the clinic switches on by hand (ADR 0066):
+                # whether it has, and whether its account tier may.
+                "optional_modules": [
+                    {
+                        "name": item.name,
+                        "enabled": item.name in switched_on,
+                        "available": ctx.clinic.account_tier in item.tiers,
+                    }
+                    for item in app.optional_modules
+                ],
                 "apis": [{"name": api.name, "status": api.status.value} for api in app.apis],
             }
             for app in load_app_catalog()
@@ -129,6 +142,72 @@ async def enable_app(
     clinic.apps = [app for app in catalog if app in chosen or app in switched_on]
     clinic.available_apps = [app for app in offered if app not in switched_on]
     return ApiResponse(data={"name": name, "enabled": True, "also_enabled": needed})
+
+
+@apps_router.post("/{name}/modules/{module}/enable")
+async def enable_optional_module(
+    name: str,
+    module: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+) -> ApiResponse[dict[str, Any]]:
+    """Switch on, for the caller's clinic, an optional module of an App (ADR 0066).
+
+    Takes effect at the next request, like an App switched on. Refused
+    when the clinic's account tier is not one the catalog allows it for.
+    """
+    _optional_module(name, module, ctx)
+    if ctx.clinic.account_tier not in _tiers_of(name, module):
+        raise HTTPException(status_code=403, detail="This module is not available to this clinic")
+    current = list(ctx.clinic.modules or [])
+    if module not in current:
+        # A new list, not an edit in place: that is what the ORM notices on JSONB.
+        ctx.clinic.modules = [*current, module]
+        await db.flush()
+        event_bus.publish_after_commit(
+            db,
+            EventType.CLINIC_MODULE_ENABLED,
+            {"clinic_id": str(ctx.clinic.id), "module": module},
+        )
+    return ApiResponse(data={"name": module, "enabled": True})
+
+
+@apps_router.post("/{name}/modules/{module}/disable")
+async def disable_optional_module(
+    name: str,
+    module: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("admin.clinic.write"))],
+) -> ApiResponse[dict[str, Any]]:
+    """Switch off, for the caller's clinic, an optional module of an App.
+
+    Its data stays as it is and comes back when it is switched on again:
+    the module is only outside the clinic meanwhile (ADR 0066).
+    """
+    _optional_module(name, module, ctx)
+    current = list(ctx.clinic.modules or [])
+    if module in current:
+        ctx.clinic.modules = [other for other in current if other != module]
+        await db.flush()
+    return ApiResponse(data={"name": module, "enabled": False})
+
+
+def _tiers_of(name: str, module: str) -> tuple[str, ...]:
+    app = next(app for app in load_app_catalog() if app.name == name)
+    return next(item.tiers for item in app.optional_modules if item.name == module)
+
+
+def _optional_module(name: str, module: str, ctx: ClinicContext) -> None:
+    """404 unless ``module`` is an optional module of ``name``, an App the
+    clinic has: a module of an App it does not have is not its to switch."""
+    app = next((app for app in load_app_catalog() if app.name == name), None)
+    if app is None or module not in {item.name for item in app.optional_modules}:
+        raise HTTPException(status_code=404, detail=f"Optional module not found: {name}/{module}")
+    chosen = clinic_apps(ctx.clinic.apps, ctx.clinic.account_tier)
+    if not app.enabled or (chosen is not None and name not in chosen):
+        raise HTTPException(status_code=404, detail=f"App not found: {name}")
 
 
 # --- Read endpoints ------------------------------------------------------
@@ -197,7 +276,7 @@ async def active_modules(
     # Held back for everyone by the deployment, or not among the Apps
     # chosen for this clinic: either way it is not there for the caller.
     held_back = modules_disabled_by_app() | modules_outside(
-        ctx.clinic.apps, ctx.clinic.account_tier
+        ctx.clinic.apps, ctx.clinic.account_tier, ctx.clinic.modules
     )
 
     for info in await svc.list_modules():

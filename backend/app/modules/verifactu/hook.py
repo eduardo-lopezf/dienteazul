@@ -498,6 +498,12 @@ class VerifactuHook(BillingComplianceHook):
     def country_code(self) -> str:
         return "ES"
 
+    @property
+    def module_name(self) -> str:
+        # Archived (disabled in apps.json): the registry hands this hook out
+        # only while the module is live.
+        return "verifactu"
+
     def get_required_fields(self) -> list[str]:
         # We handle NIF/F1-F2 logic ourselves in validate_before_issue.
         return []

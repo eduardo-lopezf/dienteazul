@@ -24,9 +24,11 @@
     "/module_layers/treatment_plan/frontend",
     "/module_layers/calendar_feed/frontend",
     "/module_layers/clinical_notes/frontend",
+    "/module_layers/commissions/frontend",
     "/module_layers/inventory/frontend",
     "/module_layers/periodontogram/frontend",
-    "/module_layers/purchasing/frontend"
+    "/module_layers/purchasing/frontend",
+    "/module_layers/sat_cfdi/frontend"
   ],
   "modules": [
     {
@@ -126,6 +128,10 @@
       "path": "/module_layers/clinical_notes/frontend"
     },
     {
+      "name": "commissions",
+      "path": "/module_layers/commissions/frontend"
+    },
+    {
       "name": "inventory",
       "path": "/module_layers/inventory/frontend"
     },
@@ -136,6 +142,10 @@
     {
       "name": "purchasing",
       "path": "/module_layers/purchasing/frontend"
+    },
+    {
+      "name": "sat_cfdi",
+      "path": "/module_layers/sat_cfdi/frontend"
     }
   ],
   "version": 1

@@ -1972,10 +1972,23 @@
       "enable": "Enable",
       "enabled": "Enabled: {name}",
       "modulesHeading": "Modules",
+      "modulesPage": {
+        "intro": "The modules the App is made of. Those it needs to run are always enabled; the clinic enables or disables the optional ones.",
+        "required": "Needed by the App: cannot be disabled",
+        "optional": "Optional",
+        "notForTier": "Not available for this account's plan",
+        "switchedOn": "{name} enabled",
+        "switchedOff": "{name} disabled",
+        "keepsData": "Disabling it deletes nothing: it comes back as it was when enabled again."
+      },
       "catalog": {
           "budgets_payments": {
             "title": "Budgets & payments",
-            "summary": "Budgets, payments, invoicing and, in Spain, Veri*Factu and the export for the accountant."
+            "summary": "Budgets, payments, invoicing and the export for the accountant."
+          },
+          "verifactu": {
+            "title": "Veri*Factu (archived)",
+            "summary": "Spain's AEAT Veri*Factu compliance. Archived: no deployment mounts it."
           },
           "cash": {
             "title": "Cash desk",

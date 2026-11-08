@@ -515,6 +515,50 @@ class MaterialCost(Protocol):
         treatments, write-offs and hand-recorded use alike."""
 
 
+@dataclass(frozen=True, slots=True)
+class CommissionTerms:
+    """What the clinic pays one professional, treatment by treatment.
+
+    ``default_percent`` covers every treatment without a percentage of its
+    own in ``by_catalog_item``. Either may be missing: a professional paid
+    only on implants has no default, and :meth:`percent_for` then answers
+    ``None`` for anything else — nothing agreed, never a confident zero.
+    """
+
+    #: ``"collected"`` (what the patient paid for the work) or
+    #: ``"earned"`` (the work performed, priced).
+    basis: str
+    default_percent: Decimal | None
+    by_catalog_item: Mapping[UUID, Decimal] = field(default_factory=dict)
+
+    def percent_for(self, catalog_item_id: UUID | None) -> Decimal | None:
+        if catalog_item_id is not None and catalog_item_id in self.by_catalog_item:
+            return self.by_catalog_item[catalog_item_id]
+        return self.default_percent
+
+
+class CommissionRates(Protocol):
+    """The percentages agreed with each professional.
+
+    Supplied by `commissions` and read by `liquidations`, which settles on
+    them. ``None`` from :func:`provider`, or :meth:`in_use` false for the
+    clinic, means it keeps no per-treatment rates and the reader falls
+    back to its own setting.
+    """
+
+    async def in_use(self, db: AsyncSession, clinic_id: UUID) -> bool:
+        """Whether the clinic has switched these rates on (ADR 0066).
+
+        `commissions` is an optional module of its App: it runs for the
+        deployment and is off for each clinic until switched on.
+        """
+
+    async def terms(
+        self, db: AsyncSession, clinic_id: UUID, professional_id: UUID
+    ) -> CommissionTerms | None:
+        """``None`` when nothing has been agreed with this professional."""
+
+
 def providers(contract: type[T]) -> list[T]:
     """Every running module's implementation of ``contract``.
 

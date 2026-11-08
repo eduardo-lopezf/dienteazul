@@ -30,6 +30,8 @@ def service_error(error: ValueError) -> AppError:
         code = "liquidations.settlement.already_issued"
     elif message.startswith("There is no agreed percentage for this professional yet."):
         code = "liquidations.commission.required"
+    elif message.startswith("Percentages are set per professional in Commissions"):
+        code = "liquidations.commission.managed_by_commissions"
     elif message == "This settlement has already been paid.":
         code = "liquidations.settlement.already_paid"
     elif message == "This settlement has not been paid.":

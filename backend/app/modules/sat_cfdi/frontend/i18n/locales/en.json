@@ -1,0 +1,100 @@
+{
+  "satCfdi": {
+    "settings": {
+      "title": "SAT — electronic invoicing",
+      "description": "The clinic as issuer of CFDIs, and its digital seal certificate (CSD).",
+      "formTitle": "SAT details",
+      "taxRegime": "Tax regime",
+      "taxRegimeHint": "The one on the clinic's tax status certificate.",
+      "taxRegimePlaceholder": "Choose the regime",
+      "postalCode": "Postal code of issue",
+      "postalCodeHint": "The postal code of the address invoices are issued from.",
+      "postalCodeInvalid": "It must have 5 digits.",
+      "productCode": "Product or service code",
+      "productCodeHint": "The code from the SAT's c_ClaveProdServ catalogue on every line. Check it with your accountant.",
+      "productCodeInvalid": "It must have 8 digits.",
+      "unitCode": "Unit code",
+      "unitCodeHint": "From the c_ClaveUnidad catalogue. E48 is “service unit”.",
+      "unitCodeInvalid": "2 to 3 upper-case letters or digits.",
+      "stampDelay": "Minutes before stamping",
+      "stampDelayHint": "Leaves time to record the payment: paid when stamped, the CFDI is PUE; otherwise PPD. The SAT allows 24 hours.",
+      "stampDelayInvalid": "Between 0 and 720 minutes.",
+      "environment": {
+        "label": "Environment",
+        "sandbox": "Test",
+        "sandboxHint": "Stamped against the PAC's test service; nothing reaches the SAT.",
+        "production": "Production",
+        "productionHint": "CFDIs are stamped for real and registered with the SAT."
+      },
+      "save": "Save",
+      "saved": "SAT details saved"
+    },
+    "status": {
+      "ready": "The clinic can invoice through the SAT",
+      "notReady": "The clinic cannot invoice through the SAT yet",
+      "sandbox": "Test environment: CFDIs do not reach the SAT.",
+      "production": "Production environment: CFDIs are registered with the SAT."
+    },
+    "issuer": {
+      "title": "Issuer",
+      "rfc": "RFC",
+      "legalName": "Legal name",
+      "hint": "These are the clinic's, as they appear on its tax status certificate.",
+      "edit": "Edit in Clinic Information"
+    },
+    "facturama": {
+      "title": "Facturama account",
+      "intro": "Facturama is the PAC that seals and stamps CFDIs. Each clinic uses its own account, one for test and one for production.",
+      "user": "User",
+      "password": "Password",
+      "passwordKept": "One is stored. Leave it empty to keep it.",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "save": "Save account",
+      "saved": "Facturama account saved",
+      "encryptionNote": "The password is stored encrypted and never shown."
+    },
+    "certificate": {
+      "title": "Digital seal certificate (CSD)",
+      "none": "There is no CSD yet. Without it the clinic cannot invoice.",
+      "upload": "Upload the CSD",
+      "replace": "Replace the CSD",
+      "cer": "Certificate (.cer)",
+      "key": "Private key (.key)",
+      "pickCer": "Choose .cer file",
+      "pickKey": "Choose .key file",
+      "password": "Private key password",
+      "passwordHint": "The one set when the CSD was generated at the SAT, not the e.firma's.",
+      "togglePassword": "Show or hide the password",
+      "submit": "Save CSD",
+      "uploaded": "CSD saved",
+      "uploadFailed": "The CSD could not be saved",
+      "encryptionNote": "The private key and its password are stored encrypted and never shown. On saving, the CSD is registered with Facturama, which seals CFDIs with it.",
+      "number": "Certificate number",
+      "validFrom": "Valid from",
+      "validUntil": "Valid until",
+      "expired": "Expired",
+      "expiresIn": "Expires in {days} days",
+      "validFor": "Valid · {days} days",
+      "registeredIn": "Registered with Facturama · {environment}",
+      "notRegisteredIn": "Not registered with Facturama · {environment}",
+      "lastAttempt": "Last attempt: {error}",
+      "register": "Register with Facturama",
+      "registered": "CSD registered with Facturama",
+      "registerFailed": "The CSD could not be registered with Facturama"
+    },
+    "receiver": {
+      "title": "Tax details for the SAT",
+      "add": "Add",
+      "noRfc": "The patient has no billing RFC. Add it to their billing details (Info tab) to invoice them by name.",
+      "public": "The billing RFC is the general public's (XAXX010101000): no tax details needed.",
+      "taxRegime": "Tax regime",
+      "taxZipCode": "Fiscal postal code",
+      "taxZipCodeHint": "The one on their tax status certificate.",
+      "cfdiUse": "CFDI use",
+      "missing": "The tax details of {rfc} are missing",
+      "missingHint": "Without tax regime, fiscal postal code and CFDI use no invoice can be issued to them. They are kept by RFC: they serve all their invoices.",
+      "saved": "Tax details saved"
+    }
+  }
+}

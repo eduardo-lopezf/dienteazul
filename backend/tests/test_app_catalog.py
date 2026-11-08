@@ -23,6 +23,7 @@ from app.core.plugins.apps import (
     integrated_modules,
     load_app_catalog,
     modules_disabled_by_app,
+    modules_outside,
     required_modules,
 )
 from app.core.plugins.db_models import ModuleRecord
@@ -88,15 +89,16 @@ def test_shipped_agenda_groups_the_agenda_modules_and_is_enabled() -> None:
     assert agenda.enabled is True
 
 
-def test_the_shipped_catalog_holds_back_only_the_ai_app() -> None:
-    """`ai` ships disabled, so `copilot` is not mounted.
+def test_the_shipped_catalog_holds_back_only_the_ai_and_verifactu_apps() -> None:
+    """`ai` ships disabled, so `copilot` is not mounted; `verifactu` is
+    archived, so it is not mounted either.
 
-    It is the App that proves the switch works on a real deployment —
+    `ai` is the App that proves the switch works on a real deployment —
     `docs/apps/ai/README.md` records what goes with it. This assertion
     used to read `frozenset()`, which was true of the catalog as drafted
     and not of the one that shipped.
     """
-    assert modules_disabled_by_app() == frozenset({"copilot"})
+    assert modules_disabled_by_app() == frozenset({"copilot", "verifactu"})
 
 
 def test_agenda_requires_nothing_and_integrates_with_the_rest() -> None:
@@ -151,6 +153,30 @@ def test_an_app_is_listed_once(apps_file) -> None:
 
     with pytest.raises(AppCatalogError, match="listed twice"):
         load_app_catalog()
+
+
+def test_an_optional_module_is_one_of_the_apps_own(apps_file) -> None:
+    apps_file([{**AGENDA, "optional_modules": [{"name": "recalls", "tiers": ["clinic"]}]}])
+
+    with pytest.raises(AppCatalogError, match="does not group"):
+        load_app_catalog()
+
+
+def test_an_optional_module_names_who_may_switch_it_on(apps_file) -> None:
+    apps_file([{**AGENDA, "optional_modules": [{"name": "schedules", "tiers": []}]}])
+
+    with pytest.raises(AppCatalogError, match="no account tier"):
+        load_app_catalog()
+
+
+def test_an_optional_module_is_outside_until_switched_on(apps_file) -> None:
+    apps_file([{**AGENDA, "optional_modules": [{"name": "schedules", "tiers": ["clinic"]}]}])
+
+    assert "schedules" in modules_outside(None, "clinic")
+    assert "schedules" not in modules_outside(None, "clinic", ["schedules"])
+    # Kept on a clinic whose tier may not have it: off all the same.
+    assert "schedules" in modules_outside(None, "basic", ["schedules"])
+    assert "agenda" not in modules_outside(None, "clinic")
 
 
 def test_an_api_status_must_be_known(apps_file) -> None:

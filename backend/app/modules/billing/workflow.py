@@ -414,6 +414,122 @@ class InvoiceWorkflowService:
         return invoice
 
     @staticmethod
+    async def cancel_invoice(
+        db: AsyncSession,
+        invoice: Invoice,
+        cancelled_by: UUID,
+        reason: str,
+        substitute: Invoice | None = None,
+    ) -> Invoice:
+        """Cancel an issued invoice (ADR 0067).
+
+        Without a compliance hook for the clinic's country the invoice is
+        cancelled at once. With one, the hook may refuse
+        (``before_cancel``) and records the request
+        (``on_invoice_cancelled``); if it needs the authority's
+        confirmation the invoice stays ``issued`` and the module calls
+        :meth:`mark_cancelled` later.
+        """
+        if not InvoiceWorkflowService.can_transition(invoice.status, "cancelled"):
+            raise InvoiceWorkflowError(f"Cannot cancel invoice from status '{invoice.status}'")
+
+        clinic = invoice.clinic
+        hook = BillingHookRegistry.get_for_clinic(clinic) if clinic else None
+        substitute_id = substitute.id if substitute else None
+        if hook is None:
+            return await InvoiceWorkflowService.mark_cancelled(
+                db, invoice, cancelled_by, reason=reason, substitute_invoice_id=substitute_id
+            )
+
+        is_valid, error = await hook.before_cancel(invoice, reason, substitute, db)
+        if not is_valid:
+            raise InvoiceWorkflowError(f"Cancellation refused: {error}")
+
+        compliance_data = await hook.on_invoice_cancelled(
+            invoice, reason, substitute, cancelled_by, db
+        )
+        if compliance_data:
+            invoice.compliance_data = {**(invoice.compliance_data or {}), **compliance_data}
+
+        if not hook.cancellation_needs_confirmation:
+            return await InvoiceWorkflowService.mark_cancelled(
+                db, invoice, cancelled_by, reason=reason, substitute_invoice_id=substitute_id
+            )
+
+        from .service import InvoiceHistoryService
+
+        await InvoiceHistoryService.add_entry(
+            db,
+            clinic_id=invoice.clinic_id,
+            invoice_id=invoice.id,
+            action="cancel_requested",
+            changed_by=cancelled_by,
+            previous_state={"status": invoice.status},
+            new_state={
+                "status": invoice.status,
+                "reason": reason,
+                "substitute_invoice_id": str(substitute_id) if substitute_id else None,
+            },
+        )
+        await db.flush()
+        return invoice
+
+    @staticmethod
+    async def mark_cancelled(
+        db: AsyncSession,
+        invoice: Invoice,
+        cancelled_by: UUID,
+        *,
+        reason: str | None = None,
+        substitute_invoice_id: UUID | None = None,
+    ) -> Invoice:
+        """Move an issued invoice to ``cancelled`` and announce it.
+
+        Public: a compliance module whose cancellations need the
+        authority's confirmation calls it once the authority answers.
+        """
+        if not InvoiceWorkflowService.can_transition(invoice.status, "cancelled"):
+            raise InvoiceWorkflowError(f"Cannot cancel invoice from status '{invoice.status}'")
+
+        from .service import InvoiceHistoryService
+
+        previous_status = invoice.status
+        invoice.status = "cancelled"
+        await InvoiceHistoryService.add_entry(
+            db,
+            clinic_id=invoice.clinic_id,
+            invoice_id=invoice.id,
+            action="cancelled",
+            changed_by=cancelled_by,
+            previous_state={"status": previous_status},
+            new_state={
+                "status": "cancelled",
+                "reason": reason,
+                "substitute_invoice_id": (
+                    str(substitute_invoice_id) if substitute_invoice_id else None
+                ),
+            },
+        )
+        await db.flush()
+
+        event_bus.publish_after_commit(
+            db,
+            EventType.INVOICE_CANCELLED,
+            {
+                "clinic_id": str(invoice.clinic_id),
+                "invoice_id": str(invoice.id),
+                "patient_id": str(invoice.patient_id),
+                "invoice_number": invoice.invoice_number,
+                "reason": reason,
+                "substitute_invoice_id": (
+                    str(substitute_invoice_id) if substitute_invoice_id else None
+                ),
+                "occurred_at": datetime.now(UTC).isoformat(),
+            },
+        )
+        return invoice
+
+    @staticmethod
     async def recalc_invoice_status(
         db: AsyncSession,
         invoice: Invoice,

@@ -19,6 +19,7 @@ from app.core.scheduling import ScheduledJob
 from app.modules.budget import BudgetModule
 from app.modules.copilot import CopilotModule
 from app.modules.notifications import NotificationsModule
+from app.modules.sat_cfdi import SatCfdiModule
 from app.modules.treatment_plan import TreatmentPlanModule
 
 
@@ -28,6 +29,7 @@ def test_modules_declare_their_jobs() -> None:
         BudgetModule: {"expire_budgets", "send_budget_reminders", "purge_budget_access_logs"},
         TreatmentPlanModule: {"auto_close_expired_plans"},
         CopilotModule: {"copilot_morning_digests"},
+        SatCfdiModule: {"sat_cfdi_stamp"},
     }
     for module_cls, ids in expected.items():
         jobs = module_cls().get_scheduled_jobs()

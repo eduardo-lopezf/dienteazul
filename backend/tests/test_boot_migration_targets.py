@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.plugins import processor as processor_mod
 from app.core.plugins.alembic_paths import (
     core_versions_dir,
+    module_branch_revisions,
     resolve_core_head,
     resolve_module_branch_head,
 )
@@ -378,3 +379,190 @@ async def test_a_database_without_alembic_version_says_so(db_session: AsyncSessi
     from app.core.plugins.service import applied_revisions
 
     assert await applied_revisions(db_session) is None
+
+
+async def test_a_claim_alembic_version_contradicts_is_corrected(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """The row that kept production broken after the backfill was fixed.
+
+    ``reports``' record claimed its branch head while ``alembic_version``
+    listed none of its revisions. ``_migrate_installed`` skips any branch
+    whose recorded revision equals the head, so the false claim stopped
+    the one step that creates the tables, and the scheduled summary job
+    raised ``relation "reports_summary_schedule" does not exist`` every
+    day. Guarding the backfill does not help a row that already lies:
+    reconcile has to look at the claim again and correct it.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    head = resolve_module_branch_head(module_registry.get(UNLABELLED))
+    branch = set(module_branch_revisions(module_registry.get(UNLABELLED)))
+
+    async def ran_no_branch_revision(db) -> set[str]:
+        return {"0001"}  # the core chain only
+
+    monkeypatch.setattr(service_mod, "applied_revisions", ran_no_branch_revision)
+
+    # base_revision is set, so the backfill below it never runs: this row
+    # is exactly the shape production's was.
+    db_session.add(_record(UNLABELLED, ModuleState.INSTALLED, head))
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.base_revision == head  # an uninstall can still downgrade it
+    assert row.applied_revision is None
+
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert head in migrated
+    assert branch  # the specimen really owns a branch
+
+
+async def test_a_claim_is_corrected_down_to_the_revision_that_ran(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """Half a branch applied is not the same as none of it.
+
+    Cleared to ``None``, the catch-up would replay the branch from its
+    base onto tables that already exist and every ``CREATE TABLE`` would
+    raise. The correction goes to the newest revision
+    ``alembic_version`` really lists, so Alembic resumes from there.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    monkeypatch.setattr(processor_mod, "_alembic_cmd", lambda args: args[-1])
+
+    module = module_registry.get(UNLABELLED)
+    head = resolve_module_branch_head(module)
+    revisions = module_branch_revisions(module)
+    assert len(revisions) > 1, "specimen must own more than one revision"
+    partway = revisions[1]  # the head's parent on the branch
+
+    async def ran_partway(db) -> set[str]:
+        return {"0001", partway}
+
+    monkeypatch.setattr(service_mod, "applied_revisions", ran_partway)
+
+    db_session.add(_record(UNLABELLED, ModuleState.INSTALLED, head))
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.applied_revision == partway
+
+
+async def test_a_truthful_claim_is_left_alone(db_session: AsyncSession, monkeypatch) -> None:
+    """The correction must not touch a record that is right.
+
+    A branch at head that ``alembic_version`` confirms stays recorded,
+    and the catch-up still runs no Alembic for it.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    head = resolve_module_branch_head(module_registry.get(UNLABELLED))
+
+    async def ran_the_branch(db) -> set[str]:
+        return {"0001", head}
+
+    monkeypatch.setattr(service_mod, "applied_revisions", ran_the_branch)
+
+    db_session.add(_record(UNLABELLED, ModuleState.INSTALLED, head))
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.applied_revision == head
+
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert head not in migrated
+
+
+async def test_a_revision_below_an_applied_head_is_not_corrected(
+    db_session: AsyncSession, monkeypatch
+) -> None:
+    """``alembic_version`` holds heads, so membership is the wrong question.
+
+    A revision another module's chain descends from has run and is still
+    absent from the table: ``pt_0001`` is, because ``bil_0001`` hangs off
+    it. Read as "never ran", reconcile corrected the claim, the catch-up
+    re-applied the branch — Alembic no-ops, since it really is applied —
+    and the next boot did it all again. In this dev database that cost
+    ~100 s of startup per restart, which is what made a ``GET`` on the
+    settings screen answer in 11.3 s: the request was waiting on a boot.
+
+    So the comparison is against the graph *below* the applied heads.
+    """
+    from app.core.plugins import service as service_mod
+    from app.core.plugins.service import ModuleService
+
+    migrated: list[str] = []
+    monkeypatch.setattr(
+        processor_mod, "_alembic_cmd", lambda args: migrated.append(args[-1]) or args[-1]
+    )
+
+    module = module_registry.get(UNLABELLED)
+    head = resolve_module_branch_head(module)
+    revisions = module_branch_revisions(module)
+    assert len(revisions) > 1
+    below = revisions[1]  # ran, and the head descends from it
+
+    async def only_the_head_is_stored(db) -> set[str]:
+        return {head}
+
+    monkeypatch.setattr(service_mod, "applied_revisions", only_the_head_is_stored)
+
+    db_session.add(_record(UNLABELLED, ModuleState.INSTALLED, below))
+    await db_session.commit()
+
+    await ModuleService(db_session).reconcile_with_db()
+
+    row = (
+        await db_session.execute(select(ModuleRecord).where(ModuleRecord.name == UNLABELLED))
+    ).scalar_one()
+    await db_session.refresh(row)
+    assert row.applied_revision == below  # left alone: it really ran
+
+    # It is still behind the head, so the catch-up does its normal work.
+    assert await PendingProcessor(async_session_maker)._migrate_installed() == set()
+    assert head in migrated
+
+
+def test_the_graph_below_a_head_includes_its_ancestors() -> None:
+    """The closure, read off the real graph rather than a fixture."""
+    from app.core.plugins.alembic_paths import revisions_at_or_below
+
+    module = module_registry.get(UNLABELLED)
+    revisions = module_branch_revisions(module)
+    head, below = revisions[0], revisions[1]
+
+    closure = revisions_at_or_below({head})
+
+    assert head in closure
+    assert below in closure
+    assert revisions_at_or_below({"no_such_revision"}) == set()

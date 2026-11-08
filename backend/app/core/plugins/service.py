@@ -17,7 +17,11 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .alembic_paths import resolve_module_branch_head
+from .alembic_paths import (
+    module_branch_revisions,
+    resolve_module_branch_head,
+    revisions_at_or_below,
+)
 from .apps import modules_disabled_by_app
 from .base import BaseModule
 from .db_models import ModuleOperationLog, ModuleRecord
@@ -70,6 +74,22 @@ async def applied_revisions(db: AsyncSession) -> set[str] | None:
         # a no-op when the branch had in fact run.
         logger.exception("Could not read alembic_version; assuming no branch is applied")
         return set()
+
+
+def _with_ancestors(heads: set[str] | None) -> set[str] | None:
+    """``heads`` plus every revision below them — what really ran.
+
+    ``applied_revisions`` reads ``alembic_version``, which holds heads
+    only, so on its own it under-reports: a revision another module's
+    chain descends from has run and is not listed. Read as "never ran",
+    it sends the catch-up to re-apply a branch on every boot — 100 s of
+    startup each time, and a warning that names a problem there is none
+    of. ``None`` (no ``alembic_version`` at all) is passed through: it
+    already means "every branch counts as run".
+    """
+    if heads is None:
+        return None
+    return heads | revisions_at_or_below(heads)
 
 
 def _ran(branch_head: str | None, applied: set[str] | None) -> bool:
@@ -250,7 +270,7 @@ class ModuleService:
         now = datetime.now(UTC)
         # What Alembic actually ran, so a branch is never recorded as
         # applied on the strength of being on disk.
-        on_disk_applied = await applied_revisions(self.db)
+        on_disk_applied = _with_ancestors(await applied_revisions(self.db))
 
         for module in discovered:
             try:
@@ -366,6 +386,48 @@ class ModuleService:
                 record.base_revision = branch_head
                 if record.applied_revision is None and _ran(branch_head, on_disk_applied):
                     record.applied_revision = branch_head
+
+            # And heal a claim already written. The guard above only
+            # stops new ones: a record that *already* claims a revision
+            # this database never ran keeps the catch-up away forever,
+            # because ``_migrate_installed`` skips any branch whose
+            # recorded revision equals the head. That is why
+            # ``reports_summary_schedule`` stayed missing in production
+            # even after the backfill was fixed — the false claim was on
+            # the row, and nothing looked at it again.
+            #
+            # The correction goes down to the newest revision of the
+            # module's own branch that ``alembic_version`` really lists
+            # (``None`` when it lists none), so the catch-up resumes from
+            # where the database actually is instead of replaying a
+            # revision that already ran.
+            #
+            # Only when ``alembic_version`` exists: without it the schema
+            # came from the models and every branch counts as run (see
+            # :func:`applied_revisions`). And the comparison is against
+            # the graph below the applied heads, never the stored heads
+            # alone — see :func:`_with_ancestors`. And only for a module that owns
+            # a branch — a legacy main-linear module's revisions are not
+            # in its own directory, so the list would be empty and the
+            # claim would be cleared for nothing.
+            if (
+                on_disk_applied is not None
+                and branch_head is not None
+                and record.applied_revision is not None
+                and record.applied_revision not in on_disk_applied
+            ):
+                truthful = next(
+                    (rev for rev in module_branch_revisions(module) if rev in on_disk_applied),
+                    None,
+                )
+                logger.warning(
+                    "Reconciled: %s claimed revision %s, which alembic_version does not "
+                    "list; correcting to %s so the catch-up can apply the branch",
+                    manifest.name,
+                    record.applied_revision,
+                    truthful,
+                )
+                record.applied_revision = truthful
 
         await self.db.commit()
 

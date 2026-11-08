@@ -31,6 +31,10 @@ export interface LiquidationLine {
   performed_at: string
   earned: string
   collected: string
+  catalog_item_id?: string | null
+  /** Null when nothing was agreed for it, and on older settlements. */
+  percent?: string | null
+  share?: string | null
 }
 
 export interface LiquidationPreview {
@@ -50,11 +54,13 @@ export interface LiquidationPreview {
   missing_commission: boolean
   /** Set when this exact period already carries an issued settlement. */
   issued_id: string | null
+  /** `commissions`: per-treatment rates set on the professional's card. */
+  rates_source: 'commissions' | 'liquidations'
 }
 
 export type PayoutMethod = 'cash' | 'transfer' | 'other'
 
-export interface Liquidation extends Omit<LiquidationPreview, 'missing_commission' | 'issued_id'> {
+export interface Liquidation extends Omit<LiquidationPreview, 'missing_commission' | 'issued_id' | 'rates_source'> {
   id: string
   notes: string | null
   issued_at: string

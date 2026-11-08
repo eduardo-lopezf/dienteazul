@@ -1,0 +1,100 @@
+{
+  "satCfdi": {
+    "settings": {
+      "title": "SAT — facturación electrónica",
+      "description": "Datos de la clínica como emisor de CFDI y su certificado de sello digital (CSD).",
+      "formTitle": "Datos para el SAT",
+      "taxRegime": "Régimen fiscal",
+      "taxRegimeHint": "El de la constancia de situación fiscal de la clínica.",
+      "taxRegimePlaceholder": "Elige el régimen",
+      "postalCode": "Código postal de expedición",
+      "postalCodeHint": "El del domicilio desde el que se emiten las facturas.",
+      "postalCodeInvalid": "Tiene que tener 5 dígitos.",
+      "productCode": "Clave de producto o servicio",
+      "productCodeHint": "La clave del catálogo c_ClaveProdServ del SAT que va en cada concepto. Confírmala con tu contador.",
+      "productCodeInvalid": "Tiene que tener 8 dígitos.",
+      "unitCode": "Clave de unidad",
+      "unitCodeHint": "Del catálogo c_ClaveUnidad. E48 es «Unidad de servicio».",
+      "unitCodeInvalid": "De 2 a 3 letras o números en mayúsculas.",
+      "stampDelay": "Minutos antes de timbrar",
+      "stampDelayHint": "Da tiempo a registrar el cobro: si la factura está pagada al timbrar va como PUE; si no, como PPD. El SAT da 24 horas.",
+      "stampDelayInvalid": "Entre 0 y 720 minutos.",
+      "environment": {
+        "label": "Entorno",
+        "sandbox": "Pruebas",
+        "sandboxHint": "Se timbra contra el servicio de pruebas del PAC; nada llega al SAT.",
+        "production": "Producción",
+        "productionHint": "Los CFDI se timbran de verdad y quedan registrados en el SAT."
+      },
+      "save": "Guardar",
+      "saved": "Datos del SAT guardados"
+    },
+    "status": {
+      "ready": "La clínica puede facturar ante el SAT",
+      "notReady": "La clínica todavía no puede facturar ante el SAT",
+      "sandbox": "Entorno de pruebas: los CFDI no llegan al SAT.",
+      "production": "Entorno de producción: los CFDI quedan registrados en el SAT."
+    },
+    "issuer": {
+      "title": "Emisor",
+      "rfc": "RFC",
+      "legalName": "Razón social",
+      "hint": "Son los de la clínica, tal como aparecen en su constancia de situación fiscal.",
+      "edit": "Editar en Información de la Clínica"
+    },
+    "facturama": {
+      "title": "Cuenta de Facturama",
+      "intro": "Facturama es el PAC que sella y timbra los CFDI. Cada clínica usa su propia cuenta, una para pruebas y otra para producción.",
+      "user": "Usuario",
+      "password": "Contraseña",
+      "passwordKept": "Hay una guardada. Déjala vacía para conservarla.",
+      "configured": "Configurada",
+      "notConfigured": "Sin configurar",
+      "save": "Guardar cuenta",
+      "saved": "Cuenta de Facturama guardada",
+      "encryptionNote": "La contraseña se guarda cifrada y nunca se muestra."
+    },
+    "certificate": {
+      "title": "Certificado de sello digital (CSD)",
+      "none": "Todavía no hay CSD. Sin él no se puede facturar.",
+      "upload": "Subir el CSD",
+      "replace": "Sustituir el CSD",
+      "cer": "Certificado (.cer)",
+      "key": "Llave privada (.key)",
+      "pickCer": "Elegir archivo .cer",
+      "pickKey": "Elegir archivo .key",
+      "password": "Contraseña de la llave privada",
+      "passwordHint": "La que pusiste al generar el CSD en el SAT, no la de la e.firma.",
+      "togglePassword": "Mostrar u ocultar la contraseña",
+      "submit": "Guardar CSD",
+      "uploaded": "CSD guardado",
+      "uploadFailed": "No se pudo guardar el CSD",
+      "encryptionNote": "La llave privada y su contraseña se guardan cifradas y nunca se muestran. Al guardar, el CSD se registra en Facturama, que sella con él los CFDI.",
+      "number": "Número de certificado",
+      "validFrom": "Válido desde",
+      "validUntil": "Válido hasta",
+      "expired": "Caducado",
+      "expiresIn": "Caduca en {days} días",
+      "validFor": "Vigente · {days} días",
+      "registeredIn": "Registrado en Facturama · {environment}",
+      "notRegisteredIn": "Sin registrar en Facturama · {environment}",
+      "lastAttempt": "Último intento: {error}",
+      "register": "Registrar en Facturama",
+      "registered": "CSD registrado en Facturama",
+      "registerFailed": "No se pudo registrar el CSD en Facturama"
+    },
+    "receiver": {
+      "title": "Datos fiscales para el SAT",
+      "add": "Añadir",
+      "noRfc": "El paciente no tiene RFC de facturación. Añádelo en sus datos de facturación (pestaña Info) para poder facturarle con su nombre.",
+      "public": "El RFC de facturación es el de público en general (XAXX010101000): no necesita datos fiscales.",
+      "taxRegime": "Régimen fiscal",
+      "taxZipCode": "Código postal fiscal",
+      "taxZipCodeHint": "El de su constancia de situación fiscal.",
+      "cfdiUse": "Uso del CFDI",
+      "missing": "Faltan los datos fiscales de {rfc}",
+      "missingHint": "Sin régimen fiscal, código postal fiscal y uso del CFDI no se le puede emitir una factura. Se guardan por RFC: sirven para todas sus facturas.",
+      "saved": "Datos fiscales guardados"
+    }
+  }
+}

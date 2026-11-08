@@ -296,6 +296,9 @@ class TestCoverage:
         "calendar_feed",
         "cashbox",
         "catalog",
+        # The percentages agreed with each professional, per catalogue
+        # treatment. No patient column anywhere.
+        "commissions",
         # Settlements with professionals. No patient column; `lines` is a
         # frozen per-treatment snapshot (treatment id, session label,
         # amounts) of what an associate was paid on. The patient's side of
@@ -360,6 +363,11 @@ class TestCoverage:
             "performed_at",
             "earned",
             "collected",
+            # The treatment's catalogue item and what it was paid at — the
+            # work, not the patient.
+            "catalog_item_id",
+            "percent",
+            "share",
         }
 
     def test_silence_list_has_no_stale_entries(self) -> None:

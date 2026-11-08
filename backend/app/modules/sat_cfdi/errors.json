@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {"code": "sat_cfdi.certificate.unreadable", "category": "validation", "status_code": 400, "message": "The .cer file is not a certificate", "description": "The uploaded certificate is not an X.509 certificate in DER, the format the SAT issues."},
+    {"code": "sat_cfdi.certificate.not_csd", "category": "validation", "status_code": 400, "message": "The certificate is not a SAT CSD", "description": "The certificate carries no 20-digit certificate number or no RFC."},
+    {"code": "sat_cfdi.certificate.key_invalid", "category": "validation", "status_code": 400, "message": "The password does not open the .key file", "description": "The private key is not PKCS#8 DER, or the password is wrong."},
+    {"code": "sat_cfdi.certificate.key_mismatch", "category": "validation", "status_code": 400, "message": "The .key file does not belong to the certificate", "description": "The private key's public half is not the certificate's."},
+    {"code": "sat_cfdi.certificate.not_valid_now", "category": "validation", "status_code": 400, "message": "The CSD is not valid today", "description": "The certificate has expired or is not valid yet."},
+    {"code": "sat_cfdi.certificate.missing", "category": "not_found", "status_code": 404, "message": "The clinic has no CSD", "description": "There is no active CSD to register with the PAC."},
+    {"code": "sat_cfdi.certificate.pac_refused", "category": "validation", "status_code": 422, "message": "Facturama refused the CSD", "description": "The PAC did not accept the certificate, the key or the deployment's credentials; the detail says why."},
+    {"code": "sat_cfdi.pac.unavailable", "category": "dependency", "status_code": 503, "message": "Facturama is not available", "description": "The PAC did not answer, failed, or the deployment has no credentials for it. Try again later."},
+    {"code": "sat_cfdi.receiver.rfc_invalid", "category": "validation", "status_code": 422, "message": "Not an RFC", "description": "The receiver's RFC in the path does not have the shape of an RFC."},
+    {"code": "sat_cfdi.certificate.rfc_mismatch", "category": "validation", "status_code": 422, "message": "The CSD belongs to another RFC", "description": "The certificate's RFC is not the clinic's tax ID."}
+  ]
+}

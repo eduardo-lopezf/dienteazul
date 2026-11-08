@@ -71,7 +71,17 @@ export interface AppInfo {
   modules: string[]
   requires: string[]
   integrates: string[]
+  /** Its modules each clinic switches on by hand, off until then (ADR 0066). */
+  optional_modules: AppOptionalModule[]
   apis: AppApi[]
+}
+
+export interface AppOptionalModule {
+  name: string
+  /** Switched on for the caller's clinic. */
+  enabled: boolean
+  /** The clinic's account tier may switch it on. */
+  available: boolean
 }
 
 export interface ModuleStatus {

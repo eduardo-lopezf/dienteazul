@@ -307,8 +307,16 @@ async function submitIssue() {
             {{ preview.percent }} %
             <span class="basis-chip">{{ t(`liquidations.basis.${preview.basis}`) }}</span>
           </dd>
+          <!-- With `commissions` installed each treatment may carry its own
+               percentage, set on the professional's card. -->
           <dd
-            v-if="canSetCommission"
+            v-if="preview.rates_source === 'commissions'"
+            class="hint"
+          >
+            {{ t('liquidations.commission.perTreatment') }}
+          </dd>
+          <dd
+            v-else-if="canSetCommission"
             class="hint"
           >
             <UButton
@@ -342,6 +350,10 @@ async function submitIssue() {
         >
           <span class="line-day">{{ day(line.performed_at.slice(0, 10)) }}</span>
           <span class="min-w-0 flex-1 line-what">{{ line.description || '—' }}</span>
+          <span
+            v-if="preview.rates_source === 'commissions'"
+            class="line-percent"
+          >{{ line.percent != null ? `${line.percent} %` : '—' }}</span>
           <span class="line-amount">{{ money(line.earned) }}</span>
           <span
             class="line-amount line-collected"

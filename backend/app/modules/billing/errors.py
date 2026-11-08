@@ -74,6 +74,10 @@ def workflow_error(error: Exception, *, operation: str) -> AppError:
         code = "billing.invoice.issue_status_invalid"
     elif message.startswith("Cannot void invoice from status "):
         code = "billing.invoice.void_status_invalid"
+    elif message.startswith("Cannot cancel invoice from status "):
+        code = "billing.invoice.cancel_status_invalid"
+    elif message.startswith("Cancellation refused: "):
+        code = "billing.invoice.cancel_refused"
     elif message.startswith("Cannot create credit note for invoice with status "):
         code = "billing.credit_note.status_invalid"
     elif "Field '" in message and message.endswith("' is required"):

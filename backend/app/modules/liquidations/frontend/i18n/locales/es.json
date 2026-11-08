@@ -33,6 +33,7 @@
       "edit": "Cambiar el acuerdo",
       "missing": "No hay acuerdo registrado con este profesional",
       "missingWhy": "Las cifras de trabajo son reales; el porcentaje es cero hasta que alguien lo diga. Regístralo antes de liquidar.",
+      "perTreatment": "Por tratamiento: se configura en Profesionales → Comisiones",
       "saveFailed": "No se pudo guardar el acuerdo"
     },
     "pay": {

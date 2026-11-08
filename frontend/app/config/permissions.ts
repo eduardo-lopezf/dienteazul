@@ -160,6 +160,10 @@ export const PERMISSIONS = {
     // How the clinic lays its record out. Admin only.
     configure: 'record.configure'
   },
+  commissions: {
+    agreementRead: 'commissions.agreement.read',
+    agreementWrite: 'commissions.agreement.write'
+  },
   liquidations: {
     settlementRead: 'liquidations.settlement.read',
     settlementIssue: 'liquidations.settlement.issue',
@@ -171,6 +175,12 @@ export const PERMISSIONS = {
     closingRead: 'cashbox.closing.read',
     closingWrite: 'cashbox.closing.write',
     closingReopen: 'cashbox.closing.reopen'
+  },
+  satCfdi: {
+    cfdiRead: 'sat_cfdi.cfdi.read',
+    receiverWrite: 'sat_cfdi.receiver.write',
+    settingsRead: 'sat_cfdi.settings.read',
+    settingsConfigure: 'sat_cfdi.settings.configure'
   },
   verifactu: {
     settingsRead: 'verifactu.settings.read',

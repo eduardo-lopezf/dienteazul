@@ -29,6 +29,11 @@ class EventType:
     # `professionals`, which gives the holder of an individual practice
     # their profile. Payload: {clinic_id, account_tier, previous_tier}.
     CLINIC_ACCOUNT_TIER_CHANGED = "clinic.account_tier_changed"
+    # A clinic's administrator switched on an optional module of an App
+    # (``POST /api/v1/apps/{app}/modules/{module}/enable``, ADR 0066).
+    # Consumed by `commissions`, which adopts the clinic's liquidation
+    # percentages. Payload: {clinic_id, module}.
+    CLINIC_MODULE_ENABLED = "clinic.module_enabled"
 
     # Specialty packs (catalog). A clinic switched a discipline on or off,
     # or put its reference catalogue back. Consumed by `treatment_plan`,

@@ -44,6 +44,13 @@
       "description": "A commission arrangement must exist before issuing a settlement."
     },
     {
+      "code": "liquidations.commission.managed_by_commissions",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Percentages are set per professional in Commissions, on the professional's card.",
+      "description": "With the commissions module installed it is the one source of percentages; this module's own setting is not used."
+    },
+    {
       "code": "liquidations.settlement.already_paid",
       "category": "conflict",
       "status_code": 422,

@@ -71,6 +71,21 @@ class ApiDefinition:
     status: ApiStatus
 
 
+@dataclass(frozen=True, slots=True)
+class OptionalModule:
+    """A module of an App that each clinic switches on by hand (ADR 0066).
+
+    Off for every clinic until its administrator turns it on from the
+    App's settings, and only clinics of an account tier in ``tiers`` may.
+    Nothing is mounted or unmounted: the module runs for the deployment
+    and is outside a clinic that has it off, as a module of an App the
+    clinic does not have is (:func:`modules_outside`).
+    """
+
+    name: str
+    tiers: tuple[str, ...]
+
+
 class AppCatalogError(ValueError):
     """``apps.json`` is malformed."""
 
@@ -91,6 +106,8 @@ class AppDefinition:
     #: Off when any of them is off — the exception to "dependents keep
     #: running", declared App by App (ADR 0053).
     requires_apps: tuple[str, ...] = ()
+    #: Its modules a clinic switches on by hand (``optional_modules``).
+    optional_modules: tuple[OptionalModule, ...] = ()
     #: The required App whose being off switched this one off. None when
     #: the file itself says ``disabled``, or when the App runs.
     held_back_by: str | None = None
@@ -133,6 +150,10 @@ def read_app_catalog() -> tuple[AppDefinition, ...]:
                 tier=AppTier(entry.get("tier", AppTier.OPTIONAL)),
                 core_for_tiers=tuple(entry.get("core_for_tiers", ())),
                 requires_apps=tuple(entry.get("requires_apps", ())),
+                optional_modules=tuple(
+                    OptionalModule(name=item["name"], tiers=tuple(item["tiers"]))
+                    for item in entry.get("optional_modules", ())
+                ),
                 apis=tuple(
                     ApiDefinition(name=api["name"], status=ApiStatus(api["status"]))
                     for api in entry.get("apis", ())
@@ -149,6 +170,14 @@ def read_app_catalog() -> tuple[AppDefinition, ...]:
             raise AppCatalogError(f"{APPS_FILE.name} declares more than one base App")
         if app.tier is not AppTier.BASE and not app.modules:
             raise AppCatalogError(f"App '{app.name}' groups no modules in {APPS_FILE.name}")
+        if stray := [m.name for m in app.optional_modules if m.name not in app.modules]:
+            raise AppCatalogError(
+                f"App '{app.name}' lists optional modules it does not group: {stray}"
+            )
+        if any(not m.tiers for m in app.optional_modules):
+            raise AppCatalogError(
+                f"App '{app.name}' has an optional module no account tier may switch on"
+            )
         api_names = [api.name for api in app.apis]
         if len(api_names) != len(set(api_names)):
             raise AppCatalogError(f"App '{app.name}' lists an API twice in {APPS_FILE.name}")
@@ -290,18 +319,42 @@ def clinic_apps(apps: list[str] | None, account_tier: str | None) -> list[str] |
     return [*apps, *(name for name in mandatory if name not in apps)]
 
 
-def modules_outside(apps: list[str] | None, account_tier: str | None = None) -> frozenset[str]:
-    """Modules a clinic does not have, given the Apps chosen for it.
+def optional_modules_on(switched_on: list[str] | None, account_tier: str | None) -> frozenset[str]:
+    """The optional modules (ADR 0066) a clinic has switched on and may have.
 
-    ``None`` — nobody chose for the clinic — means it has every App, so
-    nothing is outside. Otherwise it is every module of every App that is
-    not on the list nor mandatory for ``account_tier``
-    (:func:`clinic_apps`). What the deployment itself has switched off is
-    a separate matter (:func:`modules_disabled_by_app`).
+    One on its list whose App no longer allows the clinic's tier counts as
+    off: the switch is kept, and takes effect again if the tier comes back.
+    """
+    on = set(switched_on or ())
+    return frozenset(
+        item.name
+        for app in load_app_catalog()
+        for item in app.optional_modules
+        if item.name in on and account_tier in item.tiers
+    )
+
+
+def modules_outside(
+    apps: list[str] | None,
+    account_tier: str | None = None,
+    switched_on: list[str] | None = None,
+) -> frozenset[str]:
+    """Modules a clinic does not have.
+
+    Every module of every App that is not on ``apps`` nor mandatory for
+    ``account_tier`` (:func:`clinic_apps`) — ``None`` meaning every App —
+    plus the optional modules (ADR 0066) the clinic has not switched on
+    (``switched_on``, ``Clinic.modules``). What the deployment itself has
+    switched off is a separate matter (:func:`modules_disabled_by_app`).
     """
     has = clinic_apps(apps, account_tier)
+    on = optional_modules_on(switched_on, account_tier)
+    catalog = load_app_catalog()
+    off = frozenset(
+        item.name for app in catalog for item in app.optional_modules if item.name not in on
+    )
     if has is None:
-        return frozenset()
-    return frozenset(
-        module for app in load_app_catalog() if app.name not in has for module in app.modules
+        return off
+    return off | frozenset(
+        module for app in catalog if app.name not in has for module in app.modules
     )

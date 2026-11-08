@@ -245,7 +245,7 @@ async def get_clinic_context(
 
     segments = request.url.path.split("/")
     if len(segments) > 3 and segments[3] in modules_outside(
-        membership.clinic.apps, membership.clinic.account_tier
+        membership.clinic.apps, membership.clinic.account_tier, membership.clinic.modules
     ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 

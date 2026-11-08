@@ -114,7 +114,7 @@ class TestAudit:
         assert "openai" not in {f.declaration.target for f in findings}
 
     def test_nothing_to_report_when_all_declared(self) -> None:
-        assert audit_egress(self._policy("openai", "kapso", "aeat", "smtp")) == []
+        assert audit_egress(self._policy("openai", "kapso", "aeat", "smtp", "facturama")) == []
 
     def test_findings_carrying_personal_data_are_flagged_as_leaks(self) -> None:
         # A boot log full of equal-looking lines hides the one that
@@ -133,7 +133,7 @@ class TestAudit:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         with caplog.at_level(logging.WARNING, logger="app.core.privacy.egress"):
-            log_egress_audit(self._policy("openai", "kapso", "aeat", "smtp"))
+            log_egress_audit(self._policy("openai", "kapso", "aeat", "smtp", "facturama"))
         assert "does not permit" not in caplog.text
 
 
@@ -189,14 +189,14 @@ class TestRealModulesDeclare:
         client = Path(modules_pkg.__file__).parent / "whatsapp_kapso" / "client.py"
         assert self._CLIENTS.search(client.read_text(encoding="utf-8"))
 
-    def test_the_four_known_destinations_are_declared(self) -> None:
+    def test_the_known_destinations_are_declared(self) -> None:
         discover_and_register()
         declared = {
             entry.target
             for module in module_registry.list_discovered()
             for entry in module.get_manifest().egress
         }
-        assert declared == {"openai", "kapso", "aeat", "smtp"}
+        assert declared == {"openai", "kapso", "aeat", "smtp", "facturama"}
 
     def test_every_declaration_names_a_real_subprocessor(self) -> None:
         # The register goes into a processing agreement, so "OpenAI" is

@@ -654,7 +654,7 @@ async def get_me(
         # Not those of Apps the clinic does not have: the app hides by
         # permission, and a button for a route that answers 404 helps nobody.
         clinic = memberships[0].clinic
-        outside = modules_outside(clinic.apps, clinic.account_tier)
+        outside = modules_outside(clinic.apps, clinic.account_tier, clinic.modules)
         permissions = [p for p in permissions if p.split(".", 1)[0] not in outside]
 
     return ApiResponse(

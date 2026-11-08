@@ -33,6 +33,7 @@
       "edit": "Change the arrangement",
       "missing": "No arrangement recorded with this professional",
       "missingWhy": "The work figures are real; the percentage is zero until somebody says otherwise. Record it before settling.",
+      "perTreatment": "Per treatment: set in Professionals → Commissions",
       "saveFailed": "Could not save the arrangement"
     },
     "pay": {

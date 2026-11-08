@@ -1,0 +1,28 @@
+{
+  "commissions": {
+    "action": "Commissions",
+    "title": "{name}'s commissions",
+    "description": "The percentage they earn on each consultation or treatment they perform.",
+    "defaultPercent": "General percentage",
+    "defaultPercentHint": "Applies to every treatment without a percentage of its own.",
+    "none": "Not agreed",
+    "basisLabel": "Calculated on",
+    "basisHint": "On collected, the clinic never pays out money it has not received.",
+    "basis": {
+      "collected": "Collected",
+      "earned": "Performed"
+    },
+    "exceptions": "Percentages by treatment",
+    "exceptionsHint": "For the treatments or consultations paid differently from the general percentage.",
+    "addTreatment": "Add treatment…",
+    "percentFor": "Percentage for {treatment}",
+    "remove": "Remove {treatment}",
+    "unnamedTreatment": "Treatment unavailable",
+    "noCatalogue": "The treatment catalogue is unavailable: per-treatment percentages cannot be added.",
+    "notes": "Agreement notes",
+    "frozenNote": "You can change it whenever needed: settlements already issued keep the percentage they were made with.",
+    "saved": "Commissions saved",
+    "saveFailed": "Could not save the commissions",
+    "loadFailed": "Could not load the commissions"
+  }
+}

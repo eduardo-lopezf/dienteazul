@@ -2,7 +2,7 @@
  * Admin-only composable for the module lifecycle API.
  *
  * Distinct from `useModules` (backend-driven nav for the sidebar). This
- * one powers the read-only Settings pages over the App catalog —
+ * one powers the Settings pages over the App catalog —
  * /settings/apps (the list, its status, the doctor report and each app's
  * operation log), /settings/widgets and /settings/apis.
  */
@@ -81,6 +81,18 @@ export function useModuleAdmin() {
     return resp.data.also_enabled
   }
 
+  /**
+   * Switch an optional module of an App on or off for the clinic
+   * (ADR 0066). Like an App, it takes effect at once, so the menu, the
+   * slots and the permissions are read again.
+   */
+  async function setOptionalModule(app: string, module: string, on: boolean): Promise<void> {
+    await api.post<ApiResponse<{ name: string, enabled: boolean }>>(
+      `/api/v1/apps/${encodeURIComponent(app)}/modules/${encodeURIComponent(module)}/${on ? 'enable' : 'disable'}`
+    )
+    await Promise.all([refreshApps(), activeModules.ensureLoaded(true), auth.fetchUser()])
+  }
+
   function appTitle(name: string): string {
     const key = `settings.apps.catalog.${name}.title`
     return te(key) ? t(key) : name
@@ -103,6 +115,7 @@ export function useModuleAdmin() {
     refresh,
     refreshApps,
     enableApp,
+    setOptionalModule,
     appTitle,
     operations
   }

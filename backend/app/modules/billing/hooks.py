@@ -10,13 +10,14 @@ Country modules register themselves via the BillingHookRegistry.
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from app.core.auth.models import Clinic
 
-    from .models import Invoice
+    from .models import Invoice, InvoicePayment
 
 
 class BillingComplianceHook(ABC):
@@ -59,6 +60,17 @@ class BillingComplianceHook(ABC):
     def name(self) -> str:
         """Human-readable name for this compliance module."""
         return f"Compliance module for {self.country_code}"
+
+    @property
+    def module_name(self) -> str | None:
+        """The module that owns this hook.
+
+        A module registers its hook when it is discovered, which happens
+        whether or not it is installed; the registry hands the hook out
+        only while this module is live (ADR 0018, 0035, 0038). ``None``
+        means always — for hooks no module owns, as in tests.
+        """
+        return None
 
     async def validate_before_issue(
         self, invoice: "Invoice", db: AsyncSession
@@ -127,26 +139,17 @@ class BillingComplianceHook(ABC):
             - Patient balance = sum of all invoice balances
 
         COUNTRY-SPECIFIC OVERRIDES:
-            Some countries require different behavior. Override this hook to:
-
-            1. Cancel the original invoice (Mexico/SAT, Argentina/AFIP):
-               ```python
-               original_invoice.status = "cancelled"
-               ```
-
-            2. Submit to tax authority (TicketBAI, Verifactu, SAT):
-               ```python
-               return {"tax_id": "...", "qr_code": "..."}
-               ```
-
-            3. Link documents in external system:
-               ```python
-               return {"linked_to": original_invoice.invoice_number}
-               ```
+            Override this hook to record what the tax authority needs about
+            the credit note — an egreso CFDI for the SAT, a rectificativa for
+            Verifactu — and return it as compliance data. Never call the
+            authority here: write the pending record and let a scheduled job
+            send it after commit (ADR 0067). Never set the original
+            invoice's status either; cancelling it goes through billing's
+            cancel endpoint (:meth:`on_invoice_cancelled`).
 
         Args:
             credit_note: The newly issued credit note (negative amounts)
-            original_invoice: The invoice being rectified (can be modified if needed)
+            original_invoice: The invoice being rectified
             db: Database session (for any additional queries/updates)
 
         Returns:
@@ -155,37 +158,84 @@ class BillingComplianceHook(ABC):
         Example (Mexico SAT):
             ```python
             async def on_credit_note_issued(self, credit_note, original_invoice, db):
-                # Mexico requires cancelling the original CFDI
-                original_invoice.status = "cancelled"
-
-                # Submit to SAT and get response
-                sat_response = await self.sat_client.emit_egreso(
-                    credit_note, original_invoice
-                )
-                return {
-                    "cfdi_uuid": sat_response.uuid,
-                    "related_cfdi": original_invoice.compliance_data.get("cfdi_uuid"),
-                }
+                cfdi = await queue_egreso(db, credit_note, related=original_invoice)
+                return {"MX": {"cfdi_id": str(cfdi.id), "state": "pending"}}
             ```
         """
         return {}  # Default: no compliance data, no status changes
 
     async def on_payment_recorded(
-        self, invoice: "Invoice", payment_amount: float, db: AsyncSession
+        self, invoice: "Invoice", link: "InvoicePayment", db: AsyncSession
     ) -> dict[str, Any]:
-        """Hook called after payment is recorded.
+        """Hook called after a payment is applied to an issued invoice.
 
-        Some countries require reporting payments.
+        Called in the same transaction, once the ``InvoicePayment`` is
+        flushed and the invoice's status recomputed (``partial`` /
+        ``paid``). Mexico's SAT needs a payment complement for every
+        payment on a deferred (PPD) invoice. Like every hook it must not
+        call an outside service: write what will be sent and let a
+        scheduled job send it after commit (ADR 0067).
 
         Args:
-            invoice: Invoice receiving payment
-            payment_amount: Amount paid
+            invoice: Invoice receiving the payment
+            link: The new ``InvoicePayment``; its ``payment_id`` leads to the
+                payment's date and method
             db: Database session
 
         Returns:
             Dict of compliance data to merge into invoice.compliance_data
         """
         return {}  # Default: no compliance data
+
+    @property
+    def cancellation_needs_confirmation(self) -> bool:
+        """Whether an issued invoice stays ``issued`` until the authority
+        confirms its cancellation.
+
+        ``False`` (default): billing marks it ``cancelled`` right after
+        :meth:`on_invoice_cancelled`. ``True``: billing leaves it
+        ``issued`` and the module calls
+        ``InvoiceWorkflowService.mark_cancelled`` once the authority
+        answers — Mexico's SAT may wait for the receiver's acceptance.
+        """
+        return False
+
+    async def before_cancel(
+        self,
+        invoice: "Invoice",
+        reason: str,
+        substitute: "Invoice | None",
+        db: AsyncSession,
+    ) -> tuple[bool, str | None]:
+        """Validate a cancellation before anything changes.
+
+        ``reason`` is the code the user chose (for the SAT, ``01``–``04``);
+        ``substitute`` the invoice that replaces this one, when given.
+
+        Returns:
+            (is_valid, error_message), as :meth:`validate_before_issue`.
+        """
+        return True, None
+
+    async def on_invoice_cancelled(
+        self,
+        invoice: "Invoice",
+        reason: str,
+        substitute: "Invoice | None",
+        cancelled_by: UUID,
+        db: AsyncSession,
+    ) -> dict[str, Any]:
+        """Hook called when an issued invoice is cancelled.
+
+        Write the cancellation request; a scheduled job sends it after
+        commit (ADR 0067). See :attr:`cancellation_needs_confirmation` for
+        when the invoice becomes ``cancelled``; ``cancelled_by`` is who
+        asked, for the module to pass to ``mark_cancelled`` then.
+
+        Returns:
+            Dict of compliance data to merge into invoice.compliance_data
+        """
+        return {}
 
     def enhance_pdf_data(self, pdf_data: dict, invoice: "Invoice") -> dict:
         """Modify PDF data before generation.
@@ -312,6 +362,26 @@ class BillingHookRegistry:
         """
         cls._hooks.pop(country_code, None)
 
+    @staticmethod
+    def _live(
+        hook: BillingComplianceHook | None, clinic: "Clinic | None" = None
+    ) -> BillingComplianceHook | None:
+        """The hook, while its module is live — and, for a clinic, while
+        the clinic has it: an optional module it has not switched on
+        (ADR 0066), or one of an App it lacks, is outside it."""
+        if hook is None or hook.module_name is None:
+            return hook
+        from app.core.plugins.apps import modules_outside
+        from app.core.plugins.registry import module_registry
+
+        if not module_registry.is_installed(hook.module_name):
+            return None
+        if clinic is not None and hook.module_name in modules_outside(
+            clinic.apps, clinic.account_tier, clinic.modules
+        ):
+            return None
+        return hook
+
     @classmethod
     def get(cls, country_code: str) -> BillingComplianceHook | None:
         """Get hook by country code.
@@ -320,9 +390,10 @@ class BillingHookRegistry:
             country_code: ISO country code (ES, FR, etc.)
 
         Returns:
-            Hook instance or None if not registered
+            Hook instance, or None if none is registered or its module is
+            not live
         """
-        return cls._hooks.get(country_code)
+        return cls._live(cls._hooks.get(country_code))
 
     @classmethod
     def get_for_clinic(cls, clinic: "Clinic") -> BillingComplianceHook | None:
@@ -335,20 +406,21 @@ class BillingHookRegistry:
             clinic: Clinic entity with settings
 
         Returns:
-            Hook instance or None if no hook registered for clinic's country
+            Hook instance, or None if no hook is registered for the clinic's
+            country, its module is not live, or the clinic does not have it
         """
         settings = clinic.settings or {}
         country = settings.get("country", "")
-        return cls._hooks.get(country)
+        return cls._live(cls._hooks.get(country), clinic)
 
     @classmethod
     def get_all(cls) -> dict[str, BillingComplianceHook]:
-        """Get all registered hooks.
+        """Get all registered hooks whose module is live.
 
         Returns:
             Dict mapping country codes to hooks
         """
-        return cls._hooks.copy()
+        return {code: hook for code, hook in cls._hooks.items() if cls._live(hook)}
 
     @classmethod
     def is_registered(cls, country_code: str) -> bool:
@@ -358,9 +430,9 @@ class BillingHookRegistry:
             country_code: ISO country code
 
         Returns:
-            True if hook is registered
+            True if a hook is registered and its module is live
         """
-        return country_code in cls._hooks
+        return cls.get(country_code) is not None
 
     @classmethod
     def clear(cls) -> None:

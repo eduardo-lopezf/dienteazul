@@ -11,6 +11,7 @@ from app.core.plugins.registry import module_registry
 
 CommissionBasis = Literal["collected", "earned"]
 PaymentMethod = Literal["cash", "transfer", "other"]
+RatesSource = Literal["commissions", "liquidations"]
 
 
 class UserBrief(BaseModel):
@@ -80,6 +81,13 @@ class LiquidationLine(BaseModel):
     performed_at: datetime
     earned: Decimal
     collected: Decimal
+    #: The catalogue treatment, which is what a per-treatment rate keys on.
+    catalog_item_id: UUID | None = None
+    #: The percentage this line is paid at, and the share it comes to.
+    #: ``None`` when nothing was agreed for it — and on settlements issued
+    #: before lines carried their own percentage.
+    percent: Decimal | None = None
+    share: Decimal | None = None
 
     @property
     def pending(self) -> Decimal:
@@ -111,7 +119,12 @@ class LiquidationPreview(_HidesProfessional):
     lines: list[LiquidationLine]
     #: True when this professional has no arrangement recorded yet — the
     #: figures are the work, and the percentage is zero until somebody says.
+    #: Also true when some line's treatment has no percentage agreed.
     missing_commission: bool = False
+    #: Where the percentages come from: ``commissions`` (per treatment, set
+    #: on the professional's card) when that module runs, else this
+    #: module's single percentage per professional.
+    rates_source: RatesSource = "liquidations"
     #: Set when the period already carries an issued settlement.
     issued_id: UUID | None = None
 

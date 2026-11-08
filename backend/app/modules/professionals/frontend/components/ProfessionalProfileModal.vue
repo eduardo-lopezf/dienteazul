@@ -282,6 +282,11 @@ const tiles = computed(() => {
           >
             {{ t('actions.close', 'Cerrar') }}
           </UButton>
+          <!-- Other Apps' actions on this professional (ADR 0041). -->
+          <ModuleSlot
+            name="professional.profile.actions"
+            :ctx="{ professional }"
+          />
           <UButton
             v-if="canEdit"
             color="primary"

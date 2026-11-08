@@ -39,6 +39,9 @@ IMPORTS: dict[str, set[str]] = {
     "treatments": {"patients"},
     # Optional Apps, as they stand.
     "budgets_payments": {"patients", "treatments", "professionals", "reports"},
+    # Archived (disabled for every deployment): reaches billing and the
+    # catalog's VAT types, as it did inside Budgets and payments.
+    "verifactu": {"budgets_payments", "treatments"},
     "cash": {"budgets_payments", "professionals"},
     "communications": {"patients", "agenda", "treatments", "budgets_payments", "professionals"},
     "professionals": {"patients", "treatments"},
@@ -71,6 +74,8 @@ REQUIRES: dict[str, set[str]] = {
     # endpoint without depending on it — the known debt of
     # `test_module_isolation.KNOWN_VIOLATIONS`.
     "budgets_payments": set(),
+    # `verifactu` depends on `billing`; the catalog is an integration.
+    "verifactu": {"budgets_payments"},
     # `record` and `consents` integrate Professionals through
     # `ProfessionalDirectory` and require only the Patients App (media
     # included).

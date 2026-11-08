@@ -86,6 +86,11 @@ class Clinic(Base, TimestampMixin):
     # Apps the clinic does not have but may switch on itself, from
     # Settings → Apps. An App on neither list is not available to it.
     available_apps: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
+    # The optional modules of its Apps (``optional_modules`` in
+    # ``apps.json``) its administrator switched on, from the App's
+    # settings. One not listed is outside the clinic, as a module of an App
+    # it does not have is (ADR 0066).
+    modules: Mapped[list[str] | None] = mapped_column(JSONB, default=None)
     #: Its own limits, over its tier's (``tier_limits``): a key present
     #: (``extra_users``, ``storage_mb``) overrides that one, ``None`` in it
     #: being "no limit"; a key absent inherits. Set by the control plane.

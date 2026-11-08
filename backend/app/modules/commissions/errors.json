@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "errors": [
+    {
+      "code": "commissions.professional.not_found",
+      "category": "not_found",
+      "status_code": 404,
+      "message": "That professional is not in this clinic.",
+      "description": "A commission agreement requires a professional in the active clinic."
+    },
+    {
+      "code": "commissions.tier.unavailable",
+      "category": "conflict",
+      "status_code": 409,
+      "message": "Commissions are only available to clinics.",
+      "description": "An individual practice has no associates to pay a share to."
+    },
+    {
+      "code": "commissions.rate.duplicate",
+      "category": "validation",
+      "status_code": 422,
+      "message": "A treatment can only carry one percentage.",
+      "description": "The same catalogue treatment appears twice in the agreement."
+    },
+    {
+      "code": "commissions.treatment.not_found",
+      "category": "validation",
+      "status_code": 422,
+      "message": "That treatment is not in this clinic's catalogue.",
+      "description": "A treatment rate must name an active treatment of the clinic's catalogue."
+    },
+    {
+      "code": "commissions.apps.unavailable",
+      "category": "dependency",
+      "status_code": 422,
+      "message": "Treatment rates need the Treatments app.",
+      "description": "With the Treatments app off no new treatment rate can be added; existing ones are kept."
+    },
+    {
+      "code": "commissions.operation.invalid",
+      "category": "validation",
+      "status_code": 422,
+      "message": "Commission operation is invalid",
+      "description": "The requested commission operation failed domain validation."
+    }
+  ]
+}

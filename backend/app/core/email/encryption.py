@@ -1,4 +1,4 @@
-"""Password encryption utilities for SMTP settings.
+"""Encryption at rest for secrets: SMTP passwords, certificates and keys.
 
 Uses Fernet symmetric encryption derived from the application's SECRET_KEY.
 """
@@ -68,4 +68,25 @@ def decrypt_password(encrypted_password: str) -> str | None:
         return None
     except Exception as e:
         logger.error(f"Failed to decrypt password: {e}")
+        return None
+
+
+def encrypt_bytes(data: bytes) -> bytes:
+    """Encrypt binary data for storage — a certificate, a private key.
+
+    Same key as :func:`encrypt_password`.
+    """
+    if not data:
+        return b""
+    return _get_fernet().encrypt(data)
+
+
+def decrypt_bytes(token: bytes) -> bytes | None:
+    """Decrypt what :func:`encrypt_bytes` stored, or ``None`` if it cannot."""
+    if not token:
+        return None
+    try:
+        return _get_fernet().decrypt(token)
+    except InvalidToken:
+        logger.error("Failed to decrypt bytes: invalid token")
         return None

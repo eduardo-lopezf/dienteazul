@@ -23,6 +23,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core import contracts
+from app.core.contracts import CommissionRates, CommissionTerms
 from app.core.plugins.registry import module_registry
 from app.core.utils.clinic_time import clinic_date, clinic_day_window
 from app.modules.cashbox.models import CashMovement
@@ -68,6 +70,39 @@ def _require_calculation() -> None:
         raise LiquidationError(APPS_UNAVAILABLE)
 
 
+MANAGED_IN_COMMISSIONS = (
+    "Percentages are set per professional in Commissions, on the professional's card."
+)
+
+
+async def _rates_in_use(db: AsyncSession, clinic_id: UUID) -> CommissionRates | None:
+    """`commissions`' rates when it runs and the clinic has it switched on."""
+    rates = contracts.provider(CommissionRates)
+    if rates is None or not await rates.in_use(db, clinic_id):
+        return None
+    return rates
+
+
+async def _commission_terms(
+    db: AsyncSession, clinic_id: UUID, professional_id: UUID
+) -> tuple[CommissionTerms | None, str]:
+    """What this professional is paid on, and which module said so.
+
+    `commissions`, when it runs and the clinic has it on, is the one source
+    (ADR 0039, 0066): it knows a percentage per treatment. Without it, this
+    module's own single percentage per professional stands.
+    """
+    rates = await _rates_in_use(db, clinic_id)
+    if rates is not None:
+        return await rates.terms(db, clinic_id, professional_id), "commissions"
+    commission = await CommissionService.get(db, clinic_id, professional_id)
+    if commission is None:
+        return None, "liquidations"
+    return CommissionTerms(basis=commission.basis, default_percent=commission.percent), (
+        "liquidations"
+    )
+
+
 class CommissionService:
     """The arrangement with each professional. Mutable; documents freeze it."""
 
@@ -100,6 +135,9 @@ class CommissionService:
         db: AsyncSession, clinic_id: UUID, professional_id: UUID, data: dict
     ) -> ProfessionalCommission:
         _require_calculation()
+        if await _rates_in_use(db, clinic_id) is not None:
+            # A percentage written here would be ignored by every preview.
+            raise LiquidationError(MANAGED_IN_COMMISSIONS)
         professional = await db.scalar(
             select(Professional).where(
                 Professional.id == professional_id,
@@ -195,18 +233,34 @@ class LiquidationService:
             # a line nobody asked about.
             line.earned += entry.amount
             line.collected += covered
+            if line.catalog_item_id is None:
+                line.catalog_item_id = entry.catalog_item_id
 
         earned_total = sum((line.earned for line in lines), Decimal("0"))
         collected_total = sum((line.collected for line in lines), Decimal("0"))
 
-        commission = await CommissionService.get(db, clinic_id, professional_id)
-        basis = commission.basis if commission else "collected"
-        percent = commission.percent if commission else Decimal("0")
+        terms, rates_source = await _commission_terms(db, clinic_id, professional_id)
+        basis = terms.basis if terms else "collected"
+        percent = (terms.default_percent if terms else None) or Decimal("0")
+
+        # Each line at its own percentage: with `commissions` running a
+        # treatment can carry a rate of its own. Summed unrounded and
+        # rounded once, so a single percentage gives exactly what
+        # `base * percent` always gave.
+        missing = terms is None
+        due = Decimal("0")
+        for line in lines:
+            line.percent = terms.percent_for(line.catalog_item_id) if terms else None
+            if line.percent is None:
+                missing = True
+                continue
+            line_base = line.collected if basis == "collected" else line.earned
+            raw = line_base * line.percent / Decimal("100")
+            line.share = raw.quantize(CENTS, rounding=ROUND_HALF_UP)
+            due += raw
 
         base_amount = collected_total if basis == "collected" else earned_total
-        amount_due = (base_amount * percent / Decimal("100")).quantize(
-            CENTS, rounding=ROUND_HALF_UP
-        )
+        amount_due = due.quantize(CENTS, rounding=ROUND_HALF_UP)
 
         issued = await LiquidationService.issued_for(
             db, clinic_id, professional_id, date_from, date_to
@@ -225,7 +279,8 @@ class LiquidationService:
             base_amount=base_amount,
             amount_due=amount_due,
             lines=lines,
-            missing_commission=commission is None,
+            missing_commission=missing,
+            rates_source=rates_source,
             issued_id=issued.id if issued else None,
         )
 

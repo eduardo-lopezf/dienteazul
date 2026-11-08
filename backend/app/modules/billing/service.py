@@ -837,6 +837,38 @@ class InvoiceService:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def list_issued_in_period(
+        db: AsyncSession,
+        clinic_id: UUID,
+        start: date,
+        end: date,
+        *,
+        billing_tax_id: str | None = None,
+    ) -> list[Invoice]:
+        """The clinic's invoices issued from ``start`` to ``end``, both
+        included, with their lines — what Mexico's global invoice is built
+        from (ADR 0067).
+
+        Issued, partially paid or paid; credit notes, drafts, voided and
+        cancelled invoices are left out. ``billing_tax_id`` narrows it to
+        one receiver (for the SAT, ``XAXX010101000``, the general public).
+        """
+        query = select(Invoice).where(
+            Invoice.clinic_id == clinic_id,
+            Invoice.deleted_at.is_(None),
+            Invoice.credit_note_for_id.is_(None),
+            Invoice.status.in_(("issued", "partial", "paid")),
+            Invoice.issue_date >= start,
+            Invoice.issue_date <= end,
+        )
+        if billing_tax_id is not None:
+            query = query.where(Invoice.billing_tax_id == billing_tax_id)
+        query = query.options(selectinload(Invoice.items)).order_by(
+            Invoice.issue_date, Invoice.sequential_number
+        )
+        return list((await db.execute(query)).scalars().all())
+
+    @staticmethod
     async def create_invoice(
         db: AsyncSession,
         clinic_id: UUID,

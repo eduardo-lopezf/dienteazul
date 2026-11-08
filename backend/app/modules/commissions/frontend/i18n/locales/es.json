@@ -1,0 +1,28 @@
+{
+  "commissions": {
+    "action": "Comisiones",
+    "title": "Comisiones de {name}",
+    "description": "Porcentaje que cobra por cada consulta o tratamiento que realiza.",
+    "defaultPercent": "Porcentaje general",
+    "defaultPercentHint": "Se aplica a todo tratamiento sin porcentaje propio.",
+    "none": "Sin acordar",
+    "basisLabel": "Se calcula sobre",
+    "basisHint": "Sobre lo cobrado, la clínica nunca reparte dinero que no ha recibido.",
+    "basis": {
+      "collected": "Lo cobrado",
+      "earned": "Lo realizado"
+    },
+    "exceptions": "Porcentajes por tratamiento",
+    "exceptionsHint": "Para los tratamientos o consultas que se pagan distinto del porcentaje general.",
+    "addTreatment": "Añadir tratamiento…",
+    "percentFor": "Porcentaje para {treatment}",
+    "remove": "Quitar {treatment}",
+    "unnamedTreatment": "Tratamiento no disponible",
+    "noCatalogue": "El catálogo de tratamientos no está disponible: no se pueden añadir porcentajes por tratamiento.",
+    "notes": "Notas del acuerdo",
+    "frozenNote": "Puedes cambiarlo cuando haga falta: las liquidaciones ya emitidas guardan el porcentaje con el que se hicieron.",
+    "saved": "Comisiones guardadas",
+    "saveFailed": "No se pudieron guardar las comisiones",
+    "loadFailed": "No se pudieron cargar las comisiones"
+  }
+}

@@ -20,6 +20,7 @@ from .schemas import (
     BillingSettingsResponse,
     BillingSettingsUpdate,
     CreditNoteCreate,
+    InvoiceCancelRequest,
     InvoiceCreate,
     InvoiceDetailResponse,
     InvoiceFromBudgetCreate,
@@ -784,6 +785,64 @@ async def void_invoice(
         raise workflow_error(e, operation="invoice")
 
 
+@router.post("/invoices/{invoice_id}/cancel", response_model=ApiResponse[InvoiceResponse])
+async def cancel_invoice(
+    invoice_id: UUID,
+    data: InvoiceCancelRequest,
+    ctx: Annotated[ClinicContext, Depends(get_clinic_context)],
+    _: Annotated[None, Depends(require_permission("billing.admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ApiResponse[InvoiceResponse]:
+    """Cancel an issued invoice (ADR 0067).
+
+    With a compliance module that waits for the tax authority, the
+    invoice stays ``issued`` until it confirms.
+    """
+    from sqlalchemy import select
+
+    from .models import Invoice
+
+    invoice = await InvoiceService.get_invoice(
+        db, ctx.clinic_id, invoice_id, include_items=False, include_payments=False
+    )
+    if not invoice:
+        raise billing_error("billing.invoice.not_found")
+
+    substitute = None
+    if data.substitute_invoice_id is not None:
+        if data.substitute_invoice_id != invoice_id:
+            substitute = await InvoiceService.get_invoice(
+                db,
+                ctx.clinic_id,
+                data.substitute_invoice_id,
+                include_items=False,
+                include_payments=False,
+            )
+        if substitute is None:
+            raise billing_error(
+                "billing.invoice.substitute_invalid",
+                detail="The substitute must be another invoice of the same clinic",
+            )
+
+    # Same lock as issue and payments: a payment or a second cancellation
+    # running alongside sees the committed status.
+    await db.execute(
+        select(Invoice.id)
+        .where(Invoice.id == invoice_id, Invoice.clinic_id == ctx.clinic_id)
+        .with_for_update()
+    )
+    await db.refresh(invoice, attribute_names=["status"])
+
+    try:
+        invoice = await InvoiceWorkflowService.cancel_invoice(
+            db, invoice, ctx.user_id, data.reason, substitute
+        )
+        await db.commit()
+        return ApiResponse(data=InvoiceResponse.model_validate(invoice))
+    except InvoiceWorkflowError as e:
+        raise workflow_error(e, operation="invoice")
+
+
 @router.post(
     "/invoices/{invoice_id}/credit-note",
     response_model=ApiResponse[InvoiceResponse],
@@ -956,6 +1015,14 @@ async def apply_payment_to_invoice(
     await db.flush()
 
     await InvoiceWorkflowService.recalc_invoice_status(db, invoice, actor_id=ctx.user_id)
+
+    hook = BillingHookRegistry.get_for_clinic(invoice.clinic) if invoice.clinic else None
+    if hook:
+        compliance_data = await hook.on_payment_recorded(invoice, link, db)
+        if compliance_data:
+            invoice.compliance_data = {**(invoice.compliance_data or {}), **compliance_data}
+            await db.flush()
+
     await db.commit()
 
     return ApiResponse(data=InvoicePaymentResponse.model_validate(link))

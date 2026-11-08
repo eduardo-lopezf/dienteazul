@@ -44,7 +44,15 @@
       "version": "0.1",
       "tier": "optional",
       "status": "enabled",
-      "modules": ["budget", "payments", "billing", "verifactu", "accounting_export"]
+      "modules": ["budget", "payments", "billing", "sat_cfdi", "accounting_export"],
+      "optional_modules": [{ "name": "sat_cfdi", "tiers": ["advanced", "clinic"] }]
+    },
+    {
+      "name": "verifactu",
+      "version": "0.1",
+      "tier": "optional",
+      "status": "disabled",
+      "modules": ["verifactu"]
     },
     {
       "name": "cash",
@@ -68,7 +76,10 @@
       "version": "0.1",
       "tier": "core",
       "status": "enabled",
-      "modules": ["professionals"]
+      "modules": ["professionals", "commissions"],
+      "optional_modules": [
+        { "name": "commissions", "tiers": ["clinic"] }
+      ]
     },
     {
       "name": "clinical_record",

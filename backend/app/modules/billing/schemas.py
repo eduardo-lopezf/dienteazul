@@ -578,6 +578,17 @@ class InvoiceIssueRequest(BaseModel):
     issue_date: date = Field(default_factory=date.today)
 
 
+class InvoiceCancelRequest(BaseModel):
+    """Schema for cancelling an issued invoice (ADR 0067).
+
+    ``reason`` is free here; a country's compliance module validates it
+    (the SAT accepts ``01``–``04``).
+    """
+
+    reason: str = Field(min_length=1, max_length=100)
+    substitute_invoice_id: UUID | None = None
+
+
 class CreditNoteItemSelect(BaseModel):
     """Schema for selecting items for a credit note."""
 
