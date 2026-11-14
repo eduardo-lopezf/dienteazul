@@ -1404,7 +1404,8 @@ export type PaymentMethod = 'cash' | 'card' | 'bank_transfer' | 'direct_debit' |
 // refunds, ledger, reports. See ADR 0010.
 // ============================================================================
 
-export type AllocationTarget = 'budget' | 'on_account'
+// `membership`: a membership fee, recorded by `memberships`; never chosen by hand.
+export type AllocationTarget = 'budget' | 'on_account' | 'membership'
 export type RefundReason = 'duplicate' | 'overpaid' | 'treatment_cancelled' | 'dispute' | 'other'
 
 export interface PaymentAllocation {

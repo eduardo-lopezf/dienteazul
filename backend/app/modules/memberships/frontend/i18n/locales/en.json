@@ -1,0 +1,127 @@
+{
+  "memberships": {
+    "tab": "Membership",
+    "none": "This patient has no membership.",
+    "enroll": "Sign up to a membership",
+    "enrollAgain": "Sign up again",
+    "renew": "Record fee",
+    "loadFailed": "Could not load the membership",
+    "unnamedTreatment": "Treatment unavailable",
+    "coveredUntil": "Benefits in force until {date}",
+    "expiredSince": "Fee overdue: paid until {date}",
+    "cancelledNote": "Cancelled: it is no longer renewed.",
+    "memberSince": "Member since {date}",
+    "paymentsOff": "The Budgets and payments app is off: fees are recorded without a payment.",
+    "state": {
+      "active": "In force",
+      "expired": "Overdue",
+      "cancelled": "Cancelled"
+    },
+    "period": {
+      "monthly": "Monthly",
+      "annual": "Annual",
+      "per": {
+        "monthly": "a month",
+        "annual": "a year"
+      }
+    },
+    "method": {
+      "cash": "Cash",
+      "card": "Card",
+      "bank_transfer": "Bank transfer",
+      "direct_debit": "Direct debit",
+      "insurance": "Insurer",
+      "other": "Other"
+    },
+    "benefit": {
+      "included": "Included",
+      "discount": "Discount",
+      "perYear": "a year",
+      "kindFor": "Benefit type for {treatment}",
+      "quantityFor": "Yearly quantity of {treatment}",
+      "percentFor": "Discount for {treatment}",
+      "remove": "Remove {treatment}",
+      "includedLine": "{quantity} × {treatment} included a year",
+      "discountLine": "{percent} % off {treatment}"
+    },
+    "included": {
+      "title": "Included services",
+      "cycle": "Membership year from {date}",
+      "usage": "{used} of {quantity} used",
+      "none": "The plan includes no services."
+    },
+    "discounts": {
+      "title": "Discounts",
+      "general": "Other treatments",
+      "none": "The plan has no discounts."
+    },
+    "periods": {
+      "title": "Fees paid",
+      "refunded": "Refunded"
+    },
+    "fee": {
+      "enrollTitle": "Sign up to a membership",
+      "renewTitle": "Record fee",
+      "plan": "Plan",
+      "startsOn": "Start",
+      "paymentDate": "Payment date",
+      "method": "Payment method",
+      "reference": "Reference",
+      "collect": "Collect {amount}",
+      "collectNone": "Collect",
+      "noPlans": "No active plans. Create them in Settings → Apps → Patients → Membership plans.",
+      "planArchived": "This membership's plan is archived: change plan before recording the fee.",
+      "enrollHint": "The first fee is recorded as a payment of the patient and the membership is in force from the start date.",
+      "renewHint": "The fee extends cover from the last paid day. If it lapsed more than a week ago, it starts again on the payment date.",
+      "enrolled": "Patient signed up",
+      "renewed": "Fee recorded",
+      "failed": "Could not record the fee"
+    },
+    "changePlan": {
+      "action": "Change plan",
+      "title": "Change plan",
+      "hint": "The change applies from the next fee; paid ones keep their plan.",
+      "noOther": "There is no other active plan.",
+      "saved": "Plan changed",
+      "failed": "Could not change the plan"
+    },
+    "cancel": {
+      "action": "Cancel",
+      "title": "Cancel the membership?",
+      "hint": "It stops renewing. Benefits last until {date}, the last paid day.",
+      "keep": "Keep",
+      "confirm": "Cancel membership",
+      "done": "Membership cancelled",
+      "failed": "Could not cancel the membership"
+    },
+    "plans": {
+      "title": "Membership plans",
+      "back": "Patients",
+      "intro": "What the clinic offers for a monthly or yearly fee: included services and discounts on treatments.",
+      "new": "New plan",
+      "edit": "Edit plan",
+      "formDescription": "Fees already paid keep the terms they were collected on.",
+      "name": "Name",
+      "fee": "Fee",
+      "period": "Period",
+      "generalDiscount": "General discount",
+      "noDiscount": "No discount",
+      "generalDiscountHint": "On treatments without a benefit of their own.",
+      "generalLine": "{percent} % off the rest",
+      "benefits": "Treatments in the plan",
+      "benefitsHint": "Included: how many per membership year, at no cost. Discount: its own percentage instead of the general one.",
+      "addTreatment": "Add treatment…",
+      "noCatalogue": "The treatment catalogue is unavailable: no treatments can be added to the plan.",
+      "description": "Description",
+      "frozenNote": "Editing the plan does not change fees already paid.",
+      "showArchived": "Show archived",
+      "archived": "Archived",
+      "archive": "Archive",
+      "restore": "Restore",
+      "empty": "No plans yet.",
+      "saved": "Plan saved",
+      "saveFailed": "Could not save the plan",
+      "loadFailed": "Could not load the plans"
+    }
+  }
+}

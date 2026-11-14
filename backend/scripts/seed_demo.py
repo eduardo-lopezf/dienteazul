@@ -13,6 +13,10 @@ Creates the full clinical narrative for a demo clinic:
 - ~10 budgets derived from plan items (some draft, accepted+signed, rejected, completed)
 - ~35 appointments anchored to plan items (no random appointments)
 - 2 invoice series + ~8 invoices derived from budgets, with payments
+- 2 unsigned consent drafts (when ``consents`` is installed)
+- 1 individual practice (``solo@demo.clinic``, tier ``advanced``) with its
+  holder's profile and catalog — added on its own to a DB that already has
+  the demo clinic
 
 Usage:
     docker-compose exec -T backend python scripts/seed_demo.py              # English
@@ -63,6 +67,8 @@ from app.modules.treatment_plan.models import (
 from app.modules.treatment_plan.templates_service import PlanTemplateService
 from app.seeds.demo_data import (
     CLINIC_ID,
+    SOLO_CLINIC_ID,
+    USER_ADMIN_ID,
     USER_ASSISTANT_ID,
     USER_DENTIST_ID,
     USER_HYGIENIST_ID,
@@ -74,7 +80,9 @@ from app.seeds.demo_data import (
     generate_odontogram_data,
     generate_treatment_plans_data,
     get_clinic_data,
+    get_consent_drafts_data,
     get_patients_data,
+    get_solo_practice_data,
     get_users_data,
     set_language,
 )
@@ -261,6 +269,104 @@ async def seed_users(db: AsyncSession, password_hash: str) -> list[User]:
 
     await db.flush()
     return users
+
+
+async def seed_solo_practice(db: AsyncSession, password_hash: str) -> bool:
+    """A one-professional practice beside the demo clinic. False if present.
+
+    What ``/auth/setup`` + ``clinic.created`` would leave: clinic, admin
+    holder, the holder's directory profile, catalog and plan templates. No
+    patients — it exists to show the individual tiers, not a second story.
+    """
+    from uuid import uuid4
+
+    from app.modules.agenda.models import Cabinet
+    from app.modules.professionals.service import HolderProfileService
+
+    if await db.get(Clinic, SOLO_CLINIC_ID) is not None:
+        return False
+
+    data = get_solo_practice_data()
+    c, u = data["clinic"], data["user"]
+    db.add(
+        Clinic(
+            id=c["id"],
+            name=c["name"],
+            tax_id=c["tax_id"],
+            timezone="America/Mexico_City",
+            currency="MXN",
+            account_tier=c["account_tier"],
+        )
+    )
+    db.add(
+        User(
+            id=u["id"],
+            email=u["email"],
+            password_hash=password_hash,
+            first_name=u["first_name"],
+            last_name=u["last_name"],
+            professional_id=u["professional_id"],
+            is_active=True,
+            token_version=0,
+        )
+    )
+    await db.flush()
+    db.add(
+        ClinicMembership(id=u["membership_id"], user_id=u["id"], clinic_id=c["id"], role="admin")
+    )
+    db.add(
+        Cabinet(
+            id=uuid4(),
+            clinic_id=c["id"],
+            name=c["cabinet"],
+            color="#3B82F6",
+            display_order=0,
+            is_active=True,
+        )
+    )
+    await db.flush()
+    await HolderProfileService.ensure(db, c["id"])
+    await seed_catalog(db, c["id"])
+    await PlanTemplateService.seed(db, c["id"])
+    print(f"  Created individual practice: {c['name']} ({u['email']}, {c['account_tier']})")
+    return True
+
+
+async def seed_consent_drafts(db: AsyncSession) -> int:
+    """Unsigned consent letters for the demo clinic. 0 if present or module off.
+
+    Rows rather than ``ConsentService.create``: nothing is mounted in a
+    script, so its ``PatientDirectory`` lookup has no provider (ADR 0039).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    if not await _module_is_installed(db, "consents"):
+        return 0
+    from app.modules.consents.models import Consent
+
+    added = 0
+    for draft in get_consent_drafts_data():
+        if await db.get(Consent, draft["id"]) is not None:
+            continue
+        created = datetime.now(UTC) - timedelta(days=draft["days_ago"])
+        db.add(
+            Consent(
+                id=draft["id"],
+                clinic_id=CLINIC_ID,
+                patient_id=draft["patient_id"],
+                kind=draft["kind"],
+                status="draft",
+                title=draft["title"],
+                body=draft["body"],
+                procedure_label=draft["procedure_label"],
+                recorded_by_user_id=USER_ADMIN_ID,
+                created_at=created,
+                updated_at=created,
+            )
+        )
+        added += 1
+    await db.flush()
+    return added
 
 
 async def seed_professional_specialties(db: AsyncSession) -> int:
@@ -713,6 +819,17 @@ async def main(lang: str = "en") -> None:
 
     async with async_session_maker() as db:
         if await check_existing_data(db):
+            # Added after the demo clinic existed: each step adds its own
+            # rows only if missing, so an existing DB gets them without a reset.
+            solo = await seed_solo_practice(db, hash_password("demo1234"))
+            drafts = await seed_consent_drafts(db)
+            if solo or drafts:
+                await db.commit()
+                print(
+                    "Added to the existing demo data: "
+                    f"individual practice={solo}, unsigned consent drafts={drafts}.\n"
+                )
+                return
             print("Demo data already exists!")
             print("To reset, run: ./scripts/reset-db.sh")
             print("Then run this script again.\n")
@@ -851,6 +968,13 @@ async def main(lang: str = "en") -> None:
                     f"Movements: {stats['movements']}"
                 )
 
+            drafts = await seed_consent_drafts(db)
+            if drafts:
+                print(f"\n[opt] Created {drafts} unsigned consent drafts (module installed)")
+
+            print("\n[+] Creating individual practice...")
+            await seed_solo_practice(db, password_hash)
+
             await db.commit()
             print("\n" + "=" * 60)
             print("Demo data created successfully!")
@@ -869,6 +993,10 @@ async def main(lang: str = "en") -> None:
     print("-" * 60)
     for user in users_data:
         print(f"{user['email']:<30} {user['role']:<15} {user['first_name']} {user['last_name']}")
+    solo = get_solo_practice_data()["user"]
+    print(
+        f"{solo['email']:<30} {'admin':<15} {solo['first_name']} {solo['last_name']} (individual)"
+    )
     print("-" * 60)
     print("\nOpen http://localhost:3000 to access the application.\n")
 

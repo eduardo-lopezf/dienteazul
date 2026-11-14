@@ -29,6 +29,16 @@ const groups = computed(() =>
     .filter(group => group.widgets.length > 0)
 )
 
+// Each App's widgets start folded; the chevron on its title opens them.
+const expanded = ref(new Set<string>())
+
+function toggle(app: string) {
+  const next = new Set(expanded.value)
+  if (next.has(app)) next.delete(app)
+  else next.add(app)
+  expanded.value = next
+}
+
 // What each host screen would hand a widget. Home widgets take nothing;
 // a patient card takes its patient — a made-up one here, like the rest
 // of the example.
@@ -122,15 +132,25 @@ watch(canRead, (ok) => {
             :data-testid="`widget-group-${group.app}`"
             class="space-y-3"
           >
-            <h2
-              data-testid="widget-group-title"
-              class="text-h2 text-default"
-            >
-              {{ admin.appTitle(group.app) }}
-              <span class="text-sm font-normal text-muted">· {{ group.widgets.length }}</span>
+            <h2 class="text-h2 text-default">
+              <button
+                type="button"
+                data-testid="widget-group-title"
+                class="flex items-center gap-2 text-left"
+                :aria-expanded="expanded.has(group.app)"
+                :aria-label="expanded.has(group.app) ? t('common.collapse') : t('common.expand')"
+                @click="toggle(group.app)"
+              >
+                <UIcon
+                  :name="expanded.has(group.app) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                  class="size-5 text-muted"
+                />
+                {{ admin.appTitle(group.app) }}
+                <span class="text-sm font-normal text-muted">· {{ group.widgets.length }}</span>
+              </button>
             </h2>
             <WidgetCard
-              v-for="widget in group.widgets"
+              v-for="widget in expanded.has(group.app) ? group.widgets : []"
               :key="widget.entry.id"
               :slot-name="widget.slot"
               :entry="widget.entry"

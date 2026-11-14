@@ -9,7 +9,9 @@ export const ROLES = {
   dentist: 'dentist@demo.clinic',
   hygienist: 'hygienist@demo.clinic',
   assistant: 'assistant@demo.clinic',
-  receptionist: 'receptionist@demo.clinic'
+  receptionist: 'receptionist@demo.clinic',
+  // Holder of the individual practice (tier `advanced`), a tenant of its own.
+  solo: 'solo@demo.clinic'
 } as const
 
 export type Role = keyof typeof ROLES

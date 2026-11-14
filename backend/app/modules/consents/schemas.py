@@ -115,3 +115,25 @@ class ConsentResponse(BaseModel):
     status_note: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class UnsignedConsent(BaseModel):
+    """A draft on the home page: what it is and whose.
+
+    ``first_name``/``last_name`` are the patient's, under the columns' own
+    names so they stay classified (ADR 0025); ``None`` while the Patients
+    App is off.
+    """
+
+    id: UUID
+    patient_id: UUID
+    first_name: str | None
+    last_name: str | None
+    kind: str
+    title: str
+    created_at: datetime
+
+
+class UnsignedConsents(BaseModel):
+    total: int
+    items: list[UnsignedConsent]

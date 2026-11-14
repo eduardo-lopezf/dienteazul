@@ -20,11 +20,18 @@ from app.core.events import EventType, event_bus
 from app.modules.budget.integrations import PATIENTS_UNAVAILABLE, patients_available
 from app.modules.budget.models import Budget
 
-from .models import Payment, PaymentAllocation, PaymentHistory, Refund
+from .models import PatientEarnedEntry, Payment, PaymentAllocation, PaymentHistory, Refund
 
 
 class PaymentWorkflowError(ValueError):
     """Raised when a payment workflow precondition fails (400/422)."""
+
+
+#: ``PatientEarnedEntry.source_event`` of a membership fee and of its refund.
+MEMBERSHIP_FEE = "membership.fee"
+MEMBERSHIP_FEE_REFUND = "membership.fee_refund"
+
+MEMBERSHIP_FEE_LOCKED = "A membership fee pays its period: it cannot be reallocated"
 
 
 def _now() -> datetime:
@@ -147,6 +154,9 @@ async def record_payment(
             payment_id=payment.id,
             target_type=spec["target_type"],
             budget_id=spec.get("target_id") if spec["target_type"] == "budget" else None,
+            membership_period_id=(
+                spec.get("target_id") if spec["target_type"] == "membership" else None
+            ),
             amount=Decimal(str(spec["amount"])),
             created_by=recorded_by,
         )
@@ -214,6 +224,8 @@ async def reallocate_payment(
     reconcile budget/on_account/invoice balances.
     """
     _require_patients()
+    if any(a.target_type == "membership" for a in payment.allocations):
+        raise PaymentWorkflowError(MEMBERSHIP_FEE_LOCKED)
     if not new_allocations:
         raise PaymentWorkflowError("At least one allocation required")
     if _allocations_sum(new_allocations) != payment.amount:
@@ -323,6 +335,24 @@ async def refund_payment(
         refunded_by=refunded_by,
     )
     db.add(refund)
+    await db.flush()
+
+    fee = next((a for a in payment.allocations if a.target_type == "membership"), None)
+    if fee is not None:
+        # The fee was booked as earned so it never cut the patient's debt;
+        # refunding it takes that charge back by the same amount.
+        db.add(
+            PatientEarnedEntry(
+                clinic_id=clinic_id,
+                patient_id=payment.patient_id,
+                treatment_id=fee.membership_period_id,
+                source_session_id=refund.id,
+                description="Devolución de cuota de membresía",
+                amount=-amount,
+                performed_at=now,
+                source_event=MEMBERSHIP_FEE_REFUND,
+            )
+        )
 
     db.add(
         PaymentHistory(

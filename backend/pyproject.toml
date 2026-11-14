@@ -105,6 +105,7 @@ record = "app.modules.record:RecordModule"
 calendar_feed = "app.modules.calendar_feed:CalendarFeedModule"
 inventory = "app.modules.inventory:InventoryModule"
 purchasing = "app.modules.purchasing:PurchasingModule"
+memberships = "app.modules.memberships:MembershipsModule"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -117,6 +118,7 @@ where = ["."]
 "app.modules.billing" = ["errors.json"]
 "app.modules.cashbox" = ["errors.json"]
 "app.modules.commissions" = ["errors.json"]
+"app.modules.memberships" = ["errors.json"]
 "app.modules.catalog" = ["errors.json"]
 "app.modules.clinical_notes" = ["errors.json"]
 "app.modules.consents" = ["errors.json"]

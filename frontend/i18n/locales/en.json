@@ -1603,6 +1603,52 @@
       "viewAll": "View all",
       "empty": "No overdue invoices"
     },
+    "awaitingPlans": {
+      "title": "Plans awaiting an answer",
+      "empty": "No plan is waiting on the patient",
+      "all": "See all {n} plans",
+      "days": "today | {n} day ago | {n} days ago"
+    },
+    "teamWorkload": {
+      "title": "Team workload",
+      "empty": "No active professionals",
+      "all": "See professionals",
+      "upcoming": "no upcoming appointments | {n} upcoming appointment | {n} upcoming appointments",
+      "plans": "no plans in progress | {n} plan in progress | {n} plans in progress"
+    },
+    "expiringBudgets": {
+      "title": "Budgets about to expire",
+      "empty": "No pending budget expires in the next {n} days",
+      "all": "See budgets",
+      "until": "until {date}",
+      "more": "and {n} more"
+    },
+    "failedMessages": {
+      "title": "Undelivered messages",
+      "empty": "Every message was delivered",
+      "settings": "Notification settings",
+      "more": "and {n} more"
+    },
+    "stockAlerts": {
+      "title": "Stock alerts",
+      "empty": "Stock is in order",
+      "all": "See inventory",
+      "low_stock": "Below minimum · {n}",
+      "expiring": "Expiring soon · {n}",
+      "expired": "Expired · {n}",
+      "expiresOn": "expires {date}",
+      "expiredOn": "expired {date}"
+    },
+    "unsignedConsents": {
+      "title": "Unsigned consents",
+      "empty": "No consent is waiting for a signature",
+      "more": "and {n} more",
+      "kinds": {
+        "informed": "informed",
+        "data_use": "data use",
+        "conformity": "conformity"
+      }
+    },
     "recent": {
       "title": "Recent patients",
       "empty": "No patients yet"
@@ -1920,6 +1966,64 @@
           "quickActions": {
             "title": "Quick actions",
             "summary": "Shortcuts to book a visit or upload a document from the patient summary."
+          }
+        },
+        "treatments": {
+          "awaitingPlans": {
+            "title": "Plans awaiting an answer",
+            "summary": "Plans waiting on the patient's answer, with how many days they have waited."
+          }
+        },
+        "professionals": {
+          "teamWorkload": {
+            "title": "Team workload",
+            "summary": "Each professional's upcoming appointments and plans in progress. Clinics only."
+          }
+        },
+        "recalls": {
+          "due": {
+            "summary": "Recalls due this week and overdue, with this month's scheduled ones and the conversion rate."
+          }
+        },
+        "reports": {
+          "overdueHero": {
+            "summary": "How many payments are overdue and what they add up to."
+          },
+          "overduePanel": {
+            "summary": "The oldest overdue invoices, with what is left to collect."
+          },
+          "weekGlance": {
+            "summary": "Appointments, completed and invoiced over the last 7 days against the 7 before."
+          }
+        },
+        "budgets_payments": {
+          "expiringBudgets": {
+            "title": "Budgets about to expire",
+            "summary": "Budgets awaiting acceptance that expire in the next 7 days."
+          }
+        },
+        "cash": {
+          "till": {
+            "title": "Till count",
+            "summary": "Days of the fortnight that took money and have not been counted yet."
+          }
+        },
+        "communications": {
+          "failedMessages": {
+            "title": "Undelivered messages",
+            "summary": "Emails and WhatsApp messages to patients that could not be delivered, with the reason."
+          }
+        },
+        "inventory": {
+          "stockAlerts": {
+            "title": "Stock alerts",
+            "summary": "Articles below their minimum and lots expiring soon or already expired."
+          }
+        },
+        "clinical_record": {
+          "unsignedConsents": {
+            "title": "Unsigned consents",
+            "summary": "Consent letters written and not yet signed by the patient, oldest first."
           }
         }
       }

@@ -410,3 +410,64 @@ async def test_agreement_with_a_concluded_treatment_is_a_letter_of_its_own(
     record = await client.get(f"/api/v1/record/patients/{test_patient.id}", headers=auth_headers)
     coverage = {item["key"]: item["met"] for item in record.json()["data"]["coverage"]}
     assert coverage["informed_consent"] is False
+
+
+# --- Unsigned, clinic-wide ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_clinics_unsigned_drafts_are_listed_oldest_first(
+    client: AsyncClient,
+    auth_headers: dict,
+    db_session: AsyncSession,
+    test_patient: Patient,
+    dentist: Professional,
+) -> None:
+    from app.modules.consents.models import Consent
+
+    first = await _draft(client, auth_headers, test_patient)
+    second = await _draft(client, auth_headers, test_patient)
+    signed = await _draft(
+        client, auth_headers, test_patient, explained_by_professional_id=str(dentist.id)
+    )
+    await client.post(f"{BASE}/{signed['id']}/sign", headers=auth_headers, json=SIGNATURE)
+    discarded = await _draft(client, auth_headers, test_patient)
+    await client.post(f"{BASE}/{discarded['id']}/discard", headers=auth_headers)
+
+    # Another clinic's draft never shows.
+    other = Clinic(
+        id=uuid4(),
+        name="Otra",
+        tax_id="B00000002",
+        address={},
+        settings={},
+        account_tier="clinic",
+    )
+    db_session.add(other)
+    await db_session.flush()
+    foreign_patient = Patient(id=uuid4(), clinic_id=other.id, first_name="A", last_name="B")
+    db_session.add(foreign_patient)
+    await db_session.flush()
+    db_session.add(
+        Consent(
+            id=uuid4(),
+            clinic_id=other.id,
+            patient_id=foreign_patient.id,
+            kind="data_use",
+            title="t",
+            body="b",
+        )
+    )
+    await db_session.commit()
+
+    listed = await client.get(f"{BASE}/unsigned", headers=auth_headers)
+    assert listed.status_code == 200, listed.text
+    data = listed.json()["data"]
+    assert data["total"] == 2
+    assert [c["id"] for c in data["items"]] == [first["id"], second["id"]]
+    assert data["items"][0]["first_name"] == test_patient.first_name
+    assert data["items"][0]["last_name"] == test_patient.last_name
+
+    limited = await client.get(f"{BASE}/unsigned?limit=1", headers=auth_headers)
+    assert limited.json()["data"]["total"] == 2
+    assert [c["id"] for c in limited.json()["data"]["items"]] == [first["id"]]

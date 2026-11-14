@@ -87,6 +87,7 @@
       "addAllocation": "Add allocation",
       "allocationToBudget": "To budget",
       "allocationOnAccount": "On account",
+      "allocationMembership": "Membership fee",
       "sumLabel": "Sum:",
       "sumMismatch": "does not match the amount",
       "submit": "Record",

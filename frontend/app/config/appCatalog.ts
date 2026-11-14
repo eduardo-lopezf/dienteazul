@@ -29,7 +29,20 @@ export interface AppPresentation {
 export const APP_CATALOG: Record<string, AppPresentation> = {
   workspace: { icon: 'i-lucide-layout-dashboard', settingsPath: '/settings/apps/workspace' },
   agenda: { icon: 'i-lucide-calendar-days' },
-  patients: { icon: 'i-lucide-users' },
+  patients: {
+    icon: 'i-lucide-users',
+    settingsPath: '/settings/apps/patients',
+    actions: [
+      {
+        // `memberships`, an optional module (ADR 0066): its permission is
+        // only granted while the clinic has it on, and the button with it.
+        labelKey: 'memberships.plans.title',
+        icon: 'i-lucide-badge-percent',
+        to: '/settings/memberships',
+        permission: 'memberships.plan.read'
+      }
+    ]
+  },
   recalls: { icon: 'i-lucide-bell-ring' },
   treatments: { icon: 'i-lucide-clipboard-list', settingsPath: '/settings/apps/treatments' },
   budgets_payments: { icon: 'i-lucide-receipt', settingsPath: '/settings/apps/budgets-payments' },

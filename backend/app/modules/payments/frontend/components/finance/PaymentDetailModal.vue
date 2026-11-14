@@ -62,13 +62,16 @@ const allocations = computed(() => {
   const out: { label: string, amount: number }[] = []
   let toBudget = 0
   let onAccount = 0
+  let membership = 0
   for (const a of props.payment?.allocations ?? []) {
     const amount = Number(a.amount)
     if (a.target_type === 'budget') toBudget += amount
     else if (a.target_type === 'on_account') onAccount += amount
+    else if (a.target_type === 'membership') membership += amount
   }
   if (toBudget) out.push({ label: t('payments.new.allocationToBudget'), amount: toBudget })
   if (onAccount) out.push({ label: t('payments.new.allocationOnAccount'), amount: onAccount })
+  if (membership) out.push({ label: t('payments.new.allocationMembership'), amount: membership })
   return out
 })
 

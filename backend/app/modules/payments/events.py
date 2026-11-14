@@ -34,6 +34,8 @@ from uuid import UUID
 from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.core import contracts
+from app.core.contracts import MemberBenefits
 from app.database import async_session_maker
 
 from .models import PatientEarnedEntry
@@ -125,6 +127,17 @@ async def _upsert_earned_entry(
                 )
                 return
 
+            amount, description = await _member_price(
+                db,
+                clinic_id=clinic_id,
+                patient_id=patient_id,
+                catalog_item_id=catalog_item_id,
+                treatment_id=treatment_id,
+                performed_at=performed_at,
+                amount=amount,
+                description=description,
+            )
+
             stmt = (
                 pg_insert(PatientEarnedEntry)
                 .values(
@@ -158,6 +171,43 @@ async def _upsert_earned_entry(
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("Failed to upsert PatientEarnedEntry: %s", exc, exc_info=True)
             await db.rollback()
+
+
+async def _member_price(
+    db: Any,
+    *,
+    clinic_id: UUID,
+    patient_id: UUID,
+    catalog_item_id: UUID | None,
+    treatment_id: UUID,
+    performed_at: datetime,
+    amount: Decimal,
+    description: str | None,
+) -> tuple[Decimal, str | None]:
+    """What a member pays for the treatment performed (``MemberBenefits``).
+
+    An included service is booked at nothing and uses one of the plan's
+    units; a discount takes its percentage off. Without the Memberships
+    module, or without a membership in force, the price stands.
+    """
+    benefits = contracts.provider(MemberBenefits)
+    if benefits is None or catalog_item_id is None or amount <= 0:
+        return amount, description
+    discount = await benefits.apply(
+        db, clinic_id, patient_id, catalog_item_id, treatment_id, performed_at.date()
+    )
+    if discount is None or discount.percent <= 0:
+        return amount, description
+    member_amount = (amount * (Decimal("100") - discount.percent) / Decimal("100")).quantize(
+        Decimal("0.01")
+    )
+    note = (
+        f"Incluido en membresía {discount.plan_name}"
+        if discount.included
+        else f"Membresía {discount.plan_name}: -{discount.percent.normalize():f} %"
+    )
+    labelled = f"{description} · {note}" if description else note
+    return member_amount, labelled[:160]
 
 
 async def _has_session_rows(db: Any, clinic_id: UUID, treatment_id: UUID) -> bool:
@@ -231,6 +281,20 @@ async def on_session_reopened(data: dict[str, Any]) -> None:
                     ),
                 )
             )
+            # Nothing of the treatment booked any more: the included unit it
+            # used goes back to the patient's membership.
+            benefits = contracts.provider(MemberBenefits)
+            if benefits is not None:
+                remaining = await db.scalar(
+                    select(PatientEarnedEntry.id)
+                    .where(
+                        PatientEarnedEntry.clinic_id == clinic_id,
+                        PatientEarnedEntry.treatment_id == treatment_id,
+                    )
+                    .limit(1)
+                )
+                if remaining is None:
+                    await benefits.release(db, clinic_id, treatment_id)
             await db.commit()
         except Exception:
             await db.rollback()

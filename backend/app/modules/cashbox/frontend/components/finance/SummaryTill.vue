@@ -42,7 +42,17 @@ function clinicToday(): string {
   }).format(new Date())
 }
 
+// Inside a widget example (Settings → Widgets) the fortnight is made up
+// and nothing is fetched (ADR 0040).
+const preview = useWidgetPreview()
+
 async function load() {
+  if (preview) {
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().split('T')[0] as string
+    period.value = { pending_days: [day(1), day(4)], counted_days: 6, days_off: 1, difference_total: '-50.00' }
+    loading.value = false
+    return
+  }
   try {
     const response = await api.get<{ data: Period }>(
       `/api/v1/cashbox/periods?kind=fortnight&day=${clinicToday()}`

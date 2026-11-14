@@ -7,7 +7,22 @@ const recallsApi = useRecalls()
 const stats = ref<RecallDashboardStats | null>(null)
 const isLoading = ref(false)
 
+// Inside a widget example (Settings → Widgets) the counters are made up
+// and nothing is fetched (ADR 0040).
+const preview = useWidgetPreview()
+
 async function load() {
+  if (preview) {
+    stats.value = {
+      due_this_week: 7,
+      due_this_month: 23,
+      overdue: 4,
+      scheduled_this_month: 11,
+      completed_this_month: 9,
+      conversion_rate: 0.48
+    }
+    return
+  }
   isLoading.value = true
   try {
     const res = await recallsApi.dashboardStats()

@@ -25,7 +25,7 @@ const modulesRoot = resolve(frontendRoot, '..', 'backend', 'app', 'modules')
 
 /** Apps whose frontend must stand on its own, by module. */
 const DECOUPLED_APPS: Record<string, string[]> = {
-  patients: ['patients', 'patients_clinical', 'patient_timeline', 'media']
+  patients: ['patients', 'patients_clinical', 'patient_timeline', 'media', 'memberships']
 }
 
 /** Core API namespaces, not modules. */

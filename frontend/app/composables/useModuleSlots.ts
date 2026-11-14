@@ -44,6 +44,13 @@ export interface SlotEntry<Ctx = unknown> {
    * ``ctx`` prop. Return false to hide the entry for this context.
    */
   condition?: (ctx: Ctx) => boolean
+  /**
+   * Account tiers (``Clinic.account_tier``) the entry exists for. Unlike
+   * ``condition`` it holds everywhere the entry is listed — the home page,
+   * Settings → Widgets and the workspace layout — because a tier is a fact
+   * of the clinic, not of one render. Hidden until the clinic is loaded.
+   */
+  tiers?: string[]
   // ---- settings.sections extensions ---------------------------------
   // Optional fields used by the ``settings.sections`` slot to place the
   // entry inside the categorised settings IA. Other slots ignore them,
@@ -123,6 +130,14 @@ export function clearSlots(name?: string): void {
   state.value = name ? { ...state.value, [name]: [] } : {}
 }
 
+function tierAllows(entry: SlotEntry, tier: string | undefined): boolean {
+  return !entry.tiers || (!!tier && entry.tiers.includes(tier))
+}
+
+function currentTier(): string | undefined {
+  return useState<{ account_tier?: string } | null>('clinic:current', () => null).value?.account_tier
+}
+
 /**
  * Every registration, with the slot it went into. For screens that
  * describe the registry itself (Settings → Apps → Widgets) rather than
@@ -130,8 +145,9 @@ export function clearSlots(name?: string): void {
  */
 export function listSlotEntries(): Array<{ slot: string, entry: SlotEntry }> {
   const state = useSlotState()
+  const tier = currentTier()
   return Object.entries(state.value).flatMap(([slot, entries]) =>
-    entries.map(entry => ({ slot, entry }))
+    entries.filter(entry => tierAllows(entry, tier)).map(entry => ({ slot, entry }))
   )
 }
 
@@ -142,8 +158,10 @@ export function resolveSlot<Ctx = unknown>(
 ): SlotEntry<Ctx>[] {
   const state = useSlotState()
   const entries = (state.value[name] || []) as SlotEntry<Ctx>[]
+  const tier = currentTier()
   return [...entries]
     .filter((entry) => {
+      if (!tierAllows(entry as SlotEntry, tier)) return false
       if (entry.permission && !opts.can(entry.permission)) return false
       if (entry.condition && !entry.condition(ctx)) return false
       return true

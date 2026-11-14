@@ -45,6 +45,8 @@ export default defineNuxtPlugin(() => {
   registerSlot('dashboard.attention', {
     id: 'recalls.dashboard.due-overdue',
     labelKey: 'settings.home.labels.recallsDue',
+    descriptionKey: 'settings.widgets.catalog.recalls.due.summary',
+    widget: true,
     component: defineAsyncComponent(() => import('../components/RecallDashboardWidget.vue')),
     permission: 'recalls.read',
     order: 30

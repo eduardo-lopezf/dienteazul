@@ -100,6 +100,9 @@ test.describe('admin sees the apps screen', () => {
 
     // Grouped by App: the five Agenda contributes, each with a live example…
     const agenda = loggedIn.getByTestId('widget-group-agenda')
+    // Folded until its chevron is clicked.
+    await expect(agenda.locator('[data-testid^="widget-card-"]')).toHaveCount(0)
+    await agenda.getByTestId('widget-group-title').click()
     await expect(agenda.locator('[data-testid^="widget-card-"]')).toHaveCount(5, {
       timeout: 15_000
     })
@@ -112,6 +115,7 @@ test.describe('admin sees the apps screen', () => {
 
     // …and the four of Patients, also filled with made-up data.
     const patients = loggedIn.getByTestId('widget-group-patients')
+    await patients.getByTestId('widget-group-title').click()
     await expect(patients.locator('[data-testid^="widget-card-"]')).toHaveCount(4)
     await expect(patients.getByTestId('widget-group-title')).toContainText('Pacientes')
     await expect(patients.getByTestId('widget-card-patients.dashboard.recent'))
@@ -120,6 +124,33 @@ test.describe('admin sees the apps screen', () => {
       .toContainText('Penicilina')
     await expect(patients.getByTestId('widget-card-patients_clinical.patient.header.alerts'))
       .toContainText('Alergia a penicilina')
+
+    // Treatments and Professionals (the demo clinic is a clinic, so the
+    // team widget is listed).
+    const treatments = loggedIn.getByTestId('widget-group-treatments')
+    await treatments.getByTestId('widget-group-title').click()
+    await expect(treatments.getByTestId('widget-card-treatment_plan.dashboard.awaitingPlans'))
+      .toContainText('Laura Demo')
+    const professionals = loggedIn.getByTestId('widget-group-professionals')
+    await professionals.getByTestId('widget-group-title').click()
+    await expect(professionals.getByTestId('widget-card-professionals.dashboard.teamWorkload'))
+      .toContainText('Dra. Ana Ejemplo')
+
+    // The optional Apps, each with a made-up example of its own.
+    const optional: [string, string, string][] = [
+      ['recalls', 'recalls.dashboard.due-overdue', '48%'],
+      ['reports', 'reports.dashboard.overduePanel', 'F-2026-001'],
+      ['budgets_payments', 'budget.dashboard.expiring', 'P-2026-001'],
+      ['cash', 'cashbox.dashboard.till', '2'],
+      ['communications', 'notifications.dashboard.failedMessages', 'laura@ejemplo.test'],
+      ['inventory', 'inventory.dashboard.stockAlerts', 'Guantes de nitrilo M'],
+      ['clinical_record', 'consents.dashboard.unsigned', 'Extracción del 48']
+    ]
+    for (const [app, widget, text] of optional) {
+      const group = loggedIn.getByTestId(`widget-group-${app}`)
+      await group.getByTestId('widget-group-title').click()
+      await expect(group.getByTestId(`widget-card-${widget}`)).toContainText(text)
+    }
   })
 
   test('admin sees the APIs an App can connect to on their own page', async ({ loggedIn }) => {
@@ -157,5 +188,22 @@ test.describe('hygienist cannot reach the apps screen', () => {
     await expect(
       loggedIn.getByText(/acceso denegado|access denied/i)
     ).toBeVisible()
+  })
+})
+
+test.describe('an individual practice', () => {
+  test.use({ role: 'solo' })
+
+  test('is never offered the team workload widget', async ({ loggedIn }) => {
+    await loggedIn.goto('/settings/widgets')
+    const treatments = loggedIn.getByTestId('widget-group-treatments')
+    await expect(treatments).toBeVisible({ timeout: 15_000 })
+    await expect(loggedIn.getByTestId('widget-group-professionals')).toHaveCount(0)
+
+    await loggedIn.goto('/')
+    await expect(loggedIn.getByTestId('home-entry-treatment_plan.dashboard.awaitingPlans'))
+      .toBeVisible({ timeout: 15_000 })
+    await expect(loggedIn.getByTestId('home-entry-professionals.dashboard.teamWorkload'))
+      .toHaveCount(0)
   })
 })

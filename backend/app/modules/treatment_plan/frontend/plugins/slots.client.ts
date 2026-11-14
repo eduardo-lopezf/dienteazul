@@ -10,6 +10,17 @@ import { registerSlot } from '~~/app/composables/useModuleSlots'
 export default defineNuxtPlugin(() => {
   const { can } = usePermissions()
 
+  // Home — plans waiting on the patient's answer (ADR 0040 widget).
+  registerSlot('dashboard.attention', {
+    id: 'treatment_plan.dashboard.awaitingPlans',
+    labelKey: 'settings.widgets.catalog.treatments.awaitingPlans.title',
+    descriptionKey: 'settings.widgets.catalog.treatments.awaitingPlans.summary',
+    widget: true,
+    component: defineAsyncComponent(() => import('../components/home/AwaitingPlansPanel.vue')),
+    order: 30,
+    permission: 'treatment_plan.plans.read'
+  })
+
   // Patient Resumen — active-plan smart card. The patients module
   // exposes the ``patient.summary.cards`` slot and never imports
   // anything from treatment_plan; this registration is the contract.

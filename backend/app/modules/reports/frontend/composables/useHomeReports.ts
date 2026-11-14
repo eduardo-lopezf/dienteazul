@@ -1,4 +1,5 @@
 import type { OverdueInvoice } from '~~/app/types'
+import { sampleOverdueInvoices } from '../utils/previewSamples'
 
 /**
  * Shared state for reports widgets on the home dashboard. Overdue
@@ -6,6 +7,17 @@ import type { OverdueInvoice } from '~~/app/types'
  * attention panel.
  */
 export function useHomeReports() {
+  // Inside a widget example (Settings → Widgets) the list is made up,
+  // nothing is fetched and the shared state is left alone (ADR 0040).
+  if (useWidgetPreview()) {
+    const sample = sampleOverdueInvoices()
+    return {
+      overdue: readonly(ref(sample)),
+      overdueLoaded: readonly(ref(true)),
+      loadOverdue: async () => sample
+    }
+  }
+
   const { fetchOverdueInvoices } = useReports()
 
   const overdue = useState<OverdueInvoice[]>('reports.home:overdue', () => [])

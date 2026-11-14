@@ -164,6 +164,12 @@ export const PERMISSIONS = {
     agreementRead: 'commissions.agreement.read',
     agreementWrite: 'commissions.agreement.write'
   },
+  memberships: {
+    planRead: 'memberships.plan.read',
+    planWrite: 'memberships.plan.write',
+    membershipRead: 'memberships.membership.read',
+    membershipWrite: 'memberships.membership.write'
+  },
   liquidations: {
     settlementRead: 'liquidations.settlement.read',
     settlementIssue: 'liquidations.settlement.issue',

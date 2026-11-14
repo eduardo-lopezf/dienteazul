@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.models import Clinic
@@ -97,6 +97,18 @@ class ConsentService:
             query = query.where(Consent.status != "discarded")
         result = await db.execute(query.order_by(Consent.created_at.desc()))
         return list(result.scalars())
+
+    @staticmethod
+    async def list_unsigned(
+        db: AsyncSession, clinic_id: UUID, limit: int
+    ) -> tuple[list[Consent], int]:
+        """The clinic's drafts nobody has signed yet, oldest first, and how many."""
+        where = (Consent.clinic_id == clinic_id, Consent.status == "draft")
+        total = await db.scalar(select(func.count()).select_from(Consent).where(*where)) or 0
+        rows = await db.execute(
+            select(Consent).where(*where).order_by(Consent.created_at, Consent.id).limit(limit)
+        )
+        return list(rows.scalars()), total
 
     @staticmethod
     async def get(db: AsyncSession, clinic_id: UUID, consent_id: UUID) -> Consent | None:

@@ -101,6 +101,9 @@ class PaymentAllocation(Base, TimestampMixin):
       for anticipos and partial cobros on treatments-in-progress.
     - ``on_account``— patient credit balance with no specific budget.
       Reassignable later when an invoice is issued.
+    - ``membership``— a membership fee (``MembershipFees``). Booked with an
+      earned entry of the same amount, so it never reads as credit or
+      reduces what the patient owes for treatments. Never reallocated.
 
     Allocations to a specific Invoice live in the billing module's
     ``invoice_payments`` table — that link sits on the billing side so
@@ -123,6 +126,12 @@ class PaymentAllocation(Base, TimestampMixin):
     budget_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("budgets.id", ondelete="RESTRICT"), nullable=True, default=None, index=True
     )
+    # The membership period a fee paid for (``target_type == 'membership'``),
+    # recorded through ``MembershipFees``. No FK: `memberships` is another
+    # App's module and payments must not depend on it.
+    membership_period_id: Mapped[UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, default=None
+    )
 
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
 
@@ -137,8 +146,12 @@ class PaymentAllocation(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_alloc_amount_positive"),
         CheckConstraint(
-            "(target_type = 'budget' AND budget_id IS NOT NULL) "
-            "OR (target_type = 'on_account' AND budget_id IS NULL)",
+            "(target_type = 'budget' AND budget_id IS NOT NULL "
+            "AND membership_period_id IS NULL) "
+            "OR (target_type = 'on_account' AND budget_id IS NULL "
+            "AND membership_period_id IS NULL) "
+            "OR (target_type = 'membership' AND budget_id IS NULL "
+            "AND membership_period_id IS NOT NULL)",
             name="ck_alloc_target_consistency",
         ),
         Index("idx_alloc_payment", "payment_id"),
@@ -150,6 +163,8 @@ class PaymentAllocation(Base, TimestampMixin):
         """Public accessor over the heterogeneous target reference."""
         if self.target_type == "budget":
             return self.budget_id
+        if self.target_type == "membership":
+            return self.membership_period_id
         return None
 
 

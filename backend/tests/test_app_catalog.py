@@ -179,6 +179,13 @@ def test_an_optional_module_is_outside_until_switched_on(apps_file) -> None:
     assert "agenda" not in modules_outside(None, "clinic")
 
 
+def test_shipped_memberships_is_off_until_a_clinic_switches_it_on() -> None:
+    patients = _app("patients")
+    assert [(m.name, m.tiers) for m in patients.optional_modules] == [("memberships", ("clinic",))]
+    assert "memberships" in modules_outside(None, "clinic")
+    assert "memberships" not in modules_outside(None, "clinic", ["memberships"])
+
+
 def test_an_api_status_must_be_known(apps_file) -> None:
     apps_file([{**AGENDA, "apis": [{"name": "google_calendar", "status": "soon"}]}])
 

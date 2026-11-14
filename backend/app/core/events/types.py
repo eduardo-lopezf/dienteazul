@@ -139,6 +139,15 @@ class EventType:
     PAYMENT_REFUNDED = "payment.refunded"
     PAYMENT_VOIDED = "payment.voided"
 
+    # Membership events (`memberships`). enrolled: (clinic_id, membership_id,
+    # patient_id, plan_id, starts_on). period_paid: (clinic_id,
+    # membership_id, period_id, patient_id, amount, starts_on, ends_on,
+    # payment_id). cancelled: (clinic_id, membership_id, patient_id,
+    # paid_through).
+    MEMBERSHIP_ENROLLED = "membership.enrolled"
+    MEMBERSHIP_PERIOD_PAID = "membership.period_paid"
+    MEMBERSHIP_CANCELLED = "membership.cancelled"
+
     # Credit note events
     CREDIT_NOTE_ISSUED = "credit_note.issued"
 

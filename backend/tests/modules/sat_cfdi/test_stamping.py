@@ -28,7 +28,11 @@ from app.modules.sat_cfdi.stamping import stamp_due
 
 from .conftest import FakePac, configure_issuer
 
-LATER = datetime.now(UTC) + timedelta(hours=1)
+
+def _later() -> datetime:
+    """Past the stamping delay, counted from now: a module-level constant
+    goes stale when the suite runs for hours."""
+    return datetime.now(UTC) + timedelta(hours=1)
 
 
 @pytest_asyncio.fixture
@@ -131,7 +135,7 @@ async def test_an_unpaid_invoice_is_stamped_ppd(
 ) -> None:
     invoice = await _issued(client, auth_headers, db_session, ready, test_patient)
 
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
 
     [payload] = fake_pac.stamped
     assert (payload["PaymentMethod"], payload["PaymentForm"]) == ("PPD", "99")
@@ -165,7 +169,7 @@ async def test_a_paid_invoice_is_stamped_pue_with_the_largest_payment(
     await _pay(client, auth_headers, invoice, "30.00", "cash")
     await _pay(client, auth_headers, invoice, "70.00", "card")
 
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
 
     [payload] = fake_pac.stamped
     assert (payload["PaymentMethod"], payload["PaymentForm"]) == ("PUE", "04")
@@ -178,7 +182,7 @@ async def test_a_retry_sends_the_same_folio_and_date(
     invoice = await _issued(client, auth_headers, db_session, ready, test_patient)
     fake_pac.fail = PacError("Facturama no respondió", transient=True)
 
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
 
     cfdi = await _cfdi(db_session, invoice)
     assert (cfdi.state, cfdi.attempts, cfdi.last_error) == ("pending", 1, "Facturama no respondió")
@@ -187,10 +191,10 @@ async def test_a_retry_sends_the_same_folio_and_date(
 
     # Not before its next attempt.
     fake_pac.fail = None
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
     assert fake_pac.stamped == []
 
-    await stamp_due(now=LATER + timedelta(hours=2))
+    await stamp_due(now=_later() + timedelta(hours=2))
     [payload] = fake_pac.stamped
     assert payload["Date"] == first_date
     cfdi = await _cfdi(db_session, invoice)
@@ -204,7 +208,7 @@ async def test_a_cfdi_the_sat_refuses_is_rejected(
     invoice = await _issued(client, auth_headers, db_session, ready, test_patient)
     fake_pac.fail = PacError("Facturama lo rechazó: CFDI40147", transient=False)
 
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
 
     cfdi = await _cfdi(db_session, invoice)
     assert (cfdi.state, cfdi.last_error) == ("rejected", "Facturama lo rechazó: CFDI40147")
@@ -213,7 +217,7 @@ async def test_a_cfdi_the_sat_refuses_is_rejected(
 
     # Rejected stays rejected: nothing is sent again by itself.
     fake_pac.fail = None
-    await stamp_due(now=LATER + timedelta(hours=5))
+    await stamp_due(now=_later() + timedelta(hours=5))
     assert fake_pac.stamped == []
 
 
@@ -252,6 +256,6 @@ async def test_only_ingresos_are_stamped_so_far(
     )
     await db_session.commit()
 
-    await stamp_due(now=LATER)
+    await stamp_due(now=_later())
 
     assert fake_pac.stamped == []

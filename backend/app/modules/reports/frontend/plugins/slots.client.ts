@@ -8,6 +8,8 @@ export default defineNuxtPlugin(() => {
   registerSlot('dashboard.hero', {
     id: 'reports.dashboard.overdueHero',
     labelKey: 'settings.home.labels.overdueHero',
+    descriptionKey: 'settings.widgets.catalog.reports.overdueHero.summary',
+    widget: true,
     component: defineAsyncComponent(() => import('../components/home/OverdueHeroTile.vue')),
     order: 30,
     permission: 'reports.billing.read',
@@ -17,6 +19,8 @@ export default defineNuxtPlugin(() => {
   registerSlot('dashboard.attention', {
     id: 'reports.dashboard.overduePanel',
     labelKey: 'settings.home.labels.overduePanel',
+    descriptionKey: 'settings.widgets.catalog.reports.overduePanel.summary',
+    widget: true,
     component: defineAsyncComponent(() => import('../components/home/OverdueInvoicesPanel.vue')),
     order: 20,
     permission: 'reports.billing.read',
@@ -26,6 +30,8 @@ export default defineNuxtPlugin(() => {
   registerSlot('dashboard.activity', {
     id: 'reports.dashboard.weekGlance',
     labelKey: 'settings.home.labels.weekGlance',
+    descriptionKey: 'settings.widgets.catalog.reports.weekGlance.summary',
+    widget: true,
     component: defineAsyncComponent(() => import('../components/home/WeekGlancePanel.vue')),
     order: 20,
     permission: 'reports.billing.read',

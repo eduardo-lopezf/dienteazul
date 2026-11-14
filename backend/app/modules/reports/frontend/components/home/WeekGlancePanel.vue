@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SchedulingSummary } from '../../composables/useReports'
 import type { BillingSummary, Money } from '~~/app/types'
+import { sampleWeekGlance } from '../../utils/previewSamples'
 
 defineProps<{ ctx?: unknown }>()
 
@@ -21,7 +22,18 @@ function isoDate(d: Date): string {
   return d.toISOString().split('T')[0] as string
 }
 
+// Inside a widget example (Settings → Widgets) the figures are made up
+// and nothing is fetched (ADR 0040).
+const preview = useWidgetPreview()
+
 async function load() {
+  if (preview) {
+    const sample = sampleWeekGlance()
+    current.value = sample.current
+    previous.value = sample.previous
+    pending.value = false
+    return
+  }
   const now = new Date()
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const start = new Date(end)

@@ -61,4 +61,24 @@ describe('useModuleSlots', () => {
     const onlyUngated = resolveSlot('ordered.slot', {}, { can: () => false })
     expect(onlyUngated.map(e => e.id)).toEqual(['b'])
   })
+
+  it('lists an entry with tiers only for a clinic of one of them', async () => {
+    const { registerSlot, resolveSlot, listSlotEntries } = await import('~/composables/useModuleSlots')
+    const C = defineComponent({ name: 'C', render: () => h('span', 'c') })
+    const clinic = useState<{ account_tier: string } | null>('clinic:current', () => null)
+
+    registerSlot('tier.slot', { id: 'clinic-only', component: C, tiers: ['clinic'] })
+
+    clinic.value = null
+    expect(resolveSlot('tier.slot', {}, { can: () => true })).toHaveLength(0)
+
+    clinic.value = { account_tier: 'basic' }
+    expect(resolveSlot('tier.slot', {}, { can: () => true })).toHaveLength(0)
+    expect(listSlotEntries().some(({ entry }) => entry.id === 'clinic-only')).toBe(false)
+
+    clinic.value = { account_tier: 'clinic' }
+    expect(resolveSlot('tier.slot', {}, { can: () => true })).toHaveLength(1)
+    expect(listSlotEntries().some(({ entry }) => entry.id === 'clinic-only')).toBe(true)
+    clinic.value = null
+  })
 })

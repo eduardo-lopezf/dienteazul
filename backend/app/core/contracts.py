@@ -559,6 +559,82 @@ class CommissionRates(Protocol):
         """``None`` when nothing has been agreed with this professional."""
 
 
+@dataclass(frozen=True, slots=True)
+class MemberDiscount:
+    """What a patient's membership takes off one treatment.
+
+    ``included`` means a unit of the plan's included services covers it:
+    ``percent`` is then 100.
+    """
+
+    percent: Decimal
+    included: bool
+    plan_name: str
+
+
+class MemberBenefits(Protocol):
+    """What a patient's membership gives on a treatment of the catalogue.
+
+    Supplied by `memberships`; read by `budget`, to suggest the discount on
+    a new line, and by `payments`, to book a performed treatment at what
+    the member pays. ``None`` from :func:`provider` — or from a method,
+    for a clinic without the module on (ADR 0066) or a patient without a
+    membership in force — means full price.
+    """
+
+    async def discount_for(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        patient_id: UUID,
+        catalog_item_id: UUID,
+        on: date,
+    ) -> MemberDiscount | None:
+        """What the membership would take off today. Reads, never consumes."""
+
+    async def apply(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        patient_id: UUID,
+        catalog_item_id: UUID,
+        treatment_id: UUID,
+        on: date,
+    ) -> MemberDiscount | None:
+        """The treatment was performed: consume an included unit if one is
+        left, else the discount. Idempotent per ``treatment_id``: every
+        session of one treatment gets the same answer."""
+
+    async def release(self, db: AsyncSession, clinic_id: UUID, treatment_id: UUID) -> None:
+        """The treatment is no longer performed: give its unit back."""
+
+
+class MembershipFees(Protocol):
+    """Membership fees collected as payments of the patient.
+
+    Supplied by `payments`; used by `memberships`. ``None`` from
+    :func:`provider` means the Budgets and payments App is off: the period
+    is recorded without a payment.
+    """
+
+    async def record(
+        self,
+        db: AsyncSession,
+        clinic_id: UUID,
+        *,
+        patient_id: UUID,
+        period_id: UUID,
+        amount: Decimal,
+        method: str,
+        payment_date: date,
+        recorded_by: UUID,
+        description: str,
+        reference: str | None = None,
+    ) -> UUID:
+        """Record the fee as a payment and the period as what it paid for.
+        Returns the payment id."""
+
+
 def providers(contract: type[T]) -> list[T]:
     """Every running module's implementation of ``contract``.
 

@@ -1,0 +1,127 @@
+{
+  "memberships": {
+    "tab": "Membresía",
+    "none": "Este paciente no tiene membresía.",
+    "enroll": "Inscribir en una membresía",
+    "enrollAgain": "Inscribir de nuevo",
+    "renew": "Registrar cuota",
+    "loadFailed": "No se pudo cargar la membresía",
+    "unnamedTreatment": "Tratamiento no disponible",
+    "coveredUntil": "Beneficios vigentes hasta el {date}",
+    "expiredSince": "Cuota vencida: pagada hasta el {date}",
+    "cancelledNote": "Cancelada: ya no se renueva.",
+    "memberSince": "Miembro desde el {date}",
+    "paymentsOff": "La app Presupuestos y cobros está apagada: las cuotas se registran sin cobro asociado.",
+    "state": {
+      "active": "Vigente",
+      "expired": "Vencida",
+      "cancelled": "Cancelada"
+    },
+    "period": {
+      "monthly": "Mensual",
+      "annual": "Anual",
+      "per": {
+        "monthly": "al mes",
+        "annual": "al año"
+      }
+    },
+    "method": {
+      "cash": "Efectivo",
+      "card": "Tarjeta",
+      "bank_transfer": "Transferencia",
+      "direct_debit": "Domiciliación",
+      "insurance": "Aseguradora",
+      "other": "Otro"
+    },
+    "benefit": {
+      "included": "Incluido",
+      "discount": "Descuento",
+      "perYear": "al año",
+      "kindFor": "Tipo de beneficio para {treatment}",
+      "quantityFor": "Cantidad al año de {treatment}",
+      "percentFor": "Descuento para {treatment}",
+      "remove": "Quitar {treatment}",
+      "includedLine": "{quantity} × {treatment} incluidos al año",
+      "discountLine": "{percent} % de descuento en {treatment}"
+    },
+    "included": {
+      "title": "Servicios incluidos",
+      "cycle": "Año de membresía desde el {date}",
+      "usage": "{used} de {quantity} usados",
+      "none": "El plan no incluye servicios."
+    },
+    "discounts": {
+      "title": "Descuentos",
+      "general": "Resto de tratamientos",
+      "none": "El plan no tiene descuentos."
+    },
+    "periods": {
+      "title": "Cuotas pagadas",
+      "refunded": "Devuelta"
+    },
+    "fee": {
+      "enrollTitle": "Inscribir en una membresía",
+      "renewTitle": "Registrar cuota",
+      "plan": "Plan",
+      "startsOn": "Inicio",
+      "paymentDate": "Fecha de cobro",
+      "method": "Forma de pago",
+      "reference": "Referencia",
+      "collect": "Cobrar {amount}",
+      "collectNone": "Cobrar",
+      "noPlans": "No hay planes activos. Créalos en Configuración → Apps → Pacientes → Planes de membresía.",
+      "planArchived": "El plan de esta membresía está archivado: cambia de plan antes de registrar la cuota.",
+      "enrollHint": "La primera cuota se registra como un cobro del paciente y la membresía queda vigente desde la fecha de inicio.",
+      "renewHint": "La cuota amplía la vigencia a partir del último día pagado. Si venció hace más de una semana, empieza de nuevo en la fecha de cobro.",
+      "enrolled": "Paciente inscrito",
+      "renewed": "Cuota registrada",
+      "failed": "No se pudo registrar la cuota"
+    },
+    "changePlan": {
+      "action": "Cambiar de plan",
+      "title": "Cambiar de plan",
+      "hint": "El cambio se aplica desde la próxima cuota; las ya pagadas conservan su plan.",
+      "noOther": "No hay otro plan activo.",
+      "saved": "Plan cambiado",
+      "failed": "No se pudo cambiar el plan"
+    },
+    "cancel": {
+      "action": "Cancelar",
+      "title": "¿Cancelar la membresía?",
+      "hint": "Deja de renovarse. Los beneficios siguen hasta el {date}, último día pagado.",
+      "keep": "Mantener",
+      "confirm": "Cancelar membresía",
+      "done": "Membresía cancelada",
+      "failed": "No se pudo cancelar la membresía"
+    },
+    "plans": {
+      "title": "Planes de membresía",
+      "back": "Pacientes",
+      "intro": "Lo que la clínica ofrece por una cuota mensual o anual: servicios incluidos y descuentos en tratamientos.",
+      "new": "Nuevo plan",
+      "edit": "Editar plan",
+      "formDescription": "Las cuotas ya pagadas conservan las condiciones con que se cobraron.",
+      "name": "Nombre",
+      "fee": "Cuota",
+      "period": "Periodo",
+      "generalDiscount": "Descuento general",
+      "noDiscount": "Sin descuento",
+      "generalDiscountHint": "En los tratamientos sin beneficio propio.",
+      "generalLine": "{percent} % en el resto",
+      "benefits": "Tratamientos del plan",
+      "benefitsHint": "Incluidos: cuántos al año de membresía, sin costo. Descuento: su propio porcentaje en lugar del general.",
+      "addTreatment": "Añadir tratamiento…",
+      "noCatalogue": "El catálogo de tratamientos no está disponible: no se pueden añadir tratamientos al plan.",
+      "description": "Descripción",
+      "frozenNote": "Editar el plan no cambia las cuotas ya pagadas.",
+      "showArchived": "Mostrar archivados",
+      "archived": "Archivado",
+      "archive": "Archivar",
+      "restore": "Restaurar",
+      "empty": "Todavía no hay planes.",
+      "saved": "Plan guardado",
+      "saveFailed": "No se pudo guardar el plan",
+      "loadFailed": "No se pudieron cargar los planes"
+    }
+  }
+}

@@ -23,7 +23,10 @@
       "version": "0.1",
       "tier": "core",
       "status": "enabled",
-      "modules": ["patients", "patients_clinical", "patient_timeline", "media"]
+      "modules": ["patients", "patients_clinical", "patient_timeline", "media", "memberships"],
+      "optional_modules": [
+        { "name": "memberships", "tiers": ["clinic"] }
+      ]
     },
     {
       "name": "recalls",

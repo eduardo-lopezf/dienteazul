@@ -8,6 +8,8 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core import contracts
+from app.core.contracts import MemberBenefits
 from app.core.list_query import parse_sort
 from app.modules.catalog.models import TreatmentCatalogItem, VatType
 from app.modules.professionals.models import Professional
@@ -115,6 +117,25 @@ class BudgetNumberService:
         return f"{year_prefix}{sequence:04d}"
 
 
+async def _member_discount(
+    db: AsyncSession, clinic_id: UUID, budget_id: UUID, catalog_item_id: UUID
+):
+    """The patient's membership discount on this treatment today
+    (``MemberBenefits``). ``None`` without the Memberships module or a
+    membership in force: the line keeps its list price."""
+    benefits = contracts.provider(MemberBenefits)
+    if benefits is None:
+        return None
+    patient_id = await db.scalar(
+        select(Budget.patient_id).where(Budget.id == budget_id, Budget.clinic_id == clinic_id)
+    )
+    if patient_id is None:
+        return None
+    return await benefits.discount_for(
+        db, clinic_id, patient_id, catalog_item_id, datetime.now(UTC).date()
+    )
+
+
 class BudgetItemService:
     """Service for budget item operations."""
 
@@ -147,6 +168,21 @@ class BudgetItemService:
                 vat_type_id = vat_type.id
                 vat_rate = vat_type.rate
 
+        discount_type = data.get("discount_type")
+        discount_value = data.get("discount_value")
+        notes = data.get("notes")
+        if discount_type is None:
+            member = await _member_discount(db, clinic_id, budget_id, catalog_item.id)
+            if member is not None:
+                # Suggested, not imposed: the line can be edited like any other.
+                discount_type, discount_value = "percentage", member.percent
+                label = (
+                    f"Incluido en membresía {member.plan_name}"
+                    if member.included
+                    else f"Membresía {member.plan_name}"
+                )
+                notes = f"{notes} · {label}" if notes else label
+
         # Create item
         item = BudgetItem(
             clinic_id=clinic_id,
@@ -154,15 +190,15 @@ class BudgetItemService:
             catalog_item_id=data["catalog_item_id"],
             unit_price=unit_price,
             quantity=data.get("quantity", 1),
-            discount_type=data.get("discount_type"),
-            discount_value=data.get("discount_value"),
+            discount_type=discount_type,
+            discount_value=discount_value,
             vat_type_id=vat_type_id,
             vat_rate=vat_rate,
             tooth_number=data.get("tooth_number"),
             surfaces=data.get("surfaces"),
             treatment_id=data.get("treatment_id"),
             display_order=data.get("display_order", 0),
-            notes=data.get("notes"),
+            notes=notes,
         )
 
         # Calculate line totals

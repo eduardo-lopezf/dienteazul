@@ -16,8 +16,11 @@ docker_exec() {
   # Prefer the modern `docker compose` CLI, but fall back to `docker-compose`
   # if the host doesn't support the subcommand. Also prefer `-T` when
   # supported to avoid allocating a TTY for non-interactive commands.
+  # The probes read from /dev/null: otherwise they swallow the caller's
+  # stdin, and a heredoc meant for the real command (the DROP block below)
+  # never reaches it.
   if docker compose version >/dev/null 2>&1; then
-    if docker compose exec -T "$service" true >/dev/null 2>&1; then
+    if docker compose exec -T "$service" true </dev/null >/dev/null 2>&1; then
       docker compose exec -T "$service" "$@"
     else
       docker compose exec "$service" "$@"
@@ -27,7 +30,7 @@ docker_exec() {
 
   # Fallback to docker-compose
   if docker-compose version >/dev/null 2>&1; then
-    if docker-compose exec -T "$service" true >/dev/null 2>&1; then
+    if docker-compose exec -T "$service" true </dev/null >/dev/null 2>&1; then
       docker-compose exec -T "$service" "$@"
     else
       docker-compose exec "$service" "$@"
@@ -43,7 +46,7 @@ docker_exec() {
 docker_exec db psql -U dental -d dental_clinic -c "DELETE FROM alembic_version;" 2>/dev/null || true
 
 # Drop all tables (in correct order to handle foreign keys)
-docker_exec db psql -U dental -d dental_clinic << 'EOF'
+docker_exec db psql -U dental -d dental_clinic -v ON_ERROR_STOP=1 << 'EOF'
 DO $$
 DECLARE
     r RECORD;

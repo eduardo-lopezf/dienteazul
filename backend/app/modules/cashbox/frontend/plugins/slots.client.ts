@@ -19,6 +19,18 @@ export default defineNuxtPlugin(() => {
     order: 30
   })
 
+  // Home — the same tile: an uncounted day is found the next morning,
+  // not when a discrepancy is hunted (ADR 0040 widget).
+  registerSlot('dashboard.hero', {
+    id: 'cashbox.dashboard.till',
+    labelKey: 'settings.widgets.catalog.cash.till.title',
+    descriptionKey: 'settings.widgets.catalog.cash.till.summary',
+    widget: true,
+    component: defineAsyncComponent(() => import('../components/finance/SummaryTill.vue')),
+    permission: 'cashbox.closing.read',
+    order: 40
+  })
+
   registerSlot('finance.tabs', {
     id: 'cashbox.finance.tabs',
     component: defineAsyncComponent(() => import('../components/finance/CashboxTab.vue')),

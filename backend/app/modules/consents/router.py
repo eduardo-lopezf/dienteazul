@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.dependencies import ClinicContext, get_clinic_context, require_permission
+from app.core.contracts import PatientDirectory, provider
 from app.core.errors import AppError
 from app.core.schemas import ApiResponse
 from app.database import get_db
@@ -25,6 +26,8 @@ from .schemas import (
     TemplateCreate,
     TemplateResponse,
     TemplateUpdate,
+    UnsignedConsent,
+    UnsignedConsents,
 )
 from .service import ConsentError, ConsentService, ConsentStateError, TemplateService
 
@@ -134,6 +137,36 @@ async def create_consent(
     except ConsentError as error:
         raise _refuse(error) from error
     return ApiResponse(data=ConsentResponse.model_validate(consent))
+
+
+@router.get("/unsigned", response_model=ApiResponse[UnsignedConsents])
+async def list_unsigned(
+    ctx: Ctx, _: CanRead, db: Db, limit: int = Query(default=5, ge=1, le=50)
+) -> ApiResponse[UnsignedConsents]:
+    """The clinic's drafts still waiting for a signature, oldest first.
+
+    Declared before ``/{consent_id}`` so the literal path wins.
+    """
+    consents, total = await ConsentService.list_unsigned(db, ctx.clinic_id, limit)
+    patients = provider(PatientDirectory)
+    briefs = (
+        await patients.briefs(db, ctx.clinic_id, {c.patient_id for c in consents})
+        if patients is not None
+        else {}
+    )
+    items = [
+        UnsignedConsent(
+            id=c.id,
+            patient_id=c.patient_id,
+            first_name=briefs[c.patient_id].first_name if c.patient_id in briefs else None,
+            last_name=briefs[c.patient_id].last_name if c.patient_id in briefs else None,
+            kind=c.kind,
+            title=c.title,
+            created_at=c.created_at,
+        )
+        for c in consents
+    ]
+    return ApiResponse(data=UnsignedConsents(total=total, items=items))
 
 
 @router.get("/{consent_id}", response_model=ApiResponse[ConsentResponse])

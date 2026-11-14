@@ -1349,8 +1349,11 @@ class TreatmentPlanService:
         await db.flush()
 
         patient_id_str: str | None = None
+        catalog_item_id_str: str | None = None
         if item.treatment:
             patient_id_str = str(item.treatment.patient_id)
+            if item.treatment.catalog_item_id:
+                catalog_item_id_str = str(item.treatment.catalog_item_id)
 
         event_bus.publish_after_commit(
             db,
@@ -1365,6 +1368,7 @@ class TreatmentPlanService:
                 "amount": str(session.amount),
                 "treatment_id": str(item.treatment_id),
                 "patient_id": patient_id_str,
+                "catalog_item_id": catalog_item_id_str,
                 "completed_by": str(user_id),
                 "occurred_at": session.completed_at.isoformat(),
             },

@@ -187,6 +187,7 @@ def test_patients_and_professionals_are_apps() -> None:
         "patients_clinical",
         "patient_timeline",
         "media",
+        "memberships",
     )
     assert apps["professionals"].modules == ("professionals", "commissions")
     assert apps["patients"].enabled and apps["professionals"].enabled

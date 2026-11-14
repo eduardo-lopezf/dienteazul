@@ -1603,6 +1603,52 @@
       "viewAll": "Ver todas",
       "empty": "Sin facturas vencidas"
     },
+    "awaitingPlans": {
+      "title": "Planes esperando respuesta",
+      "empty": "Ningún plan espera la respuesta del paciente",
+      "all": "Ver los {n} planes",
+      "days": "hoy | hace {n} día | hace {n} días"
+    },
+    "teamWorkload": {
+      "title": "Carga del equipo",
+      "empty": "No hay profesionales activos",
+      "all": "Ver profesionales",
+      "upcoming": "sin citas próximas | {n} cita próxima | {n} citas próximas",
+      "plans": "sin planes en curso | {n} plan en curso | {n} planes en curso"
+    },
+    "expiringBudgets": {
+      "title": "Presupuestos a punto de caducar",
+      "empty": "Ningún presupuesto pendiente caduca en los próximos {n} días",
+      "all": "Ver presupuestos",
+      "until": "hasta el {date}",
+      "more": "y {n} más"
+    },
+    "failedMessages": {
+      "title": "Mensajes no entregados",
+      "empty": "Todos los mensajes se han entregado",
+      "settings": "Configurar notificaciones",
+      "more": "y {n} más"
+    },
+    "stockAlerts": {
+      "title": "Alertas de stock",
+      "empty": "El stock está en orden",
+      "all": "Ver inventario",
+      "low_stock": "Bajo mínimos · {n}",
+      "expiring": "Caducan pronto · {n}",
+      "expired": "Caducados · {n}",
+      "expiresOn": "caduca el {date}",
+      "expiredOn": "caducó el {date}"
+    },
+    "unsignedConsents": {
+      "title": "Consentimientos sin firmar",
+      "empty": "No hay consentimientos pendientes de firma",
+      "more": "y {n} más",
+      "kinds": {
+        "informed": "informado",
+        "data_use": "uso de datos",
+        "conformity": "conformidad"
+      }
+    },
     "recent": {
       "title": "Pacientes recientes",
       "empty": "No hay pacientes aún"
@@ -1920,6 +1966,64 @@
           "quickActions": {
             "title": "Acciones rápidas",
             "summary": "Atajos para dar cita o subir un documento desde el resumen del paciente."
+          }
+        },
+        "treatments": {
+          "awaitingPlans": {
+            "title": "Planes esperando respuesta",
+            "summary": "Planes que esperan la respuesta del paciente, con los días que llevan así."
+          }
+        },
+        "professionals": {
+          "teamWorkload": {
+            "title": "Carga del equipo",
+            "summary": "Citas próximas y planes en curso de cada profesional. Solo en clínicas."
+          }
+        },
+        "recalls": {
+          "due": {
+            "summary": "Recordatorios de esta semana y vencidos, con los agendados del mes y la tasa de conversión."
+          }
+        },
+        "reports": {
+          "overdueHero": {
+            "summary": "Cuántos pagos están vencidos y cuánto suman."
+          },
+          "overduePanel": {
+            "summary": "Las facturas vencidas más antiguas, con lo que falta por cobrar."
+          },
+          "weekGlance": {
+            "summary": "Citas, completadas y facturado de los últimos 7 días frente a los 7 anteriores."
+          }
+        },
+        "budgets_payments": {
+          "expiringBudgets": {
+            "title": "Presupuestos a punto de caducar",
+            "summary": "Presupuestos pendientes de aceptar que caducan en los próximos 7 días."
+          }
+        },
+        "cash": {
+          "till": {
+            "title": "Arqueo de caja",
+            "summary": "Los días de la quincena con dinero que aún no se han contado."
+          }
+        },
+        "communications": {
+          "failedMessages": {
+            "title": "Mensajes no entregados",
+            "summary": "Emails y WhatsApp a pacientes que no se pudieron entregar, con el motivo."
+          }
+        },
+        "inventory": {
+          "stockAlerts": {
+            "title": "Alertas de stock",
+            "summary": "Artículos bajo mínimos y lotes que caducan pronto o ya han caducado."
+          }
+        },
+        "clinical_record": {
+          "unsignedConsents": {
+            "title": "Consentimientos sin firmar",
+            "summary": "Cartas de consentimiento redactadas que el paciente aún no ha firmado, las más antiguas primero."
           }
         }
       }

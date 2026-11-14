@@ -51,6 +51,18 @@ MEMBERSHIP_HYGIENIST_ID = UUID("c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a35")
 MEMBERSHIP_ASSISTANT_ID = UUID("c3eebc99-9c0b-4ef8-bb6d-6bb9bd380a36")
 MEMBERSHIP_RECEPTIONIST_ID = UUID("c4eebc99-9c0b-4ef8-bb6d-6bb9bd380a37")
 
+# Individual practice — a second tenant, one professional (``advanced``:
+# individual, and sold under every custody mode, so no deployment warns).
+SOLO_CLINIC_ID = UUID("a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12")
+SOLO_USER_ID = UUID("b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a27")
+SOLO_MEMBERSHIP_ID = UUID("c5eebc99-9c0b-4ef8-bb6d-6bb9bd380a38")
+
+# Unsigned consent drafts (home widget "Consentimientos sin firmar").
+CONSENT_DRAFT_IDS = [
+    UUID("e0eebc99-9c0b-4ef8-bb6d-6bb9bd380b01"),
+    UUID("e1eebc99-9c0b-4ef8-bb6d-6bb9bd380b02"),
+]
+
 # Patients (15 patients) - Using hex digits only (0-9, a-f)
 PATIENT_IDS = [
     UUID("d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a40"),
@@ -133,6 +145,61 @@ USERS_I18N = {
         "en": {"first_name": "Jessica", "last_name": "Brown"},
     },
 }
+
+
+def get_consent_drafts_data() -> list[dict]:
+    """Two letters written and never signed, in current language.
+
+    The body is marked as sample text on purpose: no wording that reads as
+    legal advice ships with the demo (consents/CLAUDE.md).
+    """
+    sample = t(
+        {
+            "es": "[Texto de ejemplo de la demo — sustitúyelo por el de tu clínica.]",
+            "en": "[Demo sample text — replace it with your clinic's own.]",
+        }
+    )
+    return [
+        {
+            "id": CONSENT_DRAFT_IDS[0],
+            "patient_id": PATIENT_IDS[6],
+            "kind": "informed",
+            "title": t({"es": "Extracción del 38", "en": "Extraction of tooth 38"}),
+            "procedure_label": t({"es": "Pieza 38", "en": "Tooth 38"}),
+            "body": sample,
+            "days_ago": 6,
+        },
+        {
+            "id": CONSENT_DRAFT_IDS[1],
+            "patient_id": PATIENT_IDS[9],
+            "kind": "data_use",
+            "title": t({"es": "Aviso de privacidad", "en": "Privacy notice"}),
+            "procedure_label": None,
+            "body": sample,
+            "days_ago": 2,
+        },
+    ]
+
+
+def get_solo_practice_data() -> dict:
+    """The individual practice and its holder, in current language."""
+    return {
+        "clinic": {
+            "id": SOLO_CLINIC_ID,
+            "name": t({"es": "Consultorio Dra. Ruiz", "en": "Dr. Ruiz Dental Practice"}),
+            "tax_id": t({"es": "B87654321", "en": "98-7654321"}),
+            "account_tier": "advanced",
+            "cabinet": t({"es": "Consultorio", "en": "Office"}),
+        },
+        "user": {
+            "id": SOLO_USER_ID,
+            "email": "solo@demo.clinic",
+            "first_name": t({"es": "Elena", "en": "Elena"}),
+            "last_name": t({"es": "Ruiz Navarro", "en": "Ruiz"}),
+            "professional_id": t({"es": "28/67890", "en": "DDS-67890"}),
+            "membership_id": SOLO_MEMBERSHIP_ID,
+        },
+    }
 
 
 def get_users_data() -> list[dict]:

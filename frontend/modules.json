@@ -4,31 +4,32 @@
     "/module_layers/budget/frontend",
     "/module_layers/payments/frontend",
     "/module_layers/billing/frontend",
+    "/module_layers/calendar_feed/frontend",
     "/module_layers/cashbox/frontend",
     "/module_layers/catalog/frontend",
     "/module_layers/patients/frontend",
     "/module_layers/media/frontend",
+    "/module_layers/professionals/frontend",
+    "/module_layers/commissions/frontend",
     "/module_layers/consents/frontend",
     "/module_layers/copilot/frontend",
+    "/module_layers/inventory/frontend",
     "/module_layers/liquidations/frontend",
+    "/module_layers/memberships/frontend",
     "/module_layers/migration_import/frontend",
     "/module_layers/notifications/frontend",
     "/module_layers/odontogram/frontend",
     "/module_layers/patient_timeline/frontend",
     "/module_layers/patients_clinical/frontend",
-    "/module_layers/professionals/frontend",
+    "/module_layers/purchasing/frontend",
     "/module_layers/recalls/frontend",
     "/module_layers/record/frontend",
     "/module_layers/reports/frontend",
+    "/module_layers/sat_cfdi/frontend",
     "/module_layers/schedules/frontend",
     "/module_layers/treatment_plan/frontend",
-    "/module_layers/calendar_feed/frontend",
     "/module_layers/clinical_notes/frontend",
-    "/module_layers/commissions/frontend",
-    "/module_layers/inventory/frontend",
-    "/module_layers/periodontogram/frontend",
-    "/module_layers/purchasing/frontend",
-    "/module_layers/sat_cfdi/frontend"
+    "/module_layers/periodontogram/frontend"
   ],
   "modules": [
     {
@@ -48,6 +49,10 @@
       "path": "/module_layers/billing/frontend"
     },
     {
+      "name": "calendar_feed",
+      "path": "/module_layers/calendar_feed/frontend"
+    },
+    {
       "name": "cashbox",
       "path": "/module_layers/cashbox/frontend"
     },
@@ -64,6 +69,14 @@
       "path": "/module_layers/media/frontend"
     },
     {
+      "name": "professionals",
+      "path": "/module_layers/professionals/frontend"
+    },
+    {
+      "name": "commissions",
+      "path": "/module_layers/commissions/frontend"
+    },
+    {
       "name": "consents",
       "path": "/module_layers/consents/frontend"
     },
@@ -72,8 +85,16 @@
       "path": "/module_layers/copilot/frontend"
     },
     {
+      "name": "inventory",
+      "path": "/module_layers/inventory/frontend"
+    },
+    {
       "name": "liquidations",
       "path": "/module_layers/liquidations/frontend"
+    },
+    {
+      "name": "memberships",
+      "path": "/module_layers/memberships/frontend"
     },
     {
       "name": "migration_import",
@@ -96,8 +117,8 @@
       "path": "/module_layers/patients_clinical/frontend"
     },
     {
-      "name": "professionals",
-      "path": "/module_layers/professionals/frontend"
+      "name": "purchasing",
+      "path": "/module_layers/purchasing/frontend"
     },
     {
       "name": "recalls",
@@ -112,6 +133,10 @@
       "path": "/module_layers/reports/frontend"
     },
     {
+      "name": "sat_cfdi",
+      "path": "/module_layers/sat_cfdi/frontend"
+    },
+    {
       "name": "schedules",
       "path": "/module_layers/schedules/frontend"
     },
@@ -120,32 +145,12 @@
       "path": "/module_layers/treatment_plan/frontend"
     },
     {
-      "name": "calendar_feed",
-      "path": "/module_layers/calendar_feed/frontend"
-    },
-    {
       "name": "clinical_notes",
       "path": "/module_layers/clinical_notes/frontend"
     },
     {
-      "name": "commissions",
-      "path": "/module_layers/commissions/frontend"
-    },
-    {
-      "name": "inventory",
-      "path": "/module_layers/inventory/frontend"
-    },
-    {
       "name": "periodontogram",
       "path": "/module_layers/periodontogram/frontend"
-    },
-    {
-      "name": "purchasing",
-      "path": "/module_layers/purchasing/frontend"
-    },
-    {
-      "name": "sat_cfdi",
-      "path": "/module_layers/sat_cfdi/frontend"
     }
   ],
   "version": 1

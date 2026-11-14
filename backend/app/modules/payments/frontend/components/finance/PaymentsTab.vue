@@ -222,13 +222,16 @@ function allocationBreakdown(p: PaymentRecord): Array<{ label: string, amount: s
   const out: Array<{ label: string, amount: string }> = []
   let toBudget = 0
   let onAccount = 0
+  let membership = 0
   for (const a of p.allocations ?? []) {
     const amount = Number(a.amount)
     if (a.target_type === 'budget') toBudget += amount
     else if (a.target_type === 'on_account') onAccount += amount
+    else if (a.target_type === 'membership') membership += amount
   }
   if (toBudget) out.push({ label: t('payments.new.allocationToBudget'), amount: formatCurrency(toBudget) })
   if (onAccount) out.push({ label: t('payments.new.allocationOnAccount'), amount: formatCurrency(onAccount) })
+  if (membership) out.push({ label: t('payments.new.allocationMembership'), amount: formatCurrency(membership) })
   return out
 }
 

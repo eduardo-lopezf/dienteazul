@@ -7,6 +7,18 @@ import { registerSlot } from '~~/app/composables/useModuleSlots'
 export default defineNuxtPlugin(() => {
   const { can } = usePermissions()
 
+  // Home — budgets awaiting acceptance that lapse within a week
+  // (ADR 0040 widget).
+  registerSlot('dashboard.attention', {
+    id: 'budget.dashboard.expiring',
+    labelKey: 'settings.widgets.catalog.budgets_payments.expiringBudgets.title',
+    descriptionKey: 'settings.widgets.catalog.budgets_payments.expiringBudgets.summary',
+    widget: true,
+    component: defineAsyncComponent(() => import('../components/home/ExpiringBudgetsPanel.vue')),
+    permission: 'budget.read',
+    order: 40
+  })
+
   // Tab of the host's Finanzas page. The host owns the page and the
   // sidebar entry; this module owns its own list and never learns about
   // its sibling tabs. Uninstalling the module removes the tab.
